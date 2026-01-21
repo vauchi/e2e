@@ -1,0 +1,62 @@
+[package]
+name = "vauchi-e2e-tests"
+version = "0.1.0"
+edition = "2021"
+description = "End-to-end testing infrastructure for Vauchi"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+# Core library (git dependency with strict version pinning)
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.1.0" }
+
+# Async runtime
+tokio = { version = "1", features = ["full", "process", "time", "sync"] }
+
+# Async trait support
+async-trait = "0.1"
+
+# Temp directories for isolated test data
+tempfile = "3"
+
+# CLI subprocess testing
+assert_cmd = "2"
+predicates = "3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Async utilities
+futures = "0.3"
+
+[dev-dependencies]
+# Relay for integration tests (git dependency with strict version pinning)
+vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", tag = "v0.1.0" }
+
+[[test]]
+name = "five_user_exchange"
+path = "tests/five_user_exchange.rs"
+
+[[test]]
+name = "multi_device_sync"
+path = "tests/multi_device_sync.rs"
+
+[[test]]
+name = "relay_failover"
+path = "tests/relay_failover.rs"
+
+[[test]]
+name = "offline_catchup"
+path = "tests/offline_catchup.rs"
+
+[[test]]
+name = "cross_platform"
+path = "tests/cross_platform.rs"

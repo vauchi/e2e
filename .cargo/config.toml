@@ -1,0 +1,6 @@
+# Local development: use path dependencies instead of git
+[patch."https://gitlab.com/vauchi/core.git"]
+vauchi-core = { path = "../core/vauchi-core" }
+
+[patch."https://gitlab.com/vauchi/relay.git"]
+vauchi-relay = { path = "../relay" }
