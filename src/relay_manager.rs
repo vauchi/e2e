@@ -148,9 +148,8 @@ impl RelayManager {
             return Ok(debug_path);
         }
 
-        // Fall back to cargo run
         Err(E2eError::relay(
-            "Relay binary not found. Please run `cargo build -p vauchi-relay` first.",
+            "Relay binary not found. Please run `just build-relay` first.",
         ))
     }
 

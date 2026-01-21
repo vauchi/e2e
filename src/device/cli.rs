@@ -62,20 +62,20 @@ impl CliDevice {
     fn find_cli_binary() -> E2eResult<PathBuf> {
         // Try release binary first
         let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/release/vauchi-cli");
+            .join("../target/release/vauchi");
         if release_path.exists() {
             return Ok(release_path);
         }
 
         // Try debug binary
         let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/debug/vauchi-cli");
+            .join("../target/debug/vauchi");
         if debug_path.exists() {
             return Ok(debug_path);
         }
 
         Err(E2eError::cli_execution(
-            "CLI binary not found. Please run `cargo build -p vauchi-cli` first.",
+            "CLI binary not found. Please run `just build-cli` first.",
         ))
     }
 
@@ -355,11 +355,12 @@ impl Device for CliDevice {
         Self::extract_qr_data(&output)
     }
 
-    async fn join_identity(&self, qr_data: &str, _device_name: &str) -> E2eResult<String> {
-        // The join command needs device name input - we may need to handle this differently
-        // For now, run the command and extract request data
-        // Note: device_name would be passed via stdin for interactive prompts in the real CLI
-        let output = self.run_command_success(&["device", "join", qr_data]).await?;
+    async fn join_identity(&self, qr_data: &str, device_name: &str) -> E2eResult<String> {
+        let output = self.run_command_success(&[
+            "device", "join", qr_data,
+            "--device-name", device_name,
+            "--yes"
+        ]).await?;
         Self::extract_qr_data(&output)
     }
 
