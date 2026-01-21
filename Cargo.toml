@@ -6,8 +6,10 @@ description = "End-to-end testing infrastructure for Vauchi"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-# Core library (git dependency with strict version pinning)
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.1.0" }
+# Core library - path dependency for local development
+# Switch to git dependency after repos are created on GitLab:
+# vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.1.0" }
+vauchi-core = { path = "../core/vauchi-core" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
@@ -38,8 +40,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures = "0.3"
 
 [dev-dependencies]
-# Relay for integration tests (git dependency with strict version pinning)
-vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", tag = "v0.1.0" }
+# Relay for integration tests - path dependency for local development
+# Switch to git dependency after repos are created on GitLab:
+# vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", tag = "v0.1.0" }
+vauchi-relay = { path = "../relay" }
 
 [[test]]
 name = "five_user_exchange"
