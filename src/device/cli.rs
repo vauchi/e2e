@@ -132,35 +132,84 @@ impl CliDevice {
     }
 
     /// Parse contacts from CLI output.
+    ///
+    /// Handles the tabled output format:
+    /// ```text
+    /// Contacts (1):
+    ///
+    /// ╭───┬──────┬─────────────┬──────────────╮
+    /// │ # │ Name │ ID          │ Status       │
+    /// ├───┼──────┼─────────────┼──────────────┤
+    /// │ 1 │ Bob  │ bcdbedd4... │ not verified │
+    /// ╰───┴──────┴─────────────┴──────────────╯
+    /// ```
     fn parse_contacts(output: &str) -> Vec<Contact> {
         let mut contacts = Vec::new();
 
         for line in output.lines() {
-            // Skip header lines and empty lines
             let line = line.trim();
+
+            // Skip empty lines, headers, and decorations
             if line.is_empty()
-                || line.starts_with("Name")
-                || line.starts_with("─")
-                || line.starts_with("=")
+                || line.starts_with("Contacts")
                 || line.starts_with("No contacts")
+                || line.starts_with("ℹ")
+                // Skip Unicode box-drawing borders
+                || line.starts_with('╭')
+                || line.starts_with('├')
+                || line.starts_with('╰')
+                || line.starts_with('─')
+                || line.starts_with('=')
             {
                 continue;
             }
 
-            // Try to parse contact line
-            // Format varies but typically: "Name" or "Name (id...)"
-            let name = if let Some(paren_pos) = line.find('(') {
-                line[..paren_pos].trim().to_string()
-            } else {
-                line.to_string()
-            };
+            // Parse table row: │ # │ Name │ ID │ Status │
+            if line.starts_with('│') {
+                let parts: Vec<&str> = line
+                    .split('│')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
 
-            if !name.is_empty() {
-                contacts.push(Contact {
-                    name,
-                    id: None, // Could parse from output if needed
-                    verified: false,
-                });
+                // Expected: [#, Name, ID, Status]
+                // Skip header row (where first column is "#" or "Name")
+                if parts.len() >= 2 {
+                    let first = parts[0];
+                    // Skip if first column is a header
+                    if first == "#" || first == "Name" {
+                        continue;
+                    }
+                    // Data row: first is index number, second is name
+                    if first.parse::<usize>().is_ok() && parts.len() >= 2 {
+                        let name = parts[1].to_string();
+                        let id = parts.get(2).map(|s| s.trim_end_matches("...").to_string());
+                        let verified = parts.get(3).map(|s| s.contains('✓')).unwrap_or(false);
+
+                        if !name.is_empty() {
+                            contacts.push(Contact {
+                                name,
+                                id,
+                                verified,
+                            });
+                        }
+                    }
+                }
+            } else {
+                // Fallback for plain text format: "Name" or "Name (id...)"
+                let name = if let Some(paren_pos) = line.find('(') {
+                    line[..paren_pos].trim().to_string()
+                } else {
+                    line.to_string()
+                };
+
+                if !name.is_empty() && !name.starts_with("Name") {
+                    contacts.push(Contact {
+                        name,
+                        id: None,
+                        verified: false,
+                    });
+                }
             }
         }
 
@@ -470,14 +519,22 @@ mod tests {
     #[test]
     fn test_parse_contacts_with_data() {
         let output = r#"
-Name          Status
-─────────────────────
-Alice Smith   Active
-Bob Jones     Active
+Contacts (2):
+
+╭───┬─────────────┬─────────────┬──────────────╮
+│ # │ Name        │ ID          │ Status       │
+├───┼─────────────┼─────────────┼──────────────┤
+│ 1 │ Alice Smith │ abc123...   │ ✓ verified   │
+│ 2 │ Bob Jones   │ def456...   │ not verified │
+╰───┴─────────────┴─────────────┴──────────────╯
 "#;
         let contacts = CliDevice::parse_contacts(output);
         assert_eq!(contacts.len(), 2);
-        assert_eq!(contacts[0].name, "Alice Smith   Active");
+        assert_eq!(contacts[0].name, "Alice Smith");
+        assert_eq!(contacts[0].id, Some("abc123".to_string()));
+        assert!(contacts[0].verified);
+        assert_eq!(contacts[1].name, "Bob Jones");
+        assert!(!contacts[1].verified);
     }
 
     #[test]
