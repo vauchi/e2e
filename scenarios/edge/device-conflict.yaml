@@ -1,0 +1,99 @@
+# Device Conflict - Edge case test
+# Tests: Concurrent edits on multiple devices converge correctly
+# Feature: sync_updates.feature
+
+name: "Concurrent Multi-Device Edits"
+description: |
+  Tests that simultaneous card edits on multiple devices converge
+  correctly after sync. Uses last-write-wins semantics.
+feature: "sync_updates.feature"
+tags: ["edge", "conflict", "multi-device"]
+timeout: 120s
+
+participants:
+  alice:
+    devices: 3
+    platform: any
+
+relay_config:
+  count: 1
+
+steps:
+  # Create identity on primary device
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  # Link all devices
+  - type: action
+    action: link_devices
+    actor: alice
+
+  # Sync to propagate identity to all devices
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Simulate concurrent offline edits by not syncing between edits
+  # Each device adds a different field
+
+  # Device 1 adds phone field
+  - type: action
+    action: add_field
+    actor: alice.device0
+    params:
+      field_type: "phone"
+      label: "Phone 1"
+      value: "+1-111-1111"
+
+  # Device 2 adds different phone (simulating concurrent edit)
+  - type: action
+    action: add_field
+    actor: alice.device1
+    params:
+      field_type: "phone"
+      label: "Phone 2"
+      value: "+2-222-2222"
+
+  # Device 3 adds yet another phone
+  - type: action
+    action: add_field
+    actor: alice.device2
+    params:
+      field_type: "phone"
+      label: "Phone 3"
+      value: "+3-333-3333"
+
+  # Now sync all devices - they should converge
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Wait for convergence
+  - type: wait
+    duration: 1s
+    reason: "Allow sync to complete"
+
+  # Sync again to ensure full propagation
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Verify all devices have converged
+  - type: assertion
+    assertion: cards_converged
+    actor: alice
+
+manual_instructions:
+  - "Alice: Create identity on Device 1"
+  - "Alice: Link Device 2 and Device 3"
+  - "All devices: Enable airplane mode"
+  - "Device 1: Add phone field +1-111-1111"
+  - "Device 2: Add phone field +2-222-2222"
+  - "Device 3: Add phone field +3-333-3333"
+  - "All devices: Disable airplane mode"
+  - "All devices: Sync"
+  - "Verify: All devices show the same card content"
+  - "Note: Due to last-write-wins, exact value depends on sync order"

@@ -1,0 +1,90 @@
+# Basic Sync - Smoke test for card updates
+# Tests: Card update propagates via sync
+# Feature: sync_updates.feature
+
+name: "Basic Card Sync"
+description: "Card update propagates from one user to another"
+feature: "sync_updates.feature"
+tags: ["smoke", "sync"]
+timeout: 60s
+
+participants:
+  alice:
+    devices: 1
+    platform: any
+  bob:
+    devices: 1
+    platform: any
+
+relay_config:
+  count: 1
+
+steps:
+  # Setup identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  # Exchange contacts
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_data
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Alice updates her card
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Email"
+      value: "alice@example.com"
+
+  # Sync the update
+  - type: action
+    action: sync
+    actor: alice
+
+  # Wait for propagation
+  - type: wait
+    duration: 500ms
+    reason: "Allow relay to process update"
+
+  # Bob syncs to receive update
+  - type: action
+    action: sync
+    actor: bob
+
+  # Verify Alice still has Bob as contact
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice: Create identity 'Alice'"
+  - "Bob: Create identity 'Bob'"
+  - "Exchange contacts between Alice and Bob"
+  - "Alice: Edit Card > Add Email field 'alice@example.com'"
+  - "Alice: Sync"
+  - "Bob: Sync"
+  - "Verify: Bob sees Alice's email in her contact card"

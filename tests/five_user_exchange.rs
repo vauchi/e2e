@@ -8,13 +8,19 @@
 //! 5. Carol exchanges with Dave, Eve
 //! 6. Dave exchanges with Eve
 //! 7. Verify all devices have correct contacts after sync
+//!
+//! ## Test Tiers
+//! - `smoke_*`: Fast tests for every push (< 5 min total)
+//! - `integration_*`: Comprehensive tests for main branch
 
 use vauchi_e2e_tests::prelude::*;
 
-/// Test that all five users can exchange contacts and sync across all their devices.
+/// Integration test: Full mesh exchange between five users.
+/// Tags: integration, exchange, multi-user
+/// Feature: contact_exchange.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_five_user_full_exchange() {
+async fn integration_five_user_exchange() {
     // Setup orchestrator
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -43,10 +49,12 @@ async fn test_five_user_full_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test exchange in a specific order (sequential pairing).
+/// Integration test: Sequential chain exchange (A→B→C→D→E).
+/// Tags: integration, exchange, sequential
+/// Feature: contact_exchange.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_sequential_exchange() {
+async fn integration_sequential_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -75,10 +83,12 @@ async fn test_sequential_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test that contacts sync correctly across all devices.
+/// Integration test: Contact sync across all linked devices.
+/// Tags: integration, sync, multi-device
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_contact_sync_across_devices() {
+async fn integration_contact_sync() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 

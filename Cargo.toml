@@ -5,6 +5,10 @@ edition = "2021"
 description = "End-to-end testing infrastructure for Vauchi"
 license = "AGPL-3.0-or-later"
 
+[features]
+# Enable JUnit XML output for CI
+junit = []
+
 [dependencies]
 # Core library - path dependency for local development
 # Switch to git dependency after repos are created on GitLab:
@@ -27,6 +31,14 @@ predicates = "3"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9"
+
+# Duration parsing (for YAML scenario timeouts)
+humantime = "2"
+humantime-serde = "1"
+
+# Regex for pattern matching in scenarios
+regex = "1"
 
 # Error handling
 thiserror = "2"

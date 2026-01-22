@@ -1,0 +1,164 @@
+# Five User Exchange - Full integration test
+# Tests: Five users with multiple devices exchange and sync
+# Feature: contact_exchange.feature
+
+name: "Five User Full Exchange"
+description: |
+  Five users with varying device counts perform full mesh exchange.
+  Verifies multi-user, multi-device sync works correctly.
+feature: "contact_exchange.feature"
+tags: ["integration", "exchange", "multi-user"]
+timeout: 300s
+
+participants:
+  alice:
+    devices: 3
+    platform: any
+  bob:
+    devices: 2
+    platform: any
+  carol:
+    devices: 1
+    platform: any
+  dave:
+    devices: 1
+    platform: any
+  eve:
+    devices: 3
+    platform: any
+
+relay_config:
+  count: 2
+
+steps:
+  # Create all identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: create_identity
+    actor: carol
+    params:
+      name: "Carol"
+
+  - type: action
+    action: create_identity
+    actor: dave
+    params:
+      name: "Dave"
+
+  - type: action
+    action: create_identity
+    actor: eve
+    params:
+      name: "Eve"
+
+  # Link all devices
+  - type: action
+    action: link_devices
+    actor: alice
+
+  - type: action
+    action: link_devices
+    actor: bob
+
+  - type: action
+    action: link_devices
+    actor: eve
+
+  # Full mesh exchange: Alice exchanges with everyone
+  - type: action
+    action: exchange
+    actor: [alice, bob]
+
+  - type: action
+    action: exchange
+    actor: [alice, carol]
+
+  - type: action
+    action: exchange
+    actor: [alice, dave]
+
+  - type: action
+    action: exchange
+    actor: [alice, eve]
+
+  # Bob exchanges with remaining
+  - type: action
+    action: exchange
+    actor: [bob, carol]
+
+  - type: action
+    action: exchange
+    actor: [bob, dave]
+
+  - type: action
+    action: exchange
+    actor: [bob, eve]
+
+  # Carol exchanges with remaining
+  - type: action
+    action: exchange
+    actor: [carol, dave]
+
+  - type: action
+    action: exchange
+    actor: [carol, eve]
+
+  # Dave exchanges with Eve
+  - type: action
+    action: exchange
+    actor: [dave, eve]
+
+  # Sync all users
+  - type: action
+    action: sync_all
+    actor: [alice, bob, carol, dave, eve]
+
+  # Verify each user has 4 contacts
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 4
+
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 4
+
+  - type: assertion
+    assertion: contact_count
+    actor: carol
+    params:
+      count: 4
+
+  - type: assertion
+    assertion: contact_count
+    actor: dave
+    params:
+      count: 4
+
+  - type: assertion
+    assertion: contact_count
+    actor: eve
+    params:
+      count: 4
+
+manual_instructions:
+  - "Create identities for Alice, Bob, Carol, Dave, and Eve"
+  - "Link additional devices for Alice (3), Bob (2), and Eve (3)"
+  - "Perform full mesh exchange (10 exchanges total)"
+  - "Sync all devices"
+  - "Verify: Each user has exactly 4 contacts"
+  - "Verify: All devices of each user show the same contacts"

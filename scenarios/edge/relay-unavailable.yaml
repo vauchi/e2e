@@ -1,0 +1,124 @@
+# Relay Unavailable - Edge case test
+# Tests: Graceful degradation when relays are down
+# Feature: relay_network.feature
+
+name: "All Relays Unavailable"
+description: |
+  Tests that the application handles relay unavailability gracefully.
+  Exchange should work (QR is self-contained), sync should fail with clear error.
+feature: "relay_network.feature"
+tags: ["edge", "relay"]
+timeout: 120s
+
+participants:
+  alice:
+    devices: 1
+    platform: any
+  bob:
+    devices: 1
+    platform: any
+
+relay_config:
+  count: 2
+
+steps:
+  # Setup identities while relays are up
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  # Initial sync works
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Stop all relays
+  - type: action
+    action: stop_relay
+    actor: alice
+    params:
+      index: 0
+
+  - type: action
+    action: stop_relay
+    actor: alice
+    params:
+      index: 1
+
+  # Wait for relay shutdown
+  - type: wait
+    duration: 1s
+
+  # Generate QR still works (local operation)
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_data
+
+  # Exchange still works (cryptographic verification only)
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  # Bob has Alice locally
+  - type: assertion
+    assertion: has_contact
+    actor: bob
+    params:
+      count: 1
+
+  # Sync should fail gracefully
+  - type: action
+    action: sync
+    actor: alice
+    expect_error: "No relays available"
+
+  # Restart relays
+  - type: action
+    action: restart_relay
+    actor: alice
+    params:
+      index: 0
+
+  - type: action
+    action: restart_relay
+    actor: alice
+    params:
+      index: 1
+
+  # Wait for relay recovery
+  - type: wait
+    duration: 2s
+    reason: "Allow relays to start"
+
+  # Sync should work now
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Both should have contact
+  - type: assertion
+    assertion: contact_count
+    actor: [alice, bob]
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice & Bob: Create identities"
+  - "Stop the relay server"
+  - "Alice: Try to generate QR (should work)"
+  - "Bob: Scan Alice's QR (should work)"
+  - "Both: Try to sync (should show 'No relay available' error)"
+  - "Start the relay server"
+  - "Both: Sync (should succeed)"
+  - "Verify: Both see each other in contacts"

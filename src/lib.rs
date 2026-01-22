@@ -58,8 +58,10 @@ pub mod device;
 pub mod error;
 pub mod orchestrator;
 pub mod relay_manager;
+pub mod report;
 pub mod scenario;
 pub mod user;
+pub mod yaml;
 
 pub mod prelude {
     //! Re-exports commonly used types for convenience.
@@ -67,6 +69,13 @@ pub mod prelude {
     pub use crate::error::{E2eError, E2eResult};
     pub use crate::orchestrator::{Orchestrator, OrchestratorConfig};
     pub use crate::relay_manager::{RelayConfig, RelayInstance, RelayManager};
+    pub use crate::report::{JunitReport, TestSummary};
     pub use crate::scenario::{Scenario, ScenarioContext};
     pub use crate::user::User;
+
+    // YAML scenario types
+    pub use crate::yaml::{
+        ScenarioExecutor, ScenarioInfo, ScenarioLoader,
+        Scenario as YamlScenario, ScenarioResult,
+    };
 }

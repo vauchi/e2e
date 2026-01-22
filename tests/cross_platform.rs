@@ -8,13 +8,19 @@
 //!
 //! Note: Phase 1 only supports CLI devices. This test serves as a
 //! placeholder for future platform integration tests.
+//!
+//! ## Test Tiers
+//! - `smoke_*`: Fast tests for every push (< 5 min total)
+//! - `integration_*`: Comprehensive tests for main branch
 
 use vauchi_e2e_tests::prelude::*;
 
-/// Test exchange between two CLI devices (foundation for cross-platform).
+/// Smoke test: Basic CLI exchange between two users.
+/// Tags: smoke, exchange
+/// Feature: contact_exchange.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_cli_to_cli_exchange() {
+async fn smoke_cli_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -31,10 +37,12 @@ async fn test_cli_to_cli_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test device linking across CLI instances (simulates cross-platform linking).
+/// Integration test: Device linking across CLI instances.
+/// Tags: integration, device-linking
+/// Feature: device_management.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_multi_device_cli_linking() {
+async fn integration_device_linking() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -60,10 +68,12 @@ async fn test_multi_device_cli_linking() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test exchange between users with different device configurations.
+/// Integration test: Exchange between users with different device counts.
+/// Tags: integration, exchange, multi-device
+/// Feature: contact_exchange.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_mixed_device_count_exchange() {
+async fn integration_mixed_devices() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 

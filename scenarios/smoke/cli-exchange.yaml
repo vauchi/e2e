@@ -1,0 +1,67 @@
+# CLI Exchange - Basic smoke test
+# Tests: Two users exchange contacts via QR code
+# Feature: contact_exchange.feature
+
+name: "CLI Contact Exchange"
+description: "Basic contact exchange between two CLI users"
+feature: "contact_exchange.feature"
+tags: ["smoke", "exchange", "cli"]
+timeout: 60s
+
+participants:
+  alice:
+    devices: 1
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Create identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice Smith"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob Jones"
+
+  # Alice generates QR
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_data
+
+  # Bob scans Alice's QR
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  # Sync both users
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Verify both have 1 contact
+  - type: assertion
+    assertion: contact_count
+    actor: [alice, bob]
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice: Create identity 'Alice Smith'"
+  - "Bob: Create identity 'Bob Jones'"
+  - "Alice: Exchange > Show QR Code"
+  - "Bob: Exchange > Scan QR"
+  - "Bob: Scan Alice's QR code"
+  - "Verify: Both users see each other in Contacts"

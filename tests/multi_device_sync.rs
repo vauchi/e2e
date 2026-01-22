@@ -6,16 +6,22 @@
 //! 3. Verify Bob's devices receive update
 //! 4. Bob updates card on B2
 //! 5. Verify Alice's devices receive update
+//!
+//! ## Test Tiers
+//! - `smoke_*`: Fast tests for every push (< 5 min total)
+//! - `integration_*`: Comprehensive tests for main branch
 
 use std::time::Duration;
 
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
-/// Test that card updates propagate to all linked devices.
+/// Smoke test: Card update propagation across devices.
+/// Tags: smoke, sync
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_card_update_propagation() {
+async fn smoke_card_update() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -90,10 +96,12 @@ async fn test_card_update_propagation() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test that device linking propagates existing contacts.
+/// Integration test: Device linking propagates existing contacts.
+/// Tags: integration, device-linking, sync
+/// Feature: device_management.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_new_device_receives_contacts() {
+async fn integration_device_receives_contacts() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -127,10 +135,12 @@ async fn test_new_device_receives_contacts() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test concurrent updates from multiple devices.
+/// Integration test: Concurrent updates from multiple devices.
+/// Tags: integration, sync, concurrent
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_concurrent_updates() {
+async fn integration_concurrent_updates() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 

@@ -24,13 +24,28 @@ pub struct User {
 
 impl User {
     /// Create a new user with no devices.
-    pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            devices: Vec::new(),
+            primary_device: 0,
+            relay_url: String::new(),
+        }
+    }
+
+    /// Create a new user with no devices and a relay URL.
+    pub fn with_relay(name: impl Into<String>, relay_url: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             devices: Vec::new(),
             primary_device: 0,
             relay_url: relay_url.into(),
         }
+    }
+
+    /// Set the relay URL for this user.
+    pub fn set_relay_url(&mut self, relay_url: impl Into<String>) {
+        self.relay_url = relay_url.into();
     }
 
     /// Get the user's display name.
@@ -58,14 +73,21 @@ impl User {
         &self.devices
     }
 
-    /// Add a CLI device to this user.
-    pub fn add_cli_device(&mut self, device_name: impl Into<String>) -> E2eResult<usize> {
-        let device_name = device_name.into();
+    /// Add a CLI device to this user with an optional relay URL.
+    pub fn add_cli_device(&mut self, relay_url: &str) -> E2eResult<usize> {
+        let device_name = format!("device_{}", self.devices.len());
         let full_name = format!("{}_{}", self.name, device_name);
 
-        info!("Adding CLI device '{}' for user '{}'", device_name, self.name);
+        // Use provided relay_url or fall back to user's relay_url
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
 
-        let device = CliDevice::new(&full_name, &self.relay_url)?;
+        info!("Adding CLI device '{}' for user '{}' (relay: {})", device_name, self.name, url);
+
+        let device = CliDevice::new(&full_name, url)?;
         let device: Box<dyn Device> = Box::new(device);
         self.devices.push(Arc::new(RwLock::new(device)));
 
@@ -73,9 +95,9 @@ impl User {
     }
 
     /// Add a device with a specific type (for future expansion).
-    pub fn add_device(&mut self, device_name: impl Into<String>, device_type: DeviceType) -> E2eResult<usize> {
+    pub fn add_device(&mut self, relay_url: &str, device_type: DeviceType) -> E2eResult<usize> {
         match device_type {
-            DeviceType::Cli => self.add_cli_device(device_name),
+            DeviceType::Cli => self.add_cli_device(relay_url),
             _ => Err(E2eError::device(format!(
                 "Device type {:?} not yet implemented",
                 device_type
@@ -84,11 +106,10 @@ impl User {
     }
 
     /// Add multiple CLI devices at once.
-    pub fn add_cli_devices(&mut self, count: usize) -> E2eResult<Vec<usize>> {
+    pub fn add_cli_devices(&mut self, count: usize, relay_url: &str) -> E2eResult<Vec<usize>> {
         let mut indices = Vec::with_capacity(count);
-        for i in 0..count {
-            let name = format!("device_{}", i + 1);
-            let index = self.add_cli_device(name)?;
+        for _ in 0..count {
+            let index = self.add_cli_device(relay_url)?;
             indices.push(index);
         }
         Ok(indices)
@@ -255,6 +276,24 @@ impl User {
         device.add_field(field_type, label, value).await
     }
 
+    /// Edit a field on the contact card on the primary device.
+    pub async fn edit_field(&self, label: &str, value: &str) -> E2eResult<()> {
+        let primary = self.primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.edit_field(label, value).await
+    }
+
+    /// Get the contact card from a specific device.
+    pub async fn get_card_on_device(&self, device_index: usize) -> E2eResult<ContactCard> {
+        let device = self.device(device_index)
+            .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
+
+        let device = device.read().await;
+        device.get_card().await
+    }
+
     /// Exchange contacts with another user.
     ///
     /// This user generates a QR and the other user completes the exchange.
@@ -331,15 +370,14 @@ impl UserBuilder {
 
     /// Build the user.
     pub fn build(self) -> E2eResult<User> {
-        let mut user = User::new(self.name, self.relay_url);
+        let mut user = User::with_relay(&self.name, &self.relay_url);
 
         if self.device_types.is_empty() {
-            // Default to one CLI device
-            user.add_cli_devices(self.device_count)?;
+            // Default to CLI devices
+            user.add_cli_devices(self.device_count, &self.relay_url)?;
         } else {
-            for (i, device_type) in self.device_types.into_iter().enumerate() {
-                let name = format!("device_{}", i + 1);
-                user.add_device(name, device_type)?;
+            for device_type in self.device_types.into_iter() {
+                user.add_device(&self.relay_url, device_type)?;
             }
         }
 
@@ -353,7 +391,14 @@ mod tests {
 
     #[test]
     fn test_user_creation() {
-        let user = User::new("Alice", "ws://localhost:8080");
+        let user = User::new("Alice");
+        assert_eq!(user.name(), "Alice");
+        assert_eq!(user.device_count(), 0);
+    }
+
+    #[test]
+    fn test_user_with_relay() {
+        let user = User::with_relay("Alice", "ws://localhost:8080");
         assert_eq!(user.name(), "Alice");
         assert_eq!(user.device_count(), 0);
     }

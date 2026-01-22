@@ -7,16 +7,22 @@
 //! 4. Updates continue to propagate
 //! 5. Restart Relay A
 //! 6. Verify recovery
+//!
+//! ## Test Tiers
+//! - `smoke_*`: Fast tests for every push (< 5 min total)
+//! - `integration_*`: Comprehensive tests for main branch
 
 use std::time::Duration;
 
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
-/// Test basic relay failover when primary relay goes down.
+/// Integration test: Relay failover and recovery.
+/// Tags: integration, relay, failover
+/// Feature: relay_network.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_relay_failover() {
+async fn integration_relay_failover() {
     let config = OrchestratorConfig {
         relay_count: 2,
         ..Default::default()
@@ -59,10 +65,12 @@ async fn test_relay_failover() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test that updates made during outage are synced after recovery.
+/// Integration test: Updates during relay outage sync after recovery.
+/// Tags: integration, relay, offline
+/// Feature: relay_network.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_updates_during_outage() {
+async fn integration_updates_during_outage() {
     let config = OrchestratorConfig {
         relay_count: 2,
         ..Default::default()
@@ -117,10 +125,12 @@ async fn test_updates_during_outage() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test behavior when no relays are available.
+/// Integration test: Graceful degradation when all relays unavailable.
+/// Tags: integration, relay, edge-case
+/// Feature: relay_network.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_no_relays_available() {
+async fn integration_no_relays() {
     let config = OrchestratorConfig {
         relay_count: 2,
         ..Default::default()

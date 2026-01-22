@@ -1,0 +1,118 @@
+# Offline Exchange - Edge case test
+# Tests: Exchange works offline, sync happens when online
+# Feature: contact_exchange.feature
+
+name: "Exchange While Offline, Sync Later"
+description: |
+  Tests that contact exchange can complete without internet connectivity.
+  Exchange uses signed QR data for cryptographic verification.
+  Sync happens when devices come back online.
+feature: "contact_exchange.feature"
+tags: ["edge", "offline"]
+timeout: 120s
+
+participants:
+  alice:
+    devices: 1
+    platform: any
+  bob:
+    devices: 1
+    platform: any
+
+relay_config:
+  count: 1
+
+network_conditions:
+  alice:
+    internet: false
+    mode: offline
+  bob:
+    internet: false
+    mode: offline
+
+steps:
+  # Create identities (works offline)
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice Offline"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob Offline"
+
+  # Set both offline
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: false
+      mode: offline
+
+  - type: action
+    action: set_network
+    actor: bob
+    params:
+      internet: false
+      mode: offline
+
+  # Generate QR (works offline - contains signed data)
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_data
+
+  # Complete exchange (works offline - cryptographic only)
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  # Try to sync (should fail gracefully)
+  - type: action
+    action: sync
+    actor: alice
+    expect_error: "No relays available"
+    retries: 0
+
+  # Bring both online
+  - type: action
+    action: set_network
+    actor: [alice, bob]
+    params:
+      internet: true
+      mode: normal
+
+  # Wait for network restoration
+  - type: wait
+    duration: 1s
+    reason: "Allow network to stabilize"
+
+  # Now sync should work
+  - type: action
+    action: sync
+    actor: [alice, bob]
+    timeout: 30s
+
+  # Verify contacts after sync
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice: Enable airplane mode"
+  - "Bob: Enable airplane mode"
+  - "Alice: Create identity 'Alice Offline'"
+  - "Bob: Create identity 'Bob Offline'"
+  - "Alice: Generate QR code"
+  - "Bob: Scan Alice's QR code"
+  - "Verify: Both see 'Pending sync' or similar indicator"
+  - "Alice & Bob: Disable airplane mode"
+  - "Wait: Allow sync to complete"
+  - "Verify: Both see each other in contacts"

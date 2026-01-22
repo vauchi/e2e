@@ -6,16 +6,22 @@
 //! 3. Updates sync to A1, A2
 //! 4. Device A3 comes online
 //! 5. Verify A3 catches up with all changes
+//!
+//! ## Test Tiers
+//! - `smoke_*`: Fast tests for every push (< 5 min total)
+//! - `integration_*`: Comprehensive tests for main branch
 
 use std::time::Duration;
 
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
-/// Test that an offline device catches up when it comes back online.
+/// Integration test: Offline device catches up on reconnect.
+/// Tags: integration, offline, sync
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_offline_device_catchup() {
+async fn integration_offline_catchup() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -98,10 +104,12 @@ async fn test_offline_device_catchup() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test that card updates are received by offline device on catchup.
+/// Integration test: Card updates received by offline device on catchup.
+/// Tags: integration, offline, card
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_card_updates_catchup() {
+async fn integration_card_catchup() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -145,10 +153,12 @@ async fn test_card_updates_catchup() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Test extended offline period.
+/// Integration test: Extended offline period with multiple changes.
+/// Tags: integration, offline, edge-case
+/// Feature: sync_updates.feature
 #[tokio::test]
 #[ignore = "requires relay and CLI binaries to be built"]
-async fn test_extended_offline_period() {
+async fn integration_extended_offline() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 

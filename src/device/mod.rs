@@ -15,6 +15,37 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::E2eResult;
 
+/// Network simulation configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NetworkConfig {
+    /// Whether internet is available.
+    pub internet: bool,
+
+    /// Network mode for simulation.
+    pub mode: NetworkMode,
+
+    /// Packet drop rate (0.0 to 1.0) for flaky mode.
+    pub drop_rate: f32,
+
+    /// Added latency in milliseconds.
+    pub latency_ms: u32,
+}
+
+/// Network simulation modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkMode {
+    /// Normal network conditions.
+    #[default]
+    Normal,
+
+    /// Flaky network with packet drops.
+    Flaky,
+
+    /// Complete network outage.
+    Offline,
+}
+
 /// Types of devices that can be controlled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeviceType {
@@ -153,4 +184,101 @@ pub trait Device: Send + Sync {
 
     /// Update the display name.
     async fn edit_name(&self, name: &str) -> E2eResult<()>;
+
+    // === Network Simulation ===
+
+    /// Set network conditions for this device.
+    ///
+    /// This is used for testing offline scenarios, flaky networks, etc.
+    /// Not all device types support this - defaults to no-op.
+    async fn set_network(&self, _config: NetworkConfig) -> E2eResult<()> {
+        // Default implementation does nothing
+        Ok(())
+    }
+
+    /// Get current network configuration.
+    fn network_config(&self) -> NetworkConfig {
+        NetworkConfig::default()
+    }
+
+    // === App Lifecycle (Mobile/Desktop) ===
+
+    /// Background the app (move to background state).
+    ///
+    /// Only applicable for mobile and desktop devices.
+    async fn background_app(&self) -> E2eResult<()> {
+        // Default implementation does nothing (CLI doesn't have background state)
+        Ok(())
+    }
+
+    /// Foreground the app (bring to front).
+    ///
+    /// Only applicable for mobile and desktop devices.
+    async fn foreground_app(&self) -> E2eResult<()> {
+        // Default implementation does nothing
+        Ok(())
+    }
+
+    /// Kill the app process.
+    ///
+    /// Only applicable for mobile and desktop devices.
+    async fn kill_app(&self) -> E2eResult<()> {
+        // Default implementation does nothing
+        Ok(())
+    }
+
+    /// Launch the app.
+    ///
+    /// Only applicable for mobile and desktop devices.
+    async fn launch_app(&self) -> E2eResult<()> {
+        // Default implementation does nothing
+        Ok(())
+    }
+
+    /// Simulate device restart.
+    ///
+    /// This simulates app cold start after device reboot.
+    async fn restart_device(&self) -> E2eResult<()> {
+        // Default implementation: kill and launch
+        self.kill_app().await?;
+        self.launch_app().await?;
+        Ok(())
+    }
+
+    // === Proximity Verification (Mobile) ===
+
+    /// Start proximity verification (generates audio challenge).
+    ///
+    /// Only applicable for mobile devices with audio capability.
+    async fn start_proximity_verification(&self) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Proximity verification not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Verify proximity using audio challenge.
+    ///
+    /// Only applicable for mobile devices with audio capability.
+    async fn verify_proximity(&self, _challenge: &str) -> E2eResult<bool> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Proximity verification not supported on this device type".to_string(),
+        ))
+    }
+
+    // === Device Capabilities ===
+
+    /// Check if this device supports network simulation.
+    fn supports_network_simulation(&self) -> bool {
+        false
+    }
+
+    /// Check if this device supports app lifecycle control.
+    fn supports_lifecycle_control(&self) -> bool {
+        false
+    }
+
+    /// Check if this device supports proximity verification.
+    fn supports_proximity_verification(&self) -> bool {
+        false
+    }
 }
