@@ -162,31 +162,47 @@ async fn test_android_emulator_exchange() {
     }
 }
 
-/// Placeholder for future Desktop (Tauri) testing (Phase 3).
+/// Desktop (Tauri) testing via HTTP test server.
 ///
 /// Requirements:
-/// - Desktop app built (`just desktop-build`)
-/// - Tauri test mode or WebdriverIO for UI automation
+/// - Desktop app built (`cargo build -p vauchi-desktop --release`)
+/// - xvfb for headless testing on Linux
 ///
-/// The TauriDevice stub is available at `e2e/src/device/tauri.rs`
+/// The TauriDevice is implemented at `e2e/src/device/tauri.rs`
 #[tokio::test]
-#[ignore = "requires Tauri IPC or WebdriverIO - Phase 3"]
+#[ignore = "requires Desktop binary and xvfb - run `cargo build -p vauchi-desktop --release` first"]
 async fn test_desktop_exchange() {
-    use vauchi_e2e_tests::device::TauriDevice;
+    use vauchi_e2e_tests::device::{Device, TauriDevice};
 
-    // Try to create a TauriDevice
-    match TauriDevice::new("Alice_Desktop", "ws://localhost:8080") {
-        Ok(device) => {
-            // Device created but methods not implemented
-            match device.create_identity("Alice").await {
-                Err(e) => panic!("Desktop automation not implemented: {}", e),
-                Ok(_) => panic!("Unexpected success - desktop automation should not be implemented yet"),
-            }
-        }
-        Err(e) => {
-            panic!("Desktop app binary not found: {}. Run `just desktop-build` first.", e);
-        }
-    }
+    // Create a TauriDevice
+    let device = TauriDevice::new("Alice_Desktop", "ws://localhost:8080")
+        .expect("Desktop app binary not found. Run `cargo build -p vauchi-desktop --release` first.");
+
+    // Launch the app (starts test HTTP server)
+    device.launch_app().await
+        .expect("Failed to launch desktop app");
+
+    // Create identity
+    device.create_identity("Alice").await
+        .expect("Failed to create identity in desktop app");
+
+    // Verify identity was created
+    assert!(device.has_identity().await, "Identity should exist after creation");
+
+    // Get card
+    let card = device.get_card().await
+        .expect("Failed to get card from desktop app");
+
+    assert_eq!(card.name, "Alice", "Card name should match");
+
+    // List contacts (should be empty)
+    let contacts = device.list_contacts().await
+        .expect("Failed to list contacts");
+
+    assert!(contacts.is_empty(), "Should have no contacts initially");
+
+    // Clean up
+    device.kill_app().await.expect("Failed to kill desktop app");
 }
 
 /// TUI testing via PTY automation.

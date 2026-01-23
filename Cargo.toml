@@ -54,6 +54,12 @@ futures = "0.3"
 # PTY automation for TUI testing
 expectrl = "0.7"
 
+# HTTP client for Desktop test server
+reqwest = { version = "0.12", features = ["json"] }
+
+# Random number generation
+rand = "0.8"
+
 [dev-dependencies]
 # Relay for integration tests - path dependency for local development
 # Switch to git dependency after repos are created on GitLab:
