@@ -104,50 +104,62 @@ async fn integration_mixed_devices() {
 /// Placeholder for future iOS simulator testing (Phase 2).
 ///
 /// Requirements:
-/// - Maestro CLI installed (`brew install maestro`)
-/// - iOS Simulator running (via xcrun simctl)
+/// - Maestro CLI installed (`curl -Ls "https://get.maestro.mobile.dev" | bash`)
+/// - iOS Simulator running (via `xcrun simctl boot "iPhone 15 Pro"`)
 /// - Maestro YAML flows in `e2e/maestro/ios/`
 /// - App built for simulator
+///
+/// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
 #[tokio::test]
-#[ignore = "requires Maestro and iOS simulator - Phase 2"]
+#[ignore = "requires Maestro CLI and iOS simulator - Phase 2"]
 async fn test_ios_simulator_exchange() {
-    // This test will use MaestroDevice when implemented
-    // MaestroDevice will:
-    // 1. Connect to running iOS simulator
-    // 2. Install and launch the app
-    // 3. Execute Maestro YAML flows for each operation
-    // 4. Parse flow results for assertions
+    use vauchi_e2e_tests::device::MaestroDevice;
 
-    // Example of future implementation:
-    // ```rust
-    // let ios_device = MaestroDevice::ios(
-    //     "Alice_iOS",
-    //     "iPhone 15 Pro",
-    //     "app.vauchi.mobile",
-    //     &relay_url,
-    // )?;
-    //
-    // ios_device.create_identity("Alice").await?;
-    // let qr = ios_device.generate_qr().await?;
-    // ```
-
-    panic!("iOS simulator tests not yet implemented - requires Maestro YAML flows");
+    // Try to create an iOS MaestroDevice
+    match MaestroDevice::ios("Alice_iOS", "iPhone 15 Pro", "ws://localhost:8080") {
+        Ok(device) => {
+            // Device created but Maestro flows not implemented
+            match device.create_identity("Alice").await {
+                Err(e) => panic!("iOS Maestro automation not implemented: {}", e),
+                Ok(_) => panic!("Unexpected success - iOS automation should not be implemented yet"),
+            }
+        }
+        Err(e) => {
+            // Expected: Maestro CLI not installed
+            panic!("Maestro CLI required: {}", e);
+        }
+    }
 }
 
 /// Placeholder for future Android emulator testing (Phase 2).
 ///
 /// Requirements:
 /// - Maestro CLI installed
-/// - Android emulator running (via adb)
+/// - Android emulator running (via `emulator -avd Pixel_7`)
+/// - ADB in PATH
 /// - Maestro YAML flows in `e2e/maestro/android/`
 /// - APK built and installed
+///
+/// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
 #[tokio::test]
-#[ignore = "requires Maestro and Android emulator - Phase 2"]
+#[ignore = "requires Maestro CLI and Android emulator - Phase 2"]
 async fn test_android_emulator_exchange() {
-    // This test will use MaestroDevice for Android
-    // Same pattern as iOS but using adb instead of xcrun
+    use vauchi_e2e_tests::device::MaestroDevice;
 
-    panic!("Android emulator tests not yet implemented - requires Maestro YAML flows");
+    // Try to create an Android MaestroDevice
+    match MaestroDevice::android("Bob_Android", "Pixel_7", "ws://localhost:8080") {
+        Ok(device) => {
+            // Device created but Maestro flows not implemented
+            match device.create_identity("Bob").await {
+                Err(e) => panic!("Android Maestro automation not implemented: {}", e),
+                Ok(_) => panic!("Unexpected success - Android automation should not be implemented yet"),
+            }
+        }
+        Err(e) => {
+            // Expected: Maestro CLI not installed
+            panic!("Maestro CLI required: {}", e);
+        }
+    }
 }
 
 /// Placeholder for future Desktop (Tauri) testing (Phase 3).

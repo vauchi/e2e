@@ -4,13 +4,15 @@
 //! - CLI: Command-line based control (fully implemented)
 //! - TUI: Terminal UI control (stub - requires expectrl)
 //! - Tauri: Desktop app control (stub - requires WebdriverIO)
-//! - Maestro: Mobile app control (future - requires Maestro CLI)
+//! - Maestro: Mobile app control (stub - requires Maestro CLI)
 
 mod cli;
+mod maestro;
 mod tauri;
 mod tui;
 
 pub use cli::CliDevice;
+pub use maestro::{MaestroDevice, MaestroPlatform};
 pub use tauri::TauriDevice;
 pub use tui::TuiDevice;
 
