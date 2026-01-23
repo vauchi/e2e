@@ -1,0 +1,78 @@
+appId: app.vauchi.mobile
+name: Get Contact Card (Android)
+---
+# Get a contact's card details
+# Environment variables:
+#   CONTACT_NAME - Name of the contact to view (required)
+#
+# Output: Card data is written to /tmp/vauchi_card.json
+# Format: { "name": "...", "fields": [{"type": "...", "label": "...", "value": "..."}] }
+
+- launchApp
+
+# Wait for app to be ready
+- waitForAnimationToEnd
+
+# Navigate to contacts list
+- tapOn: "Contacts"
+
+# Wait for list to load
+- waitForAnimationToEnd
+
+# Find and tap on the specific contact
+- tapOn: ${CONTACT_NAME}
+
+# Wait for card to load
+- waitForAnimationToEnd
+
+# Verify we're viewing the correct contact
+- assertVisible: ${CONTACT_NAME}
+
+# Extract card data
+- evalScript: |-
+    const card = {
+      name: '',
+      fields: []
+    };
+
+    // Get the name
+    const nameEl = maestro.findElement({ id: 'contact_name' });
+    if (nameEl) {
+      card.name = nameEl.text || nameEl.contentDescription || '';
+    }
+
+    // Get all fields
+    const fieldElements = maestro.findElements({ className: 'CardField' });
+    for (const field of fieldElements) {
+      const typeEl = field.findChild({ id: 'field_type' });
+      const labelEl = field.findChild({ id: 'field_label' });
+      const valueEl = field.findChild({ id: 'field_value' });
+
+      card.fields.push({
+        type: typeEl?.text || '',
+        label: labelEl?.text || '',
+        value: valueEl?.text || ''
+      });
+    }
+
+    const fs = require('fs');
+    fs.writeFileSync('/tmp/vauchi_card.json', JSON.stringify(card, null, 2));
+
+# Alternative: Use content description tree
+- runFlow:
+    when:
+      visible:
+        id: "card_view"
+    commands:
+      - evalScript: |-
+          const cardView = maestro.findElement({ id: 'card_view' });
+          const contentDesc = cardView.contentDescription;
+
+          // If the app exports card data via content description
+          if (contentDesc) {
+            const fs = require('fs');
+            fs.writeFileSync('/tmp/vauchi_card.json', contentDesc);
+          }
+
+# Go back to contacts list
+- pressKey: back

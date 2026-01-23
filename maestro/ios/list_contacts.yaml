@@ -1,0 +1,68 @@
+appId: app.vauchi.mobile
+name: List Contacts
+---
+# List all contacts and output their names
+# Output: Contact names are written to /tmp/vauchi_contacts.txt
+#
+# Format: One contact name per line
+
+- launchApp
+
+# Wait for app to be ready
+- waitForAnimationToEnd
+
+# Navigate to contacts list
+- assertVisible: "Contacts"
+
+# Ensure we're on the contacts tab
+- tapOn: "Contacts"
+
+# Wait for list to load
+- waitForAnimationToEnd
+
+# Scroll through the entire list to ensure all contacts are loaded
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          direction: UP
+          duration: 300
+
+# Scroll back to top
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          direction: DOWN
+          duration: 300
+
+# Extract contact names from the list
+# This relies on contacts having an accessibility identifier pattern
+- evalScript: |-
+    const contacts = [];
+    const elements = maestro.findElements({
+      className: 'ContactListItem'
+    });
+
+    for (const el of elements) {
+      if (el.text) {
+        contacts.push(el.text);
+      }
+    }
+
+    const fs = require('fs');
+    fs.writeFileSync('/tmp/vauchi_contacts.txt', contacts.join('\n'));
+
+# Also try using accessibility identifiers
+- runFlow:
+    when:
+      visible:
+        id: "contact_list"
+    commands:
+      - evalScript: |-
+          const listEl = maestro.findElement({ id: 'contact_list' });
+          const children = listEl.children || [];
+          const names = children.map(c => c.accessibilityLabel || c.text).filter(Boolean);
+
+          const fs = require('fs');
+          fs.writeFileSync('/tmp/vauchi_contacts.txt', names.join('\n'));

@@ -1,0 +1,41 @@
+appId: app.vauchi.mobile
+name: Complete Exchange
+---
+# Complete a contact exchange using QR data from another user
+# Environment variables:
+#   QR_DATA - The QR code data to scan (required)
+#
+# This flow simulates scanning a QR code by entering the data directly,
+# since actual camera simulation is complex in automated tests.
+
+- launchApp
+
+# Wait for app to be ready
+- waitForAnimationToEnd
+
+# Navigate to scan/add contact screen
+- tapOn: "Add Contact"
+
+# Wait for camera/scanner view
+- waitForAnimationToEnd
+
+# Use manual entry instead of camera (for automation)
+- tapOn: "Enter Code Manually"
+
+# Enter the QR data
+- assertVisible: "Paste or type the code"
+- inputText: ${QR_DATA}
+
+# Submit the code
+- tapOn: "Connect"
+
+# Wait for exchange protocol to complete
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Verify exchange succeeded
+- assertVisible: "Contact added"
+
+# Optionally verify the contact appears in list
+- tapOn: "Done"
+- assertVisible: "Contacts"

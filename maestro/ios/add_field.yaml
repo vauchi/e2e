@@ -1,0 +1,54 @@
+appId: app.vauchi.mobile
+name: Add Card Field
+---
+# Add a field to the user's contact card
+# Environment variables:
+#   FIELD_TYPE - Type of field (email, phone, address, etc.)
+#   FIELD_LABEL - Label for the field (e.g., "Work", "Personal")
+#   FIELD_VALUE - Value of the field
+
+- launchApp
+
+# Wait for app to be ready
+- waitForAnimationToEnd
+
+# Navigate to own card
+- tapOn: "Your Card"
+
+# Wait for card to load
+- waitForAnimationToEnd
+
+# Enter edit mode
+- tapOn: "Edit"
+
+# Add new field
+- tapOn: "Add Field"
+
+# Select field type
+- assertVisible: "Field Type"
+- tapOn: ${FIELD_TYPE}
+
+# Enter label
+- assertVisible: "Label"
+- tapOn:
+    id: "field_label_input"
+- inputText: ${FIELD_LABEL}
+
+# Enter value
+- tapOn:
+    id: "field_value_input"
+- inputText: ${FIELD_VALUE}
+
+# Save the field
+- tapOn: "Add"
+
+# Wait for save and sync
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify field appears on card
+- assertVisible: ${FIELD_LABEL}
+- assertVisible: ${FIELD_VALUE}
+
+# Exit edit mode
+- tapOn: "Done"

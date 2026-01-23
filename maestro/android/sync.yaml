@@ -1,0 +1,34 @@
+appId: app.vauchi.mobile
+name: Sync with Relay (Android)
+---
+# Trigger a sync with the relay server
+# This pulls any pending updates from contacts
+
+- launchApp
+
+# Wait for app to be ready
+- waitForAnimationToEnd
+
+# Pull to refresh on the main contacts list
+- assertVisible: "Contacts"
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# Wait for sync to complete
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Verify sync indicator disappears (or shows success)
+- extendedWaitUntil:
+    notVisible: "Syncing..."
+    timeout: 15000
+
+# Alternative: Check for sync status in settings
+- runFlow:
+    when:
+      visible: "Settings"
+    commands:
+      - tapOn: "Settings"
+      - assertVisible: "Last synced"
+      - pressKey: back

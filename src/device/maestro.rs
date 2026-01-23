@@ -178,11 +178,18 @@ impl MaestroDevice {
 
     /// Check if Maestro CLI is installed.
     fn check_maestro_installed() -> E2eResult<()> {
-        // For now, just check if the binary exists in PATH
-        // In a real implementation, we'd run `maestro --version`
-        Err(E2eError::DeviceNotSupported(
-            "Maestro CLI not found. Install with: curl -Ls 'https://get.maestro.mobile.dev' | bash".into()
-        ))
+        // Check if maestro binary exists in PATH
+        match std::process::Command::new("maestro")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+        {
+            Ok(status) if status.success() => Ok(()),
+            _ => Err(E2eError::DeviceNotSupported(
+                "Maestro CLI not found. Install with: curl -Ls 'https://get.maestro.mobile.dev' | bash".into()
+            ))
+        }
     }
 
     /// Find the Maestro flows directory.
