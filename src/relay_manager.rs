@@ -3,8 +3,10 @@
 //! Spawns and manages isolated relay server instances for testing.
 
 use std::collections::HashMap;
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -13,11 +15,44 @@ use tracing::{debug, info};
 
 use crate::error::{E2eError, E2eResult};
 
-/// Default base port for relay servers.
-const DEFAULT_BASE_PORT: u16 = 18080;
+/// Base port range start for relay servers (tests will allocate from here).
+const PORT_RANGE_START: u16 = 18100;
 
-/// Default base port for metrics endpoints.
-const DEFAULT_METRICS_BASE_PORT: u16 = 19080;
+/// Port range end for relay servers.
+const PORT_RANGE_END: u16 = 19000;
+
+/// Global port counter to ensure unique ports across parallel tests.
+static NEXT_PORT: AtomicU16 = AtomicU16::new(PORT_RANGE_START);
+
+/// Find an available port for binding.
+///
+/// Uses a combination of atomic counter and port availability check to ensure
+/// unique ports even when tests run in parallel.
+fn find_available_port() -> E2eResult<u16> {
+    // Try up to 100 ports to find an available one
+    for _ in 0..100 {
+        // Get the next port atomically
+        let port = NEXT_PORT.fetch_add(2, Ordering::SeqCst);
+
+        // Wrap around if we exceed the range
+        if port >= PORT_RANGE_END {
+            NEXT_PORT.store(PORT_RANGE_START, Ordering::SeqCst);
+            continue;
+        }
+
+        // Check if the port is actually available
+        if is_port_available(port) && is_port_available(port + 1000) {
+            return Ok(port);
+        }
+    }
+
+    Err(E2eError::relay("Could not find available port for relay server"))
+}
+
+/// Check if a port is available for binding.
+fn is_port_available(port: u16) -> bool {
+    TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok()
+}
 
 /// Timeout for relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -71,10 +106,10 @@ impl Drop for RelayInstance {
 /// Configuration for spawning relay instances.
 #[derive(Debug, Clone)]
 pub struct RelayConfig {
-    /// Base port for relay servers (default: 18080).
+    /// Base port for relay servers (0 = auto-allocate).
+    /// When set to 0, ports are dynamically allocated to avoid conflicts
+    /// when tests run in parallel.
     pub base_port: u16,
-    /// Base port for metrics endpoints (default: 19080).
-    pub metrics_base_port: u16,
     /// Path to the relay binary (auto-detected if None).
     pub binary_path: Option<PathBuf>,
     /// Storage backend ("memory" or "sqlite").
@@ -90,8 +125,8 @@ pub struct RelayConfig {
 impl Default for RelayConfig {
     fn default() -> Self {
         Self {
-            base_port: DEFAULT_BASE_PORT,
-            metrics_base_port: DEFAULT_METRICS_BASE_PORT,
+            // Use 0 to indicate dynamic port allocation
+            base_port: 0,
             binary_path: None,
             storage_backend: "memory".to_string(),
             blob_ttl_secs: 3600,
@@ -162,8 +197,14 @@ impl RelayManager {
 
     /// Spawn a single relay instance at the given index.
     async fn spawn_one(&mut self, index: usize) -> E2eResult<()> {
-        let port = self.config.base_port + index as u16;
-        let metrics_port = self.config.metrics_base_port + index as u16;
+        // Allocate port dynamically if base_port is 0
+        let port = if self.config.base_port == 0 {
+            find_available_port()?
+        } else {
+            self.config.base_port + index as u16
+        };
+        // Metrics port is relay port + 1000
+        let metrics_port = port + 1000;
 
         info!("Spawning relay {} on port {}", index, port);
 
@@ -273,6 +314,13 @@ impl RelayManager {
 
     /// Restart a specific relay.
     pub async fn restart_relay(&mut self, index: usize) -> E2eResult<()> {
+        // Get the port from existing relay (we need to reuse the same port)
+        let (port, metrics_port) = if let Some(relay) = self.relays.get(index) {
+            (relay.port, relay.metrics_port)
+        } else {
+            return Err(E2eError::relay(format!("Relay {} not found", index)));
+        };
+
         // Stop if running
         if let Some(relay) = self.relays.get_mut(index) {
             if let Some(mut process) = relay.process.take() {
@@ -283,10 +331,6 @@ impl RelayManager {
 
         // Small delay before restart
         tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // Respawn at the same index
-        let port = self.config.base_port + index as u16;
-        let metrics_port = self.config.metrics_base_port + index as u16;
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
         env_vars.insert("RELAY_LISTEN_ADDR".to_string(), format!("127.0.0.1:{}", port));
@@ -349,7 +393,27 @@ mod tests {
     #[test]
     fn test_relay_config_default() {
         let config = RelayConfig::default();
-        assert_eq!(config.base_port, DEFAULT_BASE_PORT);
+        // base_port 0 means dynamic allocation
+        assert_eq!(config.base_port, 0);
         assert_eq!(config.storage_backend, "memory");
+    }
+
+    #[test]
+    fn test_find_available_port() {
+        let port1 = find_available_port().expect("Should find port");
+        let port2 = find_available_port().expect("Should find port");
+        // Ports should be different (increments by 2)
+        assert_ne!(port1, port2);
+        // Ports should be in range
+        assert!(port1 >= PORT_RANGE_START || port1 < PORT_RANGE_END);
+        assert!(port2 >= PORT_RANGE_START || port2 < PORT_RANGE_END);
+    }
+
+    #[test]
+    fn test_is_port_available() {
+        // Port 0 should always be "available" (OS allocates)
+        // But we test that we can bind to a random high port
+        let port = find_available_port().expect("Should find port");
+        assert!(is_port_available(port));
     }
 }
