@@ -217,32 +217,80 @@ impl CliDevice {
     }
 
     /// Parse a contact card from CLI output.
+    ///
+    /// The card output format is:
+    /// ```text
+    /// ──────────────────────────────────────────────────
+    ///   Name
+    /// ──────────────────────────────────────────────────
+    ///   icon   Label        Value
+    /// ──────────────────────────────────────────────────
+    /// ```
     fn parse_card(output: &str) -> E2eResult<ContactCard> {
         let mut name = String::new();
         let mut fields = Vec::new();
+        let mut in_header = true;
 
         for line in output.lines() {
             let line = line.trim();
 
-            // Look for the name (usually the first significant line after any headers)
-            if line.starts_with("📇") || line.contains("Contact Card") {
-                // Try to extract name from the line
-                if let Some(colon_pos) = line.find(':') {
-                    name = line[colon_pos + 1..].trim().to_string();
+            // Skip separator lines
+            if line.starts_with('─') || line.is_empty() {
+                // After first separator, we're past the header
+                if line.starts_with('─') && !name.is_empty() {
+                    in_header = false;
                 }
                 continue;
             }
 
-            // Look for field lines with icons
+            // First non-separator line is the name
+            if name.is_empty() && !line.starts_with('─') {
+                name = line.to_string();
+                continue;
+            }
+
+            // Skip "(no fields)" indicator
+            if line.contains("(no fields)") {
+                continue;
+            }
+
+            // Look for field lines with icons (space-separated format)
+            // Format: "  icon   Label        Value"
+            if !in_header && !line.starts_with('─') {
+                // Split by whitespace and reassemble
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    // First part is the icon, second is label, rest is value
+                    let icon = parts[0];
+                    let label = parts[1];
+                    let value = parts[2..].join(" ");
+
+                    // Determine field type from icon
+                    let field_type = match icon {
+                        "mail" | "📧" => "email",
+                        "phone" | "📱" => "phone",
+                        "web" | "🌐" => "website",
+                        "home" | "🏠" => "address",
+                        "social" | "👤" => "social",
+                        _ => "custom",
+                    };
+
+                    fields.push(CardField {
+                        field_type: field_type.to_string(),
+                        label: label.to_string(),
+                        value,
+                    });
+                }
+            }
+
+            // Also handle table format (│-separated) for compatibility
             if line.contains('│') || line.contains('|') {
-                // Parse field from table format
                 let parts: Vec<&str> = line.split(|c| c == '│' || c == '|')
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
                     .collect();
 
                 if parts.len() >= 2 {
-                    // Remove emoji prefix if present
                     let label = parts[0]
                         .trim_start_matches(|c: char| !c.is_alphanumeric())
                         .trim();
@@ -250,7 +298,7 @@ impl CliDevice {
 
                     if !label.is_empty() && !value.is_empty() {
                         fields.push(CardField {
-                            field_type: "custom".to_string(), // Would need better parsing for type
+                            field_type: "custom".to_string(),
                             label: label.to_string(),
                             value: value.to_string(),
                         });
@@ -258,7 +306,7 @@ impl CliDevice {
                 }
             }
 
-            // Also handle non-table format (Label: Value)
+            // Also handle colon-separated format (Label: Value)
             if let Some(colon_pos) = line.find(':') {
                 if !line.contains('│') && !line.contains('|') {
                     let label = line[..colon_pos]
@@ -273,26 +321,6 @@ impl CliDevice {
                             value: value.to_string(),
                         });
                     }
-                }
-            }
-
-            // Try to get name from "Your Contact Card" format
-            if name.is_empty() && (line.contains("Name") || line.starts_with("Name:")) {
-                if let Some(colon_pos) = line.find(':') {
-                    name = line[colon_pos + 1..].trim().to_string();
-                }
-            }
-        }
-
-        // If name still empty, use first line as fallback
-        if name.is_empty() {
-            if let Some(first_line) = output.lines().next() {
-                let first_line = first_line.trim();
-                if !first_line.is_empty()
-                    && !first_line.starts_with("Your")
-                    && !first_line.contains('─')
-                {
-                    name = first_line.to_string();
                 }
             }
         }

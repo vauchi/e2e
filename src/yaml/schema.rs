@@ -290,8 +290,17 @@ impl ActorRef {
     }
 
     /// Parse an actor reference into user and optional device index.
+    ///
+    /// Formats:
+    /// - "alice" -> ("alice", None)
+    /// - "alice.device0" -> ("alice", Some(0))
+    /// - "alice.primary" -> ("alice", None) - primary means default device
     pub fn parse(actor: &str) -> (&str, Option<usize>) {
         if let Some((user, device)) = actor.split_once('.') {
+            // "primary" is an alias for the default/first device
+            if device == "primary" {
+                return (user, None);
+            }
             if let Some(idx_str) = device.strip_prefix("device") {
                 if let Ok(idx) = idx_str.parse() {
                     return (user, Some(idx));
