@@ -90,15 +90,53 @@ struct PtySession {
 }
 
 impl PtySession {
-    fn new(cmd: &str, data_dir: &std::path::Path) -> E2eResult<Self> {
+    fn new(tui_binary: &std::path::Path, data_dir: &std::path::Path, relay_url: &str) -> E2eResult<Self> {
         // Create log file for debugging
         let log_path = data_dir.join("pty.log");
         let log_file = std::fs::File::create(&log_path).map_err(|e| {
             E2eError::device(format!("Failed to create log file: {}", e))
         })?;
 
-        // Spawn PTY session
-        let mut session = expectrl::spawn(cmd)
+        // Create a wrapper script to handle all the terminal setup
+        // This avoids complex shell quoting issues
+        let script_path = data_dir.join("run_tui.sh");
+        let script_content = format!(
+            r#"#!/bin/bash
+export TERM=xterm-256color
+export VAUCHI_DATA_DIR="{}"
+export VAUCHI_RELAY_URL="{}"
+stty rows 24 cols 80 2>/dev/null || true
+exec "{}"
+"#,
+            data_dir.display(),
+            relay_url,
+            tui_binary.display()
+        );
+
+        std::fs::write(&script_path, &script_content).map_err(|e| {
+            E2eError::device(format!("Failed to write wrapper script: {}", e))
+        })?;
+
+        // Make the script executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&script_path)
+                .map_err(|e| E2eError::device(format!("Failed to get script metadata: {}", e)))?
+                .permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms)
+                .map_err(|e| E2eError::device(format!("Failed to set script permissions: {}", e)))?;
+        }
+
+        // Use `script` to provide a proper controlling terminal with /dev/tty
+        let script_cmd = format!(
+            "script -q -c '{}' /dev/null",
+            script_path.display()
+        );
+
+        // Spawn PTY session with script wrapper
+        let mut session = expectrl::spawn(&script_cmd)
             .map_err(|e| E2eError::device(format!("Failed to spawn TUI: {}", e)))?;
 
         // Set default timeout
@@ -187,22 +225,16 @@ impl TuiSession {
 
         let mut pty_guard = self.pty.lock().await;
 
-        // Build command with environment
-        let cmd = format!(
-            "VAUCHI_DATA_DIR={} VAUCHI_RELAY_URL={} {}",
-            self.data_dir_path.display(),
-            self.relay_url,
-            self.tui_path.display()
-        );
-
-        let session = PtySession::new(&cmd, &self.data_dir_path)?;
+        // Create PTY session with wrapper script for proper terminal setup
+        let session = PtySession::new(&self.tui_path, &self.data_dir_path, &self.relay_url)?;
         *pty_guard = Some(session);
         *is_running = true;
 
-        // Give TUI time to initialize
+        // Give TUI time to initialize and render
+        // The script wrapper + TUI startup needs time to draw the first frame
         drop(pty_guard);
         drop(is_running);
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         Ok(())
     }
@@ -346,14 +378,17 @@ impl Device for TuiDevice {
         // Start session if not running
         self.session.ensure_started().await?;
 
-        // Wait for setup screen
-        self.session.expect("Welcome to Vauchi").await?;
+        // Wait for setup screen - look for key text in the TUI output
+        // The TUI uses Ratatui which includes ANSI escape codes mixed with text
+        // Look for the setup screen indicators
+        self.session.expect_timeout("Setup|Create New Identity|Welcome", Duration::from_secs(15)).await?;
 
         // Press 'c' to create identity
         self.session.send_char('c').await?;
 
-        // Wait for home screen (identity created with default name)
-        self.session.expect("Identity created").await?;
+        // Wait for home screen - TUI goes directly to home after identity creation
+        // Look for common home screen elements
+        self.session.expect_timeout("Contacts|Search|Press", Duration::from_secs(10)).await?;
 
         // Now go to settings to update the name
         self.session.send_char('s').await?;

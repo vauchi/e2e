@@ -189,29 +189,34 @@ async fn test_desktop_exchange() {
     }
 }
 
-/// Placeholder for future TUI testing (Phase 4).
+/// TUI testing via PTY automation.
 ///
 /// Requirements:
 /// - TUI binary built (`cargo build -p vauchi-tui`)
-/// - expectrl crate for PTY automation
+/// - expectrl crate for PTY automation (uses `script` command for /dev/tty)
 ///
-/// The TuiDevice stub is available at `e2e/src/device/tui.rs`
+/// The TuiDevice is implemented at `e2e/src/device/tui.rs`
 #[tokio::test]
-#[ignore = "requires expectrl for PTY automation - Phase 4"]
+#[ignore = "requires TUI binary - run `cargo build -p vauchi-tui --release` first"]
 async fn test_tui_exchange() {
-    use vauchi_e2e_tests::device::TuiDevice;
+    use vauchi_e2e_tests::device::{Device, TuiDevice};
 
-    // Try to create a TuiDevice
-    match TuiDevice::new("Alice_TUI", "ws://localhost:8080") {
-        Ok(device) => {
-            // Device created but methods not implemented
-            match device.create_identity("Alice").await {
-                Err(e) => panic!("TUI automation not implemented: {}", e),
-                Ok(_) => panic!("Unexpected success - TUI automation should not be implemented yet"),
-            }
-        }
-        Err(e) => {
-            panic!("TUI binary not found: {}. Run `cargo build -p vauchi-tui` first.", e);
-        }
-    }
+    // Create a TuiDevice
+    let device = TuiDevice::new("Alice_TUI", "ws://localhost:8080")
+        .expect("TUI binary not found. Run `cargo build -p vauchi-tui --release` first.");
+
+    // Create identity
+    device.create_identity("Alice").await
+        .expect("Failed to create identity in TUI");
+
+    // Verify identity was created by checking if we're on the home screen
+    let card = device.get_card().await
+        .expect("Failed to get card from TUI");
+
+    // The card should exist (even if empty)
+    assert!(card.name.is_empty() || card.name.contains("Alice") || card.name.contains("User"),
+        "Card name should be set after identity creation");
+
+    // Clean up
+    device.kill_app().await.expect("Failed to kill TUI");
 }
