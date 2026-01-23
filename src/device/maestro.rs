@@ -525,9 +525,25 @@ mod tests {
     }
 
     #[test]
-    fn test_maestro_device_creation_fails_without_cli() {
-        // This should fail because Maestro CLI is not installed
+    fn test_maestro_device_creation_depends_on_cli() {
+        // Device creation depends on whether Maestro CLI is installed
         let result = MaestroDevice::ios("test", "iPhone 15 Pro", "ws://localhost:8080");
-        assert!(result.is_err());
+
+        // Check if Maestro is actually installed
+        let maestro_installed = std::process::Command::new("maestro")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+
+        if maestro_installed {
+            // If Maestro is installed, device creation should succeed
+            assert!(result.is_ok(), "Expected Ok when Maestro is installed");
+        } else {
+            // If Maestro is not installed, device creation should fail
+            assert!(result.is_err(), "Expected Err when Maestro is not installed");
+        }
     }
 }
