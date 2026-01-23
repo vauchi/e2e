@@ -4,10 +4,10 @@
 //!
 //! ## Implementation Status
 //!
-//! This device type requires:
-//! - Process management for the Tauri app
-//! - IPC communication with the Tauri backend
-//! - Optionally: WebdriverIO for UI automation
+//! This device type supports:
+//! - Process management for the Tauri app (launch/kill)
+//! - Future: IPC communication with the Tauri backend
+//! - Future: WebdriverIO for UI automation
 //!
 //! ## Architecture
 //!
@@ -21,13 +21,6 @@
 //! 1. Invoke IPC commands directly (requires Tauri test mode)
 //! 2. Use WebdriverIO for full UI automation
 //!
-//! ## Dependencies
-//!
-//! For WebdriverIO approach:
-//! ```toml
-//! tauri-driver = "2.0"  # Tauri's WebDriver implementation
-//! ```
-//!
 //! ## Example Flow
 //!
 //! ```ignore
@@ -40,10 +33,12 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tempfile::TempDir;
 use tokio::process::{Child, Command};
+use tokio::sync::Mutex;
 
 use super::{Contact, ContactCard, Device, DeviceType};
 use crate::error::{E2eError, E2eResult};
@@ -60,8 +55,8 @@ pub struct TauriDevice {
     relay_url: String,
     /// Path to the desktop app binary.
     app_path: PathBuf,
-    /// Running app process handle.
-    process: Option<Child>,
+    /// Running app process handle (interior mutability for &self methods).
+    process: Mutex<Option<Child>>,
 }
 
 impl TauriDevice {
@@ -78,7 +73,7 @@ impl TauriDevice {
             data_dir,
             relay_url: relay_url.into(),
             app_path,
-            process: None,
+            process: Mutex::new(None),
         })
     }
 
@@ -118,6 +113,23 @@ impl TauriDevice {
             return Ok(debug_path);
         }
 
+        // Try shared target directory
+        #[cfg(target_os = "linux")]
+        let shared_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../target/release/vauchi-desktop");
+
+        #[cfg(target_os = "macos")]
+        let shared_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../target/release/vauchi-desktop");
+
+        #[cfg(target_os = "windows")]
+        let shared_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../target/release/vauchi-desktop.exe");
+
+        if shared_path.exists() {
+            return Ok(shared_path);
+        }
+
         Err(E2eError::device(
             "Desktop app binary not found. Please run `just desktop-build` first.",
         ))
@@ -130,9 +142,33 @@ impl TauriDevice {
     }
 
     /// Check if the app process is running.
-    #[allow(dead_code)]
-    pub fn is_running(&self) -> bool {
-        self.process.is_some()
+    pub async fn is_running(&self) -> bool {
+        self.process.lock().await.is_some()
+    }
+
+    /// Wait for the app to be ready (basic implementation - waits for process to start).
+    async fn wait_for_ready(&self) -> E2eResult<()> {
+        // Basic implementation: just wait a bit for the app to initialize
+        // In a real implementation, we'd check for window appearance or IPC availability
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Verify process is still running
+        let mut process_guard = self.process.lock().await;
+        if let Some(ref mut child) = *process_guard {
+            match child.try_wait() {
+                Ok(None) => Ok(()), // Still running
+                Ok(Some(status)) => Err(E2eError::device(format!(
+                    "Desktop app exited prematurely with status: {:?}",
+                    status
+                ))),
+                Err(e) => Err(E2eError::device(format!(
+                    "Failed to check process status: {}",
+                    e
+                ))),
+            }
+        } else {
+            Err(E2eError::device("Process handle lost"))
+        }
     }
 }
 
@@ -153,8 +189,9 @@ impl Device for TauriDevice {
     // === Identity Management ===
 
     async fn create_identity(&self, _name: &str) -> E2eResult<()> {
+        // TODO: Implement via Tauri IPC or WebdriverIO
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented. Requires Tauri IPC or WebdriverIO.".into()
+            "Desktop IPC automation not yet implemented. Use CLI for programmatic control.".into()
         ))
     }
 
@@ -166,13 +203,13 @@ impl Device for TauriDevice {
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
@@ -180,13 +217,13 @@ impl Device for TauriDevice {
 
     async fn generate_qr(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
@@ -194,31 +231,31 @@ impl Device for TauriDevice {
 
     async fn start_device_link(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
@@ -226,7 +263,7 @@ impl Device for TauriDevice {
 
     async fn sync(&self) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
@@ -234,13 +271,13 @@ impl Device for TauriDevice {
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn get_contact(&self, _name_or_id: &str) -> E2eResult<Option<Contact>> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
@@ -248,49 +285,56 @@ impl Device for TauriDevice {
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn add_field(&self, _field_type: &str, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn edit_field(&self, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn remove_field(&self, _label: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     async fn edit_name(&self, _name: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device automation not yet implemented".into()
+            "Desktop IPC automation not yet implemented".into()
         ))
     }
 
     // === App Lifecycle ===
 
     async fn kill_app(&self) -> E2eResult<()> {
-        // Kill is implemented - just terminate the process
-        if let Some(mut process) = unsafe {
-            // SAFETY: We're taking ownership of the process
-            std::ptr::read(&self.process as *const Option<Child>)
-        } {
-            let _ = process.kill().await;
+        let mut process_guard = self.process.lock().await;
+
+        if let Some(mut child) = process_guard.take() {
+            // Try graceful kill first
+            child.kill().await.map_err(|e| {
+                E2eError::device(format!("Failed to kill desktop app: {}", e))
+            })?;
+
+            // Wait for process to exit
+            let _ = child.wait().await;
         }
+
         Ok(())
     }
 
     async fn launch_app(&self) -> E2eResult<()> {
-        if self.process.is_some() {
+        let mut process_guard = self.process.lock().await;
+
+        if process_guard.is_some() {
             return Err(E2eError::device("App is already running"));
         }
 
@@ -305,27 +349,31 @@ impl Device for TauriDevice {
             E2eError::device(format!("Failed to launch desktop app: {}", e))
         })?;
 
-        // Store process handle (this is a bit hacky due to mut self)
-        // In a real implementation, we'd use interior mutability
-        let _ = child;
+        // Store the process handle
+        *process_guard = Some(child);
 
-        // TODO: Wait for app to be ready (window appears, IPC available)
+        // Release the lock before waiting
+        drop(process_guard);
 
-        Err(E2eError::DeviceNotSupported(
-            "Desktop app launch not yet fully implemented".into()
-        ))
+        // Wait for app to be ready
+        self.wait_for_ready().await?;
+
+        Ok(())
     }
 
     fn supports_lifecycle_control(&self) -> bool {
-        true // Desktop supports kill/launch
+        true
     }
 }
 
 impl Drop for TauriDevice {
     fn drop(&mut self) {
         // Kill the app process if still running
-        if let Some(mut process) = self.process.take() {
-            let _ = process.start_kill();
+        // We can't use async here, so use blocking approach
+        if let Ok(mut guard) = self.process.try_lock() {
+            if let Some(mut process) = guard.take() {
+                let _ = process.start_kill();
+            }
         }
     }
 }
@@ -340,6 +388,13 @@ mod tests {
         if let Ok(device) = TauriDevice::new("test", "ws://localhost:8080") {
             assert_eq!(device.device_type(), DeviceType::Desktop);
             assert_eq!(device.name(), "test");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_is_running_initially_false() {
+        if let Ok(device) = TauriDevice::new("test", "ws://localhost:8080") {
+            assert!(!device.is_running().await);
         }
     }
 }

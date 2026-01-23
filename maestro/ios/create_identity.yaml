@@ -25,12 +25,24 @@ name: Create Identity
 # Continue to next step
 - tapOn: "Continue"
 
+# Skip onboarding steps (Add Fields, Preview, Security)
+# These are optional steps we can fast-track
+- tapOn: "Skip for now"
+- assertVisible: "Your card"
+- tapOn: "Looks good!"
+- assertVisible: "Your info is private"
+- tapOn: "Finish setup"
+
 # Wait for identity generation (crypto operations)
 - waitForAnimationToEnd:
     timeout: 10000
 
-# Verify identity was created successfully
-- assertVisible: "Identity created"
+# Verify onboarding completed successfully
+- assertVisible: "You're all set!"
+
+# Wait for transition to main app
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # Optional: Set custom relay if provided
 - runFlow:

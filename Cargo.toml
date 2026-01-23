@@ -51,6 +51,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Async utilities
 futures = "0.3"
 
+# PTY automation for TUI testing
+expectrl = "0.7"
+
 [dev-dependencies]
 # Relay for integration tests - path dependency for local development
 # Switch to git dependency after repos are created on GitLab:
