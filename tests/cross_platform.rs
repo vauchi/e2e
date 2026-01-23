@@ -102,49 +102,104 @@ async fn integration_mixed_devices() {
 }
 
 /// Placeholder for future iOS simulator testing (Phase 2).
+///
+/// Requirements:
+/// - Maestro CLI installed (`brew install maestro`)
+/// - iOS Simulator running (via xcrun simctl)
+/// - Maestro YAML flows in `e2e/maestro/ios/`
+/// - App built for simulator
 #[tokio::test]
 #[ignore = "requires Maestro and iOS simulator - Phase 2"]
 async fn test_ios_simulator_exchange() {
     // This test will use MaestroDevice when implemented
-    // For now, it's a placeholder to document the intended test
+    // MaestroDevice will:
+    // 1. Connect to running iOS simulator
+    // 2. Install and launch the app
+    // 3. Execute Maestro YAML flows for each operation
+    // 4. Parse flow results for assertions
 
     // Example of future implementation:
-    // ```
-    // let ios_device = MaestroDevice::new(
+    // ```rust
+    // let ios_device = MaestroDevice::ios(
     //     "Alice_iOS",
-    //     MaestroPlatform::Ios,
-    //     "iPhone-15-Pro",
+    //     "iPhone 15 Pro",
     //     "app.vauchi.mobile",
     //     &relay_url,
     // )?;
     //
-    // ios_device.run_flow("create_identity.yaml").await?;
-    // ios_device.run_flow("generate_qr.yaml").await?;
+    // ios_device.create_identity("Alice").await?;
+    // let qr = ios_device.generate_qr().await?;
     // ```
 
-    panic!("iOS simulator tests not yet implemented");
+    panic!("iOS simulator tests not yet implemented - requires Maestro YAML flows");
 }
 
 /// Placeholder for future Android emulator testing (Phase 2).
+///
+/// Requirements:
+/// - Maestro CLI installed
+/// - Android emulator running (via adb)
+/// - Maestro YAML flows in `e2e/maestro/android/`
+/// - APK built and installed
 #[tokio::test]
 #[ignore = "requires Maestro and Android emulator - Phase 2"]
 async fn test_android_emulator_exchange() {
-    // This test will use MaestroDevice when implemented
-    panic!("Android emulator tests not yet implemented");
+    // This test will use MaestroDevice for Android
+    // Same pattern as iOS but using adb instead of xcrun
+
+    panic!("Android emulator tests not yet implemented - requires Maestro YAML flows");
 }
 
 /// Placeholder for future Desktop (Tauri) testing (Phase 3).
+///
+/// Requirements:
+/// - Desktop app built (`just desktop-build`)
+/// - Tauri test mode or WebdriverIO for UI automation
+///
+/// The TauriDevice stub is available at `e2e/src/device/tauri.rs`
 #[tokio::test]
-#[ignore = "requires WebdriverIO and Tauri - Phase 3"]
+#[ignore = "requires Tauri IPC or WebdriverIO - Phase 3"]
 async fn test_desktop_exchange() {
-    // This test will use TauriDevice when implemented
-    panic!("Desktop tests not yet implemented");
+    use vauchi_e2e_tests::device::TauriDevice;
+
+    // Try to create a TauriDevice
+    match TauriDevice::new("Alice_Desktop", "ws://localhost:8080") {
+        Ok(device) => {
+            // Device created but methods not implemented
+            match device.create_identity("Alice").await {
+                Err(e) => panic!("Desktop automation not implemented: {}", e),
+                Ok(_) => panic!("Unexpected success - desktop automation should not be implemented yet"),
+            }
+        }
+        Err(e) => {
+            panic!("Desktop app binary not found: {}. Run `just desktop-build` first.", e);
+        }
+    }
 }
 
 /// Placeholder for future TUI testing (Phase 4).
+///
+/// Requirements:
+/// - TUI binary built (`cargo build -p vauchi-tui`)
+/// - expectrl crate for PTY automation
+///
+/// The TuiDevice stub is available at `e2e/src/device/tui.rs`
 #[tokio::test]
-#[ignore = "requires expectrl - Phase 4"]
+#[ignore = "requires expectrl for PTY automation - Phase 4"]
 async fn test_tui_exchange() {
-    // This test will use TuiDevice when implemented
-    panic!("TUI tests not yet implemented");
+    use vauchi_e2e_tests::device::TuiDevice;
+
+    // Try to create a TuiDevice
+    match TuiDevice::new("Alice_TUI", "ws://localhost:8080") {
+        Ok(device) => {
+            // Device created but methods not implemented
+            match device.create_identity("Alice").await {
+                Err(e) => panic!("TUI automation not implemented: {}", e),
+                Ok(_) => panic!("Unexpected success - TUI automation should not be implemented yet"),
+            }
+        }
+        Err(e) => {
+            panic!("TUI binary not found: {}. Run `cargo build -p vauchi-tui` first.", e);
+        }
+    }
 }

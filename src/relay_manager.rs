@@ -7,10 +7,9 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::error::{E2eError, E2eResult};
 
@@ -179,45 +178,17 @@ impl RelayManager {
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            // Redirect both stdout and stderr to null to prevent buffer filling.
+            // When pipes are not consumed, the buffer fills (~64KB) and the relay
+            // process blocks on write(), becoming unresponsive under heavy load.
+            // We use TCP health checks instead of monitoring stderr for readiness.
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let mut child = cmd.spawn().map_err(|e| {
+        let child = cmd.spawn().map_err(|e| {
             E2eError::relay(format!("Failed to spawn relay {}: {}", index, e))
         })?;
-
-        // Wait for the relay to start by monitoring stderr for the "listening" message
-        if let Some(stderr) = child.stderr.take() {
-            let mut reader = BufReader::new(stderr).lines();
-
-            let wait_for_ready = async {
-                while let Ok(Some(line)) = reader.next_line().await {
-                    debug!("Relay {}: {}", index, line);
-                    // Check for various indicators that the server is ready
-                    if line.contains("listening") || line.contains("Listening") || line.contains("started") {
-                        return Ok(());
-                    }
-                    if line.contains("error") || line.contains("Error") || line.contains("failed") {
-                        return Err(E2eError::relay(format!("Relay {} failed to start: {}", index, line)));
-                    }
-                }
-                Err(E2eError::relay(format!("Relay {} stderr closed unexpectedly", index)))
-            };
-
-            // Wait with timeout, but don't fail if we timeout - just do a health check
-            match timeout(Duration::from_secs(5), wait_for_ready).await {
-                Ok(Ok(())) => {
-                    debug!("Relay {} reported ready", index);
-                }
-                Ok(Err(e)) => {
-                    warn!("Relay {} startup warning: {}", index, e);
-                }
-                Err(_) => {
-                    debug!("Relay {} startup timeout, checking health...", index);
-                }
-            }
-        }
 
         // Verify the relay is actually listening by doing a health check
         let url = format!("ws://127.0.0.1:{}", port);
@@ -328,8 +299,9 @@ impl RelayManager {
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            // Use null for both to prevent buffer filling (same as spawn_one)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .kill_on_drop(true);
 
         let child = cmd.spawn().map_err(|e| {

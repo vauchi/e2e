@@ -1,14 +1,18 @@
 //! Device abstraction for E2E testing.
 //!
 //! Provides a trait-based abstraction over different device types:
-//! - CLI: Command-line based control
-//! - Maestro: Mobile app control (Phase 2)
-//! - Tauri: Desktop app control (Phase 3)
-//! - TUI: Terminal UI control (Phase 4)
+//! - CLI: Command-line based control (fully implemented)
+//! - TUI: Terminal UI control (stub - requires expectrl)
+//! - Tauri: Desktop app control (stub - requires WebdriverIO)
+//! - Maestro: Mobile app control (future - requires Maestro CLI)
 
 mod cli;
+mod tauri;
+mod tui;
 
 pub use cli::CliDevice;
+pub use tauri::TauriDevice;
+pub use tui::TuiDevice;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
