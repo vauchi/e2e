@@ -48,7 +48,7 @@
 //!
 //! ## Directory Structure
 //!
-//! ```
+//! ```text
 //! e2e/maestro/
 //! ├── ios/
 //! │   ├── create_identity.yaml
