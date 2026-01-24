@@ -285,7 +285,7 @@ impl CliDevice {
 
             // Also handle table format (│-separated) for compatibility
             if line.contains('│') || line.contains('|') {
-                let parts: Vec<&str> = line.split(|c| c == '│' || c == '|')
+                let parts: Vec<&str> = line.split(['│', '|'])
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
                     .collect();
