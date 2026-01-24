@@ -1,6 +1,6 @@
 # CLAUDE.md - vauchi-e2e-tests
 
-> **Inherits**: See [/CLAUDE.md](/CLAUDE.md) for project-wide rules.
+> **Inherits**: See [CLAUDE.md](../CLAUDE.md) for project-wide rules.
 
 End-to-end testing infrastructure for Vauchi.
 

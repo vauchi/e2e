@@ -1,0 +1,47 @@
+# GitLab CI for vauchi-e2e
+#
+# End-to-end testing infrastructure
+
+stages:
+  - lint
+
+variables:
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+  RUST_BACKTRACE: "1"
+
+.rust-cache: &rust-cache
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-rust
+    paths:
+      - .cargo/bin/
+      - .cargo/registry/index/
+      - .cargo/registry/cache/
+      - .cargo/git/db/
+      - target/
+
+lint:format:
+  stage: lint
+  image: rust:latest
+  <<: *rust-cache
+  script:
+    - rustup component add rustfmt
+    - cargo fmt --all -- --check
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true  # Advisory until codebase is formatted
+
+lint:clippy:
+  stage: lint
+  image: rust:latest
+  <<: *rust-cache
+  script:
+    - rustup component add clippy
+    - cargo clippy --all-targets -- -D warnings
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true  # May fail on git dependency issues
+
+# Note: E2E tests require relay and CLI binaries, so they run from the meta-repo
+# See vauchi/vauchi CI for e2e:smoke and e2e:release jobs
