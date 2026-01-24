@@ -1,8 +1,10 @@
 # CLAUDE.md - vauchi-e2e-tests
 
+> **Inherits**: See [/CLAUDE.md](/CLAUDE.md) for project-wide rules.
+
 End-to-end testing infrastructure for Vauchi.
 
-## Rules
+## Component-Specific Rules
 
 - Depends on `vauchi-core` and `vauchi-relay`
 - Tests multi-user, multi-device scenarios
