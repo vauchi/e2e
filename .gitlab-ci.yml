@@ -1,13 +1,27 @@
 # GitLab CI for vauchi-e2e
 #
 # End-to-end testing infrastructure
+#
+# GitLab Ultimate Features:
+#   - SAST: Static application security testing
+#   - Secret Detection: Prevent credential leaks
+
+# GitLab Ultimate Templates
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
 
 stages:
   - lint
+  - security
 
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
+
+  # GitLab Ultimate Security Configuration
+  SAST_EXCLUDED_PATHS: "target/, scenarios/"
+  SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
 .rust-cache: &rust-cache
   cache:
@@ -19,22 +33,27 @@ variables:
       - .cargo/git/db/
       - target/
 
-lint:format:
-  stage: lint
+.rust-job:
   image: rust:latest
   <<: *rust-cache
+
+# ============================================================
+# Lint Stage
+# ============================================================
+
+lint:format:
+  extends: .rust-job
+  stage: lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true  # Advisory until codebase is formatted
 
 lint:clippy:
+  extends: .rust-job
   stage: lint
-  image: rust:latest
-  <<: *rust-cache
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
@@ -42,6 +61,23 @@ lint:clippy:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
   allow_failure: true  # May fail on git dependency issues
+
+# ============================================================
+# Security Stage
+# ============================================================
+
+# Override GitLab templates
+sast:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+secret_detection:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 # Note: E2E tests require relay and CLI binaries, so they run from the meta-repo
 # See vauchi/vauchi CI for e2e:smoke and e2e:release jobs
