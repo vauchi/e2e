@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Mobile device implementation using Maestro.
 //!
 //! Controls iOS Simulator and Android Emulator using Maestro CLI.

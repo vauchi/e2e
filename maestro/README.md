@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Maestro Flows for Mobile E2E Testing
 
 This directory contains Maestro YAML flows for automated mobile testing.

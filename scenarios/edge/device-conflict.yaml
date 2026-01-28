@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Device Conflict - Edge case test
 # Tests: Concurrent edits on multiple devices converge correctly
 # Feature: sync_updates.feature

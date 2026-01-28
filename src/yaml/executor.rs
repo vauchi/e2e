@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! YAML Scenario Executor
 //!
 //! Executes YAML scenario files by interpreting steps and coordinating devices.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Scenario DSL for E2E testing.
 //!
 //! Provides a fluent API for defining multi-user, multi-device test scenarios.

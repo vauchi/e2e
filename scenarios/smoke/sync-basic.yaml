@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Basic Sync - Smoke test for card updates
 # Tests: Card update propagates via sync
 # Feature: sync_updates.feature

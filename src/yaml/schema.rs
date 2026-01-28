@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! YAML Scenario Schema Definitions
 //!
 //! Defines the structure of YAML scenario files for E2E testing.

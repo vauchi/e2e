@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Desktop (Tauri) device implementation.
 //!
 //! Controls the Vauchi desktop app built with Tauri via a test HTTP server.
