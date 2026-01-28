@@ -40,22 +40,6 @@ variables:
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
 # ============================================================
-# Local Template Definitions (until scripts MR is merged)
-# ============================================================
-
-.validation-rust:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - "**/*.rs"
-        - "**/Cargo.toml"
-        - "**/Cargo.lock"
-        - ".gitlab-ci.yml"
-
-.timeout-quick:
-  timeout: 10 minutes
-
-# ============================================================
 # Lint Stage (runs on Rust code changes)
 # ============================================================
 
