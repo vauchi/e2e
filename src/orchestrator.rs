@@ -69,7 +69,10 @@ impl Orchestrator {
             return Err(E2eError::scenario("Orchestrator already started"));
         }
 
-        info!("Starting orchestrator with {} relay(s)", self.config.relay_count);
+        info!(
+            "Starting orchestrator with {} relay(s)",
+            self.config.relay_count
+        );
 
         let mut relay_manager = RelayManager::with_config(self.config.relay_config.clone()).await?;
         relay_manager.spawn(self.config.relay_count).await?;
@@ -122,7 +125,11 @@ impl Orchestrator {
     }
 
     /// Add a user with the specified number of devices.
-    pub fn add_user(&mut self, name: impl Into<String>, device_count: usize) -> E2eResult<Arc<RwLock<User>>> {
+    pub fn add_user(
+        &mut self,
+        name: impl Into<String>,
+        device_count: usize,
+    ) -> E2eResult<Arc<RwLock<User>>> {
         let name = name.into();
         let relay_url = self.primary_relay_url()?;
 
@@ -206,9 +213,11 @@ impl Orchestrator {
 
     /// Perform a full exchange between two users.
     pub async fn exchange(&self, user_a_name: &str, user_b_name: &str) -> E2eResult<()> {
-        let user_a = self.user(user_a_name)
+        let user_a = self
+            .user(user_a_name)
             .ok_or_else(|| E2eError::user(format!("User '{}' not found", user_a_name)))?;
-        let user_b = self.user(user_b_name)
+        let user_b = self
+            .user(user_b_name)
             .ok_or_else(|| E2eError::user(format!("User '{}' not found", user_b_name)))?;
 
         info!("Exchange: {} -> {}", user_a_name, user_b_name);
@@ -254,7 +263,8 @@ impl Orchestrator {
 
     /// Verify that a user has a specific number of contacts on all devices.
     pub async fn verify_contact_count(&self, user_name: &str, expected: usize) -> E2eResult<()> {
-        let user = self.user(user_name)
+        let user = self
+            .user(user_name)
             .ok_or_else(|| E2eError::user(format!("User '{}' not found", user_name)))?;
 
         let user = user.read().await;

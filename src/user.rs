@@ -85,7 +85,10 @@ impl User {
             relay_url
         };
 
-        info!("Adding CLI device '{}' for user '{}' (relay: {})", device_name, self.name, url);
+        info!(
+            "Adding CLI device '{}' for user '{}' (relay: {})",
+            device_name, self.name, url
+        );
 
         let device = CliDevice::new(&full_name, url)?;
         let device: Box<dyn Device> = Box::new(device);
@@ -117,7 +120,8 @@ impl User {
 
     /// Create identity on the primary device.
     pub async fn create_identity(&self) -> E2eResult<()> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No devices available"))?;
 
         let device = primary.read().await;
@@ -127,7 +131,8 @@ impl User {
 
     /// Create identity on a specific device.
     pub async fn create_identity_on_device(&self, device_index: usize) -> E2eResult<()> {
-        let device = self.device(device_index)
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -143,11 +148,16 @@ impl User {
     /// 4. Secondary device finishes joining
     pub async fn link_devices(&self) -> E2eResult<()> {
         if self.devices.len() <= 1 {
-            debug!("User '{}' has {} devices, no linking needed", self.name, self.devices.len());
+            debug!(
+                "User '{}' has {} devices, no linking needed",
+                self.name,
+                self.devices.len()
+            );
             return Ok(());
         }
 
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         for i in 1..self.devices.len() {
@@ -197,7 +207,8 @@ impl User {
 
     /// Sync a specific device.
     pub async fn sync_device(&self, device_index: usize) -> E2eResult<()> {
-        let device = self.device(device_index)
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -206,7 +217,8 @@ impl User {
 
     /// Generate exchange QR from the primary device.
     pub async fn generate_qr(&self) -> E2eResult<String> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -215,7 +227,8 @@ impl User {
 
     /// Generate exchange QR from a specific device.
     pub async fn generate_qr_from_device(&self, device_index: usize) -> E2eResult<String> {
-        let device = self.device(device_index)
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -224,7 +237,8 @@ impl User {
 
     /// Complete an exchange using the primary device.
     pub async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -232,8 +246,13 @@ impl User {
     }
 
     /// Complete an exchange using a specific device.
-    pub async fn complete_exchange_on_device(&self, device_index: usize, qr_data: &str) -> E2eResult<()> {
-        let device = self.device(device_index)
+    pub async fn complete_exchange_on_device(
+        &self,
+        device_index: usize,
+        qr_data: &str,
+    ) -> E2eResult<()> {
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -242,7 +261,8 @@ impl User {
 
     /// List contacts on the primary device.
     pub async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -251,7 +271,8 @@ impl User {
 
     /// List contacts on a specific device.
     pub async fn list_contacts_on_device(&self, device_index: usize) -> E2eResult<Vec<Contact>> {
-        let device = self.device(device_index)
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -260,7 +281,8 @@ impl User {
 
     /// Get the contact card from the primary device.
     pub async fn get_card(&self) -> E2eResult<ContactCard> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -269,7 +291,8 @@ impl User {
 
     /// Add a field to the contact card on the primary device.
     pub async fn add_field(&self, field_type: &str, label: &str, value: &str) -> E2eResult<()> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -278,7 +301,8 @@ impl User {
 
     /// Edit a field on the contact card on the primary device.
     pub async fn edit_field(&self, label: &str, value: &str) -> E2eResult<()> {
-        let primary = self.primary_device()
+        let primary = self
+            .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
@@ -287,7 +311,8 @@ impl User {
 
     /// Get the contact card from a specific device.
     pub async fn get_card_on_device(&self, device_index: usize) -> E2eResult<ContactCard> {
-        let device = self.device(device_index)
+        let device = self
+            .device(device_index)
             .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
 
         let device = device.read().await;
@@ -317,7 +342,10 @@ impl User {
     ///
     /// Both users exchange QRs and complete the exchange bidirectionally.
     pub async fn mutual_exchange_with(&self, other: &User) -> E2eResult<()> {
-        info!("Mutual exchange between '{}' and '{}'", self.name, other.name);
+        info!(
+            "Mutual exchange between '{}' and '{}'",
+            self.name, other.name
+        );
 
         // This user generates QR and other completes
         let my_qr = self.generate_qr().await?;

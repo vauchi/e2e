@@ -46,7 +46,9 @@ fn find_available_port() -> E2eResult<u16> {
         }
     }
 
-    Err(E2eError::relay("Could not find available port for relay server"))
+    Err(E2eError::relay(
+        "Could not find available port for relay server",
+    ))
 }
 
 /// Check if a port is available for binding.
@@ -169,15 +171,15 @@ impl RelayManager {
     /// Find the relay binary in the workspace.
     fn find_relay_binary() -> E2eResult<PathBuf> {
         // Try release binary first
-        let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/release/vauchi-relay");
+        let release_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi-relay");
         if release_path.exists() {
             return Ok(release_path);
         }
 
         // Try debug binary
-        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/debug/vauchi-relay");
+        let debug_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi-relay");
         if debug_path.exists() {
             return Ok(debug_path);
         }
@@ -209,12 +211,30 @@ impl RelayManager {
         info!("Spawning relay {} on port {}", index, port);
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
-        env_vars.insert("RELAY_LISTEN_ADDR".to_string(), format!("127.0.0.1:{}", port));
-        env_vars.insert("RELAY_METRICS_ADDR".to_string(), format!("127.0.0.1:{}", metrics_port));
-        env_vars.insert("RELAY_STORAGE_BACKEND".to_string(), self.config.storage_backend.clone());
-        env_vars.insert("RELAY_BLOB_TTL_SECS".to_string(), self.config.blob_ttl_secs.to_string());
-        env_vars.insert("RELAY_IDLE_TIMEOUT".to_string(), self.config.idle_timeout.to_string());
-        env_vars.insert("RELAY_RATE_LIMIT".to_string(), self.config.rate_limit.to_string());
+        env_vars.insert(
+            "RELAY_LISTEN_ADDR".to_string(),
+            format!("127.0.0.1:{}", port),
+        );
+        env_vars.insert(
+            "RELAY_METRICS_ADDR".to_string(),
+            format!("127.0.0.1:{}", metrics_port),
+        );
+        env_vars.insert(
+            "RELAY_STORAGE_BACKEND".to_string(),
+            self.config.storage_backend.clone(),
+        );
+        env_vars.insert(
+            "RELAY_BLOB_TTL_SECS".to_string(),
+            self.config.blob_ttl_secs.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_IDLE_TIMEOUT".to_string(),
+            self.config.idle_timeout.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_RATE_LIMIT".to_string(),
+            self.config.rate_limit.to_string(),
+        );
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
@@ -227,9 +247,9 @@ impl RelayManager {
             .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let child = cmd.spawn().map_err(|e| {
-            E2eError::relay(format!("Failed to spawn relay {}: {}", index, e))
-        })?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
 
         // Verify the relay is actually listening by doing a health check
         let url = format!("ws://127.0.0.1:{}", port);
@@ -258,7 +278,11 @@ impl RelayManager {
                 // Try TCP connection first
                 match tokio::net::TcpStream::connect(format!("127.0.0.1:{}", port)).await {
                     Ok(_) => {
-                        debug!("Relay {} accepting connections (attempt {})", index, attempt + 1);
+                        debug!(
+                            "Relay {} accepting connections (attempt {})",
+                            index,
+                            attempt + 1
+                        );
                         return Ok(());
                     }
                     Err(_) => {
@@ -333,12 +357,30 @@ impl RelayManager {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
-        env_vars.insert("RELAY_LISTEN_ADDR".to_string(), format!("127.0.0.1:{}", port));
-        env_vars.insert("RELAY_METRICS_ADDR".to_string(), format!("127.0.0.1:{}", metrics_port));
-        env_vars.insert("RELAY_STORAGE_BACKEND".to_string(), self.config.storage_backend.clone());
-        env_vars.insert("RELAY_BLOB_TTL_SECS".to_string(), self.config.blob_ttl_secs.to_string());
-        env_vars.insert("RELAY_IDLE_TIMEOUT".to_string(), self.config.idle_timeout.to_string());
-        env_vars.insert("RELAY_RATE_LIMIT".to_string(), self.config.rate_limit.to_string());
+        env_vars.insert(
+            "RELAY_LISTEN_ADDR".to_string(),
+            format!("127.0.0.1:{}", port),
+        );
+        env_vars.insert(
+            "RELAY_METRICS_ADDR".to_string(),
+            format!("127.0.0.1:{}", metrics_port),
+        );
+        env_vars.insert(
+            "RELAY_STORAGE_BACKEND".to_string(),
+            self.config.storage_backend.clone(),
+        );
+        env_vars.insert(
+            "RELAY_BLOB_TTL_SECS".to_string(),
+            self.config.blob_ttl_secs.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_IDLE_TIMEOUT".to_string(),
+            self.config.idle_timeout.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_RATE_LIMIT".to_string(),
+            self.config.rate_limit.to_string(),
+        );
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
@@ -348,9 +390,9 @@ impl RelayManager {
             .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let child = cmd.spawn().map_err(|e| {
-            E2eError::relay(format!("Failed to restart relay {}: {}", index, e))
-        })?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
 
         // Wait for health
         self.wait_for_health(port, index).await?;

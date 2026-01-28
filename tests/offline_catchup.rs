@@ -30,8 +30,12 @@ async fn integration_offline_catchup() {
     orch.add_user("Carol", 1).expect("Failed to add Carol");
     orch.add_user("Dave", 1).expect("Failed to add Dave");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -76,8 +80,14 @@ async fn integration_offline_catchup() {
     // Verify A1 and A2 have 3 contacts
     {
         let alice = alice.read().await;
-        let contacts_0 = alice.list_contacts_on_device(0).await.expect("Failed to list contacts");
-        let contacts_1 = alice.list_contacts_on_device(1).await.expect("Failed to list contacts");
+        let contacts_0 = alice
+            .list_contacts_on_device(0)
+            .await
+            .expect("Failed to list contacts");
+        let contacts_1 = alice
+            .list_contacts_on_device(1)
+            .await
+            .expect("Failed to list contacts");
 
         assert_eq!(contacts_0.len(), 3, "Device A1 should have 3 contacts");
         assert_eq!(contacts_1.len(), 3, "Device A2 should have 3 contacts");
@@ -92,7 +102,10 @@ async fn integration_offline_catchup() {
     // Step 5: Verify A3 catches up
     {
         let alice = alice.read().await;
-        let contacts_2 = alice.list_contacts_on_device(2).await.expect("Failed to list contacts");
+        let contacts_2 = alice
+            .list_contacts_on_device(2)
+            .await
+            .expect("Failed to list contacts");
 
         assert_eq!(
             contacts_2.len(),
@@ -116,11 +129,17 @@ async fn integration_card_catchup() {
     orch.add_user("Alice", 2).expect("Failed to add Alice");
     orch.add_user("Bob", 1).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     // Initial exchange
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -130,7 +149,8 @@ async fn integration_card_catchup() {
     // Bob updates his card
     {
         let bob = bob.read().await;
-        bob.add_field("email", "Email", "bob@example.com").await
+        bob.add_field("email", "Email", "bob@example.com")
+            .await
             .expect("Failed to add field");
         bob.sync_all().await.expect("Failed to sync Bob");
     }
@@ -166,8 +186,12 @@ async fn integration_extended_offline() {
     orch.add_user("Bob", 1).expect("Failed to add Bob");
     orch.add_user("Carol", 1).expect("Failed to add Carol");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -202,7 +226,8 @@ async fn integration_extended_offline() {
     // Bob updates his card
     {
         let bob = bob.read().await;
-        bob.add_field("phone", "Phone", "+1-555-0123").await
+        bob.add_field("phone", "Phone", "+1-555-0123")
+            .await
             .expect("Failed to add field");
         bob.sync_all().await.expect("Failed to sync Bob");
     }
@@ -222,7 +247,9 @@ async fn integration_extended_offline() {
     // Verify A2 has all contacts and updates
     {
         let alice = alice.read().await;
-        let contacts = alice.list_contacts_on_device(1).await
+        let contacts = alice
+            .list_contacts_on_device(1)
+            .await
             .expect("Failed to list contacts");
 
         assert_eq!(

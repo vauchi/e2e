@@ -15,9 +15,8 @@ use crate::relay_manager::{RelayConfig as RMConfig, RelayManager};
 use crate::user::User;
 
 use super::schema::{
-    Action, ActorRef, Assertion, AssertionStep, ActionStep, ConditionalStep,
-    NetworkCondition, NetworkMode, ParallelStep, Platform, Scenario,
-    ScenarioResult, Step, StepResult, WaitStep,
+    Action, ActionStep, ActorRef, Assertion, AssertionStep, ConditionalStep, NetworkCondition,
+    NetworkMode, ParallelStep, Platform, Scenario, ScenarioResult, Step, StepResult, WaitStep,
 };
 
 /// Executor for YAML scenarios.
@@ -72,8 +71,7 @@ impl ScenarioExecutor {
         }
 
         // Execute steps with scenario timeout
-        let result = timeout(scenario.timeout, self.execute_steps(&scenario.steps))
-            .await;
+        let result = timeout(scenario.timeout, self.execute_steps(&scenario.steps)).await;
 
         let (passed, error, steps) = match result {
             Ok(Ok(steps)) => (true, None, steps),
@@ -195,7 +193,8 @@ impl ScenarioExecutor {
 
         // Apply initial network conditions
         for (actor, condition) in &scenario.network_conditions {
-            self.network_conditions.insert(actor.clone(), condition.clone());
+            self.network_conditions
+                .insert(actor.clone(), condition.clone());
         }
 
         Ok(())
@@ -222,7 +221,8 @@ impl ScenarioExecutor {
     fn execute_step<'a>(
         &'a mut self,
         step: &'a Step,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = E2eResult<StepResult>> + Send + 'a>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = E2eResult<StepResult>> + Send + 'a>>
+    {
         Box::pin(async move {
             match step {
                 Step::Action(action_step) => self.execute_action(action_step).await,
@@ -267,7 +267,10 @@ impl ScenarioExecutor {
                         passed: step.expect_error.is_none(),
                         duration: start.elapsed(),
                         error: None,
-                        output: self.outputs.get(step.output.as_ref().unwrap_or(&String::new())).cloned(),
+                        output: self
+                            .outputs
+                            .get(step.output.as_ref().unwrap_or(&String::new()))
+                            .cloned(),
                     });
                 }
                 Ok(Err(e)) => {
@@ -319,7 +322,10 @@ impl ScenarioExecutor {
                     // Get the device (primary or specific)
                     let device_idx = device_idx.unwrap_or(0);
                     let device = user.device(device_idx).ok_or_else(|| {
-                        E2eError::InvalidActor(format!("Device {} not found for {}", device_idx, user_name))
+                        E2eError::InvalidActor(format!(
+                            "Device {} not found for {}",
+                            device_idx, user_name
+                        ))
                     })?;
                     device.read().await.create_identity(&name).await?;
                 }
@@ -421,7 +427,9 @@ impl ScenarioExecutor {
             }
 
             Action::SetNetwork => {
-                let internet = self.get_param_bool(&step.params, "internet").unwrap_or(true);
+                let internet = self
+                    .get_param_bool(&step.params, "internet")
+                    .unwrap_or(true);
                 let mode_str = self.get_param_string(&step.params, "mode").ok();
                 let mode = match mode_str.as_deref() {
                     Some("flaky") => NetworkMode::Flaky,
@@ -575,11 +583,7 @@ impl ScenarioExecutor {
 
     /// Actually perform an assertion.
     async fn do_assertion(&self, step: &AssertionStep) -> E2eResult<()> {
-        let actors = step
-            .actor
-            .as_ref()
-            .map(|a| a.actors())
-            .unwrap_or_default();
+        let actors = step.actor.as_ref().map(|a| a.actors()).unwrap_or_default();
 
         match &step.assertion {
             Assertion::ContactCount | Assertion::HasContact => {
@@ -674,7 +678,9 @@ impl ScenarioExecutor {
                     for i in 0..user.device_count() {
                         let card = user.get_card_on_device(i).await?;
                         if let Some(ref_card) = &reference_card {
-                            if card.name != ref_card.name || card.fields.len() != ref_card.fields.len() {
+                            if card.name != ref_card.name
+                                || card.fields.len() != ref_card.fields.len()
+                            {
                                 return Err(E2eError::AssertionFailed(format!(
                                     "{}'s devices have not converged",
                                     actor
@@ -808,9 +814,10 @@ impl ScenarioExecutor {
     // Helper methods
 
     fn get_user(&self, name: &str) -> E2eResult<Arc<RwLock<User>>> {
-        self.users.get(name).cloned().ok_or_else(|| {
-            E2eError::InvalidActor(format!("User '{}' not found", name))
-        })
+        self.users
+            .get(name)
+            .cloned()
+            .ok_or_else(|| E2eError::InvalidActor(format!("User '{}' not found", name)))
     }
 
     fn get_param_string(
@@ -845,11 +852,7 @@ impl ScenarioExecutor {
         params.get(key).and_then(|v| v.as_bool())
     }
 
-    fn get_param_f32(
-        &self,
-        params: &HashMap<String, serde_yaml::Value>,
-        key: &str,
-    ) -> Option<f32> {
+    fn get_param_f32(&self, params: &HashMap<String, serde_yaml::Value>, key: &str) -> Option<f32> {
         params.get(key).and_then(|v| v.as_f64()).map(|n| n as f32)
     }
 
@@ -888,7 +891,9 @@ mod tests {
     #[test]
     fn test_interpolate_var() {
         let mut executor = ScenarioExecutor::new();
-        executor.outputs.insert("qr_data".to_string(), "ABC123".to_string());
+        executor
+            .outputs
+            .insert("qr_data".to_string(), "ABC123".to_string());
 
         assert_eq!(executor.interpolate_var("${qr_data}"), "ABC123");
         assert_eq!(executor.interpolate_var("QR: ${qr_data}"), "QR: ABC123");
@@ -898,7 +903,9 @@ mod tests {
     #[test]
     fn test_evaluate_condition() {
         let mut executor = ScenarioExecutor::new();
-        executor.outputs.insert("flag".to_string(), "true".to_string());
+        executor
+            .outputs
+            .insert("flag".to_string(), "true".to_string());
 
         assert!(executor.evaluate_condition("${flag}"));
         assert!(!executor.evaluate_condition("${undefined}"));

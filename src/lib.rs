@@ -75,7 +75,6 @@ pub mod prelude {
 
     // YAML scenario types
     pub use crate::yaml::{
-        ScenarioExecutor, ScenarioInfo, ScenarioLoader,
-        Scenario as YamlScenario, ScenarioResult,
+        Scenario as YamlScenario, ScenarioExecutor, ScenarioInfo, ScenarioLoader, ScenarioResult,
     };
 }

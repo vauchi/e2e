@@ -49,29 +49,28 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 /// Find the TUI binary in the workspace.
 fn find_tui_binary() -> E2eResult<PathBuf> {
     // Try release binary first
-    let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../tui/target/release/vauchi-tui");
+    let release_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tui/target/release/vauchi-tui");
     if release_path.exists() {
         return Ok(release_path);
     }
 
     // Try debug binary
-    let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../tui/target/debug/vauchi-tui");
+    let debug_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tui/target/debug/vauchi-tui");
     if debug_path.exists() {
         return Ok(debug_path);
     }
 
     // Try shared target directory (release)
-    let shared_release = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../target/release/vauchi-tui");
+    let shared_release =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi-tui");
     if shared_release.exists() {
         return Ok(shared_release);
     }
 
     // Try shared target directory (debug)
-    let shared_debug = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../target/debug/vauchi-tui");
+    let shared_debug = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi-tui");
     if shared_debug.exists() {
         return Ok(shared_debug);
     }
@@ -90,12 +89,15 @@ struct PtySession {
 }
 
 impl PtySession {
-    fn new(tui_binary: &std::path::Path, data_dir: &std::path::Path, relay_url: &str) -> E2eResult<Self> {
+    fn new(
+        tui_binary: &std::path::Path,
+        data_dir: &std::path::Path,
+        relay_url: &str,
+    ) -> E2eResult<Self> {
         // Create log file for debugging
         let log_path = data_dir.join("pty.log");
-        let log_file = std::fs::File::create(&log_path).map_err(|e| {
-            E2eError::device(format!("Failed to create log file: {}", e))
-        })?;
+        let log_file = std::fs::File::create(&log_path)
+            .map_err(|e| E2eError::device(format!("Failed to create log file: {}", e)))?;
 
         // Create a wrapper script to handle all the terminal setup
         // This avoids complex shell quoting issues
@@ -113,9 +115,8 @@ exec "{}"
             tui_binary.display()
         );
 
-        std::fs::write(&script_path, &script_content).map_err(|e| {
-            E2eError::device(format!("Failed to write wrapper script: {}", e))
-        })?;
+        std::fs::write(&script_path, &script_content)
+            .map_err(|e| E2eError::device(format!("Failed to write wrapper script: {}", e)))?;
 
         // Make the script executable
         #[cfg(unix)]
@@ -125,15 +126,13 @@ exec "{}"
                 .map_err(|e| E2eError::device(format!("Failed to get script metadata: {}", e)))?
                 .permissions();
             perms.set_mode(0o755);
-            std::fs::set_permissions(&script_path, perms)
-                .map_err(|e| E2eError::device(format!("Failed to set script permissions: {}", e)))?;
+            std::fs::set_permissions(&script_path, perms).map_err(|e| {
+                E2eError::device(format!("Failed to set script permissions: {}", e))
+            })?;
         }
 
         // Use `script` to provide a proper controlling terminal with /dev/tty
-        let script_cmd = format!(
-            "script -q -c '{}' /dev/null",
-            script_path.display()
-        );
+        let script_cmd = format!("script -q -c '{}' /dev/null", script_path.display());
 
         // Spawn PTY session with script wrapper
         let mut session = expectrl::spawn(&script_cmd)
@@ -146,16 +145,16 @@ exec "{}"
     }
 
     fn send_key(&mut self, key: u8) -> E2eResult<()> {
-        self.session.write_all(&[key]).map_err(|e| {
-            E2eError::device(format!("Failed to send key: {}", e))
-        })?;
+        self.session
+            .write_all(&[key])
+            .map_err(|e| E2eError::device(format!("Failed to send key: {}", e)))?;
         Ok(())
     }
 
     fn send_text(&mut self, text: &str) -> E2eResult<()> {
-        self.session.write_all(text.as_bytes()).map_err(|e| {
-            E2eError::device(format!("Failed to send text: {}", e))
-        })?;
+        self.session
+            .write_all(text.as_bytes())
+            .map_err(|e| E2eError::device(format!("Failed to send text: {}", e)))?;
         Ok(())
     }
 
@@ -169,9 +168,10 @@ exec "{}"
         // expectrl's Regex takes the pattern directly
         let regex = Regex(pattern);
 
-        let found = self.session.expect(regex).map_err(|e| {
-            E2eError::device(format!("Pattern '{}' not found: {}", pattern, e))
-        })?;
+        let found = self
+            .session
+            .expect(regex)
+            .map_err(|e| E2eError::device(format!("Pattern '{}' not found: {}", pattern, e)))?;
 
         let matched = String::from_utf8_lossy(found.as_bytes()).to_string();
         Ok(matched)
@@ -179,7 +179,8 @@ exec "{}"
 
     fn read_available(&mut self) -> E2eResult<String> {
         // Set very short timeout for non-blocking read
-        self.session.set_expect_timeout(Some(Duration::from_millis(100)));
+        self.session
+            .set_expect_timeout(Some(Duration::from_millis(100)));
 
         let mut buffer = vec![0u8; 4096];
         match self.session.read(&mut buffer) {
@@ -241,9 +242,9 @@ impl TuiSession {
 
     async fn send_key(&self, key: u8) -> E2eResult<()> {
         let mut pty_guard = self.pty.lock().await;
-        let pty = pty_guard.as_mut().ok_or_else(|| {
-            E2eError::device("TUI session not started")
-        })?;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.send_key(key)?;
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(())
@@ -271,9 +272,9 @@ impl TuiSession {
 
     async fn send_text(&self, text: &str) -> E2eResult<()> {
         let mut pty_guard = self.pty.lock().await;
-        let pty = pty_guard.as_mut().ok_or_else(|| {
-            E2eError::device("TUI session not started")
-        })?;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.send_text(text)?;
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(())
@@ -281,25 +282,25 @@ impl TuiSession {
 
     async fn expect(&self, pattern: &str) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
-        let pty = pty_guard.as_mut().ok_or_else(|| {
-            E2eError::device("TUI session not started")
-        })?;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.expect(pattern)
     }
 
     async fn expect_timeout(&self, pattern: &str, timeout: Duration) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
-        let pty = pty_guard.as_mut().ok_or_else(|| {
-            E2eError::device("TUI session not started")
-        })?;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.expect_with_timeout(pattern, timeout)
     }
 
     async fn read_screen(&self) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
-        let pty = pty_guard.as_mut().ok_or_else(|| {
-            E2eError::device("TUI session not started")
-        })?;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.read_available()
     }
 
@@ -332,9 +333,8 @@ pub struct TuiDevice {
 impl TuiDevice {
     /// Create a new TUI device with an isolated data directory.
     pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> E2eResult<Self> {
-        let data_dir = TempDir::new().map_err(|e| {
-            E2eError::device(format!("Failed to create temp directory: {}", e))
-        })?;
+        let data_dir = TempDir::new()
+            .map_err(|e| E2eError::device(format!("Failed to create temp directory: {}", e)))?;
 
         let tui_path = find_tui_binary()?;
         let relay_url = relay_url.into();
@@ -381,14 +381,18 @@ impl Device for TuiDevice {
         // Wait for setup screen - look for key text in the TUI output
         // The TUI uses Ratatui which includes ANSI escape codes mixed with text
         // Look for the setup screen indicators
-        self.session.expect_timeout("Setup|Create New Identity|Welcome", Duration::from_secs(15)).await?;
+        self.session
+            .expect_timeout("Setup|Create New Identity|Welcome", Duration::from_secs(15))
+            .await?;
 
         // Press 'c' to create identity
         self.session.send_char('c').await?;
 
         // Wait for home screen - TUI goes directly to home after identity creation
         // Look for common home screen elements
-        self.session.expect_timeout("Contacts|Search|Press", Duration::from_secs(10)).await?;
+        self.session
+            .expect_timeout("Contacts|Search|Press", Duration::from_secs(10))
+            .await?;
 
         // Now go to settings to update the name
         self.session.send_char('s').await?;
@@ -422,13 +426,13 @@ impl Device for TuiDevice {
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Use backup/restore for TUI identity export".into()
+            "Use backup/restore for TUI identity export".into(),
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Use backup/restore for TUI identity import".into()
+            "Use backup/restore for TUI identity import".into(),
         ))
     }
 
@@ -443,13 +447,13 @@ impl Device for TuiDevice {
 
         // For now, return error - TUI QR extraction is complex
         Err(E2eError::DeviceNotSupported(
-            "TUI QR extraction not yet implemented - requires screen OCR or data export".into()
+            "TUI QR extraction not yet implemented - requires screen OCR or data export".into(),
         ))
     }
 
     async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "TUI cannot scan QR codes. Use CLI for programmatic exchange.".into()
+            "TUI cannot scan QR codes. Use CLI for programmatic exchange.".into(),
         ))
     }
 
@@ -485,19 +489,19 @@ impl Device for TuiDevice {
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual QR entry. Use CLI.".into()
+            "TUI device linking requires manual QR entry. Use CLI.".into(),
         ))
     }
 
     async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual interaction. Use CLI.".into()
+            "TUI device linking requires manual interaction. Use CLI.".into(),
         ))
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual interaction. Use CLI.".into()
+            "TUI device linking requires manual interaction. Use CLI.".into(),
         ))
     }
 
@@ -534,7 +538,9 @@ impl Device for TuiDevice {
         self.session.send_char('s').await?;
 
         // Wait for sync to complete
-        self.session.expect_timeout("Sync complete|Sync failed", Duration::from_secs(10)).await?;
+        self.session
+            .expect_timeout("Sync complete|Sync failed", Duration::from_secs(10))
+            .await?;
 
         // Go back to home
         self.session.send_escape().await?;
@@ -653,7 +659,10 @@ impl Device for TuiDevice {
         self.session.ensure_started().await?;
 
         let card = self.get_card().await?;
-        let field_index = card.fields.iter().position(|f| f.label == label)
+        let field_index = card
+            .fields
+            .iter()
+            .position(|f| f.label == label)
             .ok_or_else(|| E2eError::device(format!("Field '{}' not found", label)))?;
 
         for _ in 0..field_index {
@@ -678,7 +687,10 @@ impl Device for TuiDevice {
         self.session.ensure_started().await?;
 
         let card = self.get_card().await?;
-        let field_index = card.fields.iter().position(|f| f.label == label)
+        let field_index = card
+            .fields
+            .iter()
+            .position(|f| f.label == label)
             .ok_or_else(|| E2eError::device(format!("Field '{}' not found", label)))?;
 
         for _ in 0..field_index {

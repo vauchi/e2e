@@ -34,14 +34,22 @@ async fn integration_relay_failover() {
     orch.add_user("Alice", 1).expect("Failed to add Alice");
     orch.add_user("Bob", 1).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
 
     // Initial exchange using primary relay
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
     // Verify initial state
-    orch.verify_contact_count("Alice", 1).await.expect("Alice should have 1 contact");
-    orch.verify_contact_count("Bob", 1).await.expect("Bob should have 1 contact");
+    orch.verify_contact_count("Alice", 1)
+        .await
+        .expect("Alice should have 1 contact");
+    orch.verify_contact_count("Bob", 1)
+        .await
+        .expect("Bob should have 1 contact");
 
     // Step 2: Stop primary relay (relay 0)
     orch.stop_relay(0).await.expect("Failed to stop relay 0");
@@ -50,7 +58,9 @@ async fn integration_relay_failover() {
     sleep(Duration::from_secs(1)).await;
 
     // Step 5: Restart primary relay
-    orch.restart_relay(0).await.expect("Failed to restart relay 0");
+    orch.restart_relay(0)
+        .await
+        .expect("Failed to restart relay 0");
 
     // Give time for recovery
     sleep(Duration::from_secs(2)).await;
@@ -59,8 +69,12 @@ async fn integration_relay_failover() {
     orch.sync_all().await.expect("Failed to sync all");
 
     // Verify contacts are still intact
-    orch.verify_contact_count("Alice", 1).await.expect("Alice should still have 1 contact");
-    orch.verify_contact_count("Bob", 1).await.expect("Bob should still have 1 contact");
+    orch.verify_contact_count("Alice", 1)
+        .await
+        .expect("Alice should still have 1 contact");
+    orch.verify_contact_count("Bob", 1)
+        .await
+        .expect("Bob should still have 1 contact");
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
@@ -82,8 +96,12 @@ async fn integration_updates_during_outage() {
     orch.add_user("Alice", 1).expect("Failed to add Alice");
     orch.add_user("Bob", 1).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -94,7 +112,9 @@ async fn integration_updates_during_outage() {
     // Alice updates her card while relay is down
     {
         let alice = alice.read().await;
-        alice.add_field("email", "Email", "alice@offline.com").await
+        alice
+            .add_field("email", "Email", "alice@offline.com")
+            .await
             .expect("Failed to add field");
     }
 
@@ -105,7 +125,9 @@ async fn integration_updates_during_outage() {
     }
 
     // Restart relay
-    orch.restart_relay(0).await.expect("Failed to restart relay");
+    orch.restart_relay(0)
+        .await
+        .expect("Failed to restart relay");
 
     // Give time for recovery
     sleep(Duration::from_secs(2)).await;
@@ -142,8 +164,12 @@ async fn integration_no_relays() {
     orch.add_user("Alice", 1).expect("Failed to add Alice");
     orch.add_user("Bob", 1).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
     let alice = orch.user("Alice").unwrap();
 
@@ -163,8 +189,12 @@ async fn integration_no_relays() {
     }
 
     // Restart both relays
-    orch.restart_relay(0).await.expect("Failed to restart relay 0");
-    orch.restart_relay(1).await.expect("Failed to restart relay 1");
+    orch.restart_relay(0)
+        .await
+        .expect("Failed to restart relay 0");
+    orch.restart_relay(1)
+        .await
+        .expect("Failed to restart relay 1");
 
     // Give time for recovery
     sleep(Duration::from_secs(2)).await;
@@ -172,7 +202,10 @@ async fn integration_no_relays() {
     // Sync should work now
     {
         let alice = alice.read().await;
-        alice.sync_all().await.expect("Failed to sync after relay recovery");
+        alice
+            .sync_all()
+            .await
+            .expect("Failed to sync after relay recovery");
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");

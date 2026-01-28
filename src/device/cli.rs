@@ -28,9 +28,8 @@ pub struct CliDevice {
 impl CliDevice {
     /// Create a new CLI device with an isolated data directory.
     pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> E2eResult<Self> {
-        let data_dir = TempDir::new().map_err(|e| {
-            E2eError::device(format!("Failed to create temp directory: {}", e))
-        })?;
+        let data_dir = TempDir::new()
+            .map_err(|e| E2eError::device(format!("Failed to create temp directory: {}", e)))?;
 
         let cli_path = Self::find_cli_binary()?;
 
@@ -61,15 +60,14 @@ impl CliDevice {
     /// Find the CLI binary in the workspace.
     fn find_cli_binary() -> E2eResult<PathBuf> {
         // Try release binary first
-        let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/release/vauchi");
+        let release_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
         if release_path.exists() {
             return Ok(release_path);
         }
 
         // Try debug binary
-        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/debug/vauchi");
+        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi");
         if debug_path.exists() {
             return Ok(debug_path);
         }
@@ -101,18 +99,13 @@ impl CliDevice {
             args.join(" ")
         );
 
-        let output = cmd.output().await.map_err(|e| {
-            E2eError::cli_execution(format!("Failed to run CLI command: {}", e))
-        })?;
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| E2eError::cli_execution(format!("Failed to run CLI command: {}", e)))?;
 
-        trace!(
-            "CLI stdout: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-        trace!(
-            "CLI stderr: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        trace!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
+        trace!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));
 
         Ok(output)
     }
@@ -187,11 +180,7 @@ impl CliDevice {
                         let verified = parts.get(3).map(|s| s.contains('✓')).unwrap_or(false);
 
                         if !name.is_empty() {
-                            contacts.push(Contact {
-                                name,
-                                id,
-                                verified,
-                            });
+                            contacts.push(Contact { name, id, verified });
                         }
                     }
                 }
@@ -285,7 +274,8 @@ impl CliDevice {
 
             // Also handle table format (│-separated) for compatibility
             if line.contains('│') || line.contains('|') {
-                let parts: Vec<&str> = line.split(['│', '|'])
+                let parts: Vec<&str> = line
+                    .split(['│', '|'])
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
                     .collect();
@@ -349,7 +339,10 @@ impl CliDevice {
             }
 
             // Check if it looks like base64 data
-            if line.chars().all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=') {
+            if line
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=')
+            {
                 return Ok(line.to_string());
             }
 
@@ -366,13 +359,17 @@ impl CliDevice {
         for line in output.lines() {
             let line = line.trim();
             if line.len() >= 50
-                && line.chars().all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=')
+                && line
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=')
             {
                 return Ok(line.to_string());
             }
         }
 
-        Err(E2eError::parse_output("Could not find QR data in CLI output"))
+        Err(E2eError::parse_output(
+            "Could not find QR data in CLI output",
+        ))
     }
 }
 
@@ -421,7 +418,8 @@ impl Device for CliDevice {
     }
 
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
-        self.run_command_success(&["exchange", "complete", qr_data]).await?;
+        self.run_command_success(&["exchange", "complete", qr_data])
+            .await?;
         Ok(())
     }
 
@@ -433,21 +431,29 @@ impl Device for CliDevice {
     }
 
     async fn join_identity(&self, qr_data: &str, device_name: &str) -> E2eResult<String> {
-        let output = self.run_command_success(&[
-            "device", "join", qr_data,
-            "--device-name", device_name,
-            "--yes"
-        ]).await?;
+        let output = self
+            .run_command_success(&[
+                "device",
+                "join",
+                qr_data,
+                "--device-name",
+                device_name,
+                "--yes",
+            ])
+            .await?;
         Self::extract_qr_data(&output)
     }
 
     async fn complete_device_link(&self, request_data: &str) -> E2eResult<String> {
-        let output = self.run_command_success(&["device", "complete", request_data]).await?;
+        let output = self
+            .run_command_success(&["device", "complete", request_data])
+            .await?;
         Self::extract_qr_data(&output)
     }
 
     async fn finish_device_join(&self, response_data: &str) -> E2eResult<()> {
-        self.run_command_success(&["device", "finish", response_data]).await?;
+        self.run_command_success(&["device", "finish", response_data])
+            .await?;
         Ok(())
     }
 
@@ -513,12 +519,14 @@ impl Device for CliDevice {
     }
 
     async fn add_field(&self, field_type: &str, label: &str, value: &str) -> E2eResult<()> {
-        self.run_command_success(&["card", "add", field_type, label, value]).await?;
+        self.run_command_success(&["card", "add", field_type, label, value])
+            .await?;
         Ok(())
     }
 
     async fn edit_field(&self, label: &str, value: &str) -> E2eResult<()> {
-        self.run_command_success(&["card", "edit", label, value]).await?;
+        self.run_command_success(&["card", "edit", label, value])
+            .await?;
         Ok(())
     }
 
@@ -528,7 +536,8 @@ impl Device for CliDevice {
     }
 
     async fn edit_name(&self, name: &str) -> E2eResult<()> {
-        self.run_command_success(&["card", "edit-name", name]).await?;
+        self.run_command_success(&["card", "edit-name", name])
+            .await?;
         Ok(())
     }
 }
@@ -574,6 +583,9 @@ QR data:
 abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+/=
 "#;
         let qr = CliDevice::extract_qr_data(output).unwrap();
-        assert_eq!(qr, "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+/=");
+        assert_eq!(
+            qr,
+            "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+/="
+        );
     }
 }

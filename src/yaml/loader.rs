@@ -30,8 +30,7 @@ impl ScenarioLoader {
     /// Create a loader for the default scenarios directory.
     pub fn default() -> Self {
         // Try to find the scenarios directory relative to the crate
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-            .unwrap_or_else(|_| ".".to_string());
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
         let scenarios_dir = PathBuf::from(manifest_dir).join("scenarios");
 
         if scenarios_dir.exists() {
@@ -88,17 +87,15 @@ impl ScenarioLoader {
         for entry in std::fs::read_dir(&dir).map_err(|e| {
             E2eError::ScenarioLoad(format!("Failed to read {}: {}", dir.display(), e))
         })? {
-            let entry = entry.map_err(|e| {
-                E2eError::ScenarioLoad(format!("Failed to read entry: {}", e))
-            })?;
+            let entry = entry
+                .map_err(|e| E2eError::ScenarioLoad(format!("Failed to read entry: {}", e)))?;
             let path = entry.path();
 
-            if path.extension().map_or(false, |ext| ext == "yaml" || ext == "yml") {
-                let name = format!(
-                    "{}/{}",
-                    subdir,
-                    path.file_stem().unwrap().to_string_lossy()
-                );
+            if path
+                .extension()
+                .map_or(false, |ext| ext == "yaml" || ext == "yml")
+            {
+                let name = format!("{}/{}", subdir, path.file_stem().unwrap().to_string_lossy());
                 names.push(name);
             }
         }
@@ -109,10 +106,7 @@ impl ScenarioLoader {
         }
 
         // Return references
-        Ok(names
-            .iter()
-            .filter_map(|n| self.cache.get(n))
-            .collect())
+        Ok(names.iter().filter_map(|n| self.cache.get(n)).collect())
     }
 
     /// Load all scenarios matching given tags.
@@ -153,12 +147,14 @@ impl ScenarioLoader {
             for entry in std::fs::read_dir(&dir).map_err(|e| {
                 E2eError::ScenarioLoad(format!("Failed to read {}: {}", dir.display(), e))
             })? {
-                let entry = entry.map_err(|e| {
-                    E2eError::ScenarioLoad(format!("Failed to read entry: {}", e))
-                })?;
+                let entry = entry
+                    .map_err(|e| E2eError::ScenarioLoad(format!("Failed to read entry: {}", e)))?;
                 let path = entry.path();
 
-                if path.extension().map_or(false, |ext| ext == "yaml" || ext == "yml") {
+                if path
+                    .extension()
+                    .map_or(false, |ext| ext == "yaml" || ext == "yml")
+                {
                     let content = std::fs::read_to_string(&path).ok();
                     let info = if let Some(content) = content {
                         if let Ok(scenario) = serde_yaml::from_str::<Scenario>(&content) {
@@ -248,7 +244,10 @@ impl ScenarioLoader {
     }
 
     /// Filter scenarios by platform capability.
-    pub fn filter_by_platform<'a>(scenarios: &'a [&'a Scenario], platform: Platform) -> Vec<&'a Scenario> {
+    pub fn filter_by_platform<'a>(
+        scenarios: &'a [&'a Scenario],
+        platform: Platform,
+    ) -> Vec<&'a Scenario> {
         scenarios
             .iter()
             .filter(|s| {

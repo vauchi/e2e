@@ -27,12 +27,20 @@ async fn smoke_cli_exchange() {
     orch.add_user("Alice", 1).expect("Failed to add Alice");
     orch.add_user("Bob", 1).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
 
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
-    orch.verify_contact_count("Alice", 1).await.expect("Alice should have 1 contact");
-    orch.verify_contact_count("Bob", 1).await.expect("Bob should have 1 contact");
+    orch.verify_contact_count("Alice", 1)
+        .await
+        .expect("Alice should have 1 contact");
+    orch.verify_contact_count("Bob", 1)
+        .await
+        .expect("Bob should have 1 contact");
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
@@ -48,8 +56,12 @@ async fn integration_device_linking() {
 
     orch.add_user("Eve", 3).expect("Failed to add Eve"); // Simulates iOS + Android + CLI
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     let eve = orch.user("Eve").unwrap();
 
@@ -57,7 +69,10 @@ async fn integration_device_linking() {
     {
         let eve = eve.read().await;
         let devices = eve.device(0).unwrap().read().await;
-        let device_list = devices.list_devices().await.expect("Failed to list devices");
+        let device_list = devices
+            .list_devices()
+            .await
+            .expect("Failed to list devices");
 
         assert!(
             !device_list.is_empty(),
@@ -77,26 +92,42 @@ async fn integration_mixed_devices() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
-    orch.add_user("Alice", 1).expect("Failed to add Alice");  // Single device
-    orch.add_user("Bob", 2).expect("Failed to add Bob");      // Two devices
-    orch.add_user("Carol", 3).expect("Failed to add Carol");  // Three devices
+    orch.add_user("Alice", 1).expect("Failed to add Alice"); // Single device
+    orch.add_user("Bob", 2).expect("Failed to add Bob"); // Two devices
+    orch.add_user("Carol", 3).expect("Failed to add Carol"); // Three devices
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     // Alice exchanges with Bob
-    orch.exchange("Alice", "Bob").await.expect("Alice-Bob exchange failed");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Alice-Bob exchange failed");
 
     // Bob exchanges with Carol
-    orch.exchange("Bob", "Carol").await.expect("Bob-Carol exchange failed");
+    orch.exchange("Bob", "Carol")
+        .await
+        .expect("Bob-Carol exchange failed");
 
     // Carol exchanges with Alice
-    orch.exchange("Carol", "Alice").await.expect("Carol-Alice exchange failed");
+    orch.exchange("Carol", "Alice")
+        .await
+        .expect("Carol-Alice exchange failed");
 
     // Verify all users have 2 contacts each
-    orch.verify_contact_count("Alice", 2).await.expect("Alice should have 2 contacts");
-    orch.verify_contact_count("Bob", 2).await.expect("Bob should have 2 contacts");
-    orch.verify_contact_count("Carol", 2).await.expect("Carol should have 2 contacts");
+    orch.verify_contact_count("Alice", 2)
+        .await
+        .expect("Alice should have 2 contacts");
+    orch.verify_contact_count("Bob", 2)
+        .await
+        .expect("Bob should have 2 contacts");
+    orch.verify_contact_count("Carol", 2)
+        .await
+        .expect("Carol should have 2 contacts");
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
@@ -121,7 +152,9 @@ async fn test_ios_simulator_exchange() {
             // Device created but Maestro flows not implemented
             match device.create_identity("Alice").await {
                 Err(e) => panic!("iOS Maestro automation not implemented: {}", e),
-                Ok(_) => panic!("Unexpected success - iOS automation should not be implemented yet"),
+                Ok(_) => {
+                    panic!("Unexpected success - iOS automation should not be implemented yet")
+                }
             }
         }
         Err(e) => {
@@ -152,7 +185,9 @@ async fn test_android_emulator_exchange() {
             // Device created but Maestro flows not implemented
             match device.create_identity("Bob").await {
                 Err(e) => panic!("Android Maestro automation not implemented: {}", e),
-                Ok(_) => panic!("Unexpected success - Android automation should not be implemented yet"),
+                Ok(_) => {
+                    panic!("Unexpected success - Android automation should not be implemented yet")
+                }
             }
         }
         Err(e) => {
@@ -175,28 +210,40 @@ async fn test_desktop_exchange() {
     use vauchi_e2e_tests::device::{Device, TauriDevice};
 
     // Create a TauriDevice
-    let device = TauriDevice::new("Alice_Desktop", "ws://localhost:8080")
-        .expect("Desktop app binary not found. Run `cargo build -p vauchi-desktop --release` first.");
+    let device = TauriDevice::new("Alice_Desktop", "ws://localhost:8080").expect(
+        "Desktop app binary not found. Run `cargo build -p vauchi-desktop --release` first.",
+    );
 
     // Launch the app (starts test HTTP server)
-    device.launch_app().await
+    device
+        .launch_app()
+        .await
         .expect("Failed to launch desktop app");
 
     // Create identity
-    device.create_identity("Alice").await
+    device
+        .create_identity("Alice")
+        .await
         .expect("Failed to create identity in desktop app");
 
     // Verify identity was created
-    assert!(device.has_identity().await, "Identity should exist after creation");
+    assert!(
+        device.has_identity().await,
+        "Identity should exist after creation"
+    );
 
     // Get card
-    let card = device.get_card().await
+    let card = device
+        .get_card()
+        .await
         .expect("Failed to get card from desktop app");
 
     assert_eq!(card.name, "Alice", "Card name should match");
 
     // List contacts (should be empty)
-    let contacts = device.list_contacts().await
+    let contacts = device
+        .list_contacts()
+        .await
         .expect("Failed to list contacts");
 
     assert!(contacts.is_empty(), "Should have no contacts initially");
@@ -222,16 +269,22 @@ async fn test_tui_exchange() {
         .expect("TUI binary not found. Run `cargo build -p vauchi-tui --release` first.");
 
     // Create identity
-    device.create_identity("Alice").await
+    device
+        .create_identity("Alice")
+        .await
         .expect("Failed to create identity in TUI");
 
     // Verify identity was created by checking if we're on the home screen
-    let card = device.get_card().await
+    let card = device
+        .get_card()
+        .await
         .expect("Failed to get card from TUI");
 
     // The card should exist (even if empty)
-    assert!(card.name.is_empty() || card.name.contains("Alice") || card.name.contains("User"),
-        "Card name should be set after identity creation");
+    assert!(
+        card.name.is_empty() || card.name.contains("Alice") || card.name.contains("User"),
+        "Card name should be set after identity creation"
+    );
 
     // Clean up
     device.kill_app().await.expect("Failed to kill TUI");

@@ -55,9 +55,8 @@ pub struct TauriDevice {
 impl TauriDevice {
     /// Create a new Tauri device with an isolated data directory.
     pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> E2eResult<Self> {
-        let data_dir = TempDir::new().map_err(|e| {
-            E2eError::device(format!("Failed to create temp directory: {}", e))
-        })?;
+        let data_dir = TempDir::new()
+            .map_err(|e| E2eError::device(format!("Failed to create temp directory: {}", e)))?;
 
         let app_path = Self::find_app_binary()?;
 
@@ -79,8 +78,9 @@ impl TauriDevice {
             .join("../desktop/src-tauri/target/release/vauchi-desktop");
 
         #[cfg(target_os = "macos")]
-        let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../desktop/src-tauri/target/release/bundle/macos/Vauchi.app/Contents/MacOS/Vauchi");
+        let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../desktop/src-tauri/target/release/bundle/macos/Vauchi.app/Contents/MacOS/Vauchi",
+        );
 
         #[cfg(target_os = "windows")]
         let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -236,13 +236,13 @@ impl Device for TauriDevice {
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop identity export not yet implemented via test API".into()
+            "Desktop identity export not yet implemented via test API".into(),
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop identity import not yet implemented via test API".into()
+            "Desktop identity import not yet implemented via test API".into(),
         ))
     }
 
@@ -250,13 +250,13 @@ impl Device for TauriDevice {
 
     async fn generate_qr(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop QR generation not yet implemented via test API".into()
+            "Desktop QR generation not yet implemented via test API".into(),
         ))
     }
 
     async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop exchange not yet implemented via test API".into()
+            "Desktop exchange not yet implemented via test API".into(),
         ))
     }
 
@@ -264,31 +264,31 @@ impl Device for TauriDevice {
 
     async fn start_device_link(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device linking not yet implemented via test API".into()
+            "Desktop device linking not yet implemented via test API".into(),
         ))
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device linking not yet implemented via test API".into()
+            "Desktop device linking not yet implemented via test API".into(),
         ))
     }
 
     async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device linking not yet implemented via test API".into()
+            "Desktop device linking not yet implemented via test API".into(),
         ))
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device linking not yet implemented via test API".into()
+            "Desktop device linking not yet implemented via test API".into(),
         ))
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop device listing not yet implemented via test API".into()
+            "Desktop device listing not yet implemented via test API".into(),
         ))
     }
 
@@ -328,7 +328,11 @@ impl Device for TauriDevice {
     async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>> {
         let contacts = self.list_contacts().await?;
         Ok(contacts.into_iter().find(|c| {
-            c.name.contains(name_or_id) || c.id.as_ref().map(|id| id.contains(name_or_id)).unwrap_or(false)
+            c.name.contains(name_or_id)
+                || c.id
+                    .as_ref()
+                    .map(|id| id.contains(name_or_id))
+                    .unwrap_or(false)
         }))
     }
 
@@ -356,25 +360,25 @@ impl Device for TauriDevice {
 
     async fn add_field(&self, _field_type: &str, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop field management not yet implemented via test API".into()
+            "Desktop field management not yet implemented via test API".into(),
         ))
     }
 
     async fn edit_field(&self, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop field management not yet implemented via test API".into()
+            "Desktop field management not yet implemented via test API".into(),
         ))
     }
 
     async fn remove_field(&self, _label: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop field management not yet implemented via test API".into()
+            "Desktop field management not yet implemented via test API".into(),
         ))
     }
 
     async fn edit_name(&self, _name: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Desktop name editing not yet implemented via test API".into()
+            "Desktop name editing not yet implemented via test API".into(),
         ))
     }
 
@@ -386,9 +390,10 @@ impl Device for TauriDevice {
 
         if let Some(mut child) = process_guard.take() {
             // Try graceful kill first
-            child.kill().await.map_err(|e| {
-                E2eError::device(format!("Failed to kill desktop app: {}", e))
-            })?;
+            child
+                .kill()
+                .await
+                .map_err(|e| E2eError::device(format!("Failed to kill desktop app: {}", e)))?;
 
             // Wait for process to exit
             let _ = child.wait().await;
@@ -428,9 +433,9 @@ impl Device for TauriDevice {
             .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let child = cmd.spawn().map_err(|e| {
-            E2eError::device(format!("Failed to launch desktop app: {}", e))
-        })?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| E2eError::device(format!("Failed to launch desktop app: {}", e)))?;
 
         // Store the process handle and port
         *process_guard = Some(child);

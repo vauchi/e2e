@@ -54,7 +54,9 @@ impl ScenarioContext {
 
     /// Get all users.
     pub fn users(&self) -> impl Iterator<Item = Arc<RwLock<User>>> + '_ {
-        self.user_order.iter().filter_map(|name| self.users.get(name).cloned())
+        self.user_order
+            .iter()
+            .filter_map(|name| self.users.get(name).cloned())
     }
 
     /// Get user names in order.
@@ -319,7 +321,11 @@ pub mod helpers {
                 let user_a_guard = user_a.read().await;
                 let user_b_guard = user_b.read().await;
 
-                info!("Exchanging: {} <-> {}", user_a_guard.name(), user_b_guard.name());
+                info!(
+                    "Exchanging: {} <-> {}",
+                    user_a_guard.name(),
+                    user_b_guard.name()
+                );
 
                 // User A generates QR, User B completes
                 let qr = user_a_guard.generate_qr().await?;

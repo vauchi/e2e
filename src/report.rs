@@ -224,7 +224,10 @@ impl JunitReport {
             "Total: {} | Passed: {} | Failed: {} | Skipped: {} | Errors: {}\n",
             total, passed, failed, skipped, errors
         ));
-        summary.push_str(&format!("Duration: {:.2}s\n", self.total_time.as_secs_f64()));
+        summary.push_str(&format!(
+            "Duration: {:.2}s\n",
+            self.total_time.as_secs_f64()
+        ));
         summary.push('\n');
 
         // List failed and error tests
@@ -330,7 +333,11 @@ mod tests {
     #[test]
     fn test_junit_report_xml() {
         let mut report = JunitReport::new("e2e-smoke");
-        report.add_passed("smoke_cli_exchange", "e2e.smoke", Duration::from_millis(1500));
+        report.add_passed(
+            "smoke_cli_exchange",
+            "e2e.smoke",
+            Duration::from_millis(1500),
+        );
         report.add_failed(
             "smoke_sync",
             "e2e.smoke",

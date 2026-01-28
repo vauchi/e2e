@@ -54,6 +54,6 @@ pub mod schema;
 pub use executor::ScenarioExecutor;
 pub use loader::{ScenarioInfo, ScenarioLoader};
 pub use schema::{
-    Action, ActorRef, Assertion, NetworkCondition, NetworkMode, Participant, Platform,
-    RelayConfig, Scenario, ScenarioResult, Step, StepResult,
+    Action, ActorRef, Assertion, NetworkCondition, NetworkMode, Participant, Platform, RelayConfig,
+    Scenario, ScenarioResult, Step, StepResult,
 };

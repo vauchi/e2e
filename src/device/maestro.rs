@@ -238,9 +238,10 @@ impl MaestroDevice {
             }
         }
 
-        let output = cmd.output().await.map_err(|e| {
-            E2eError::device(format!("Failed to run Maestro flow: {}", e))
-        })?;
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| E2eError::device(format!("Failed to run Maestro flow: {}", e)))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -263,7 +264,7 @@ impl MaestroDevice {
         // 2. Take a screenshot and use QR detection
         // 3. Have the flow copy QR data to clipboard
         Err(E2eError::DeviceNotSupported(
-            "QR extraction from Maestro flows not yet implemented".into()
+            "QR extraction from Maestro flows not yet implemented".into(),
         ))
     }
 
@@ -272,7 +273,7 @@ impl MaestroDevice {
     fn parse_contacts_from_output(&self, _output: &str) -> E2eResult<Vec<Contact>> {
         // In a real implementation, we'd parse structured output from the flow
         Err(E2eError::DeviceNotSupported(
-            "Contact parsing from Maestro flows not yet implemented".into()
+            "Contact parsing from Maestro flows not yet implemented".into(),
         ))
     }
 }
@@ -313,13 +314,13 @@ impl Device for MaestroDevice {
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: export_identity not implemented".into()
+            "Maestro device: export_identity not implemented".into(),
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: import_identity not implemented".into()
+            "Maestro device: import_identity not implemented".into(),
         ))
     }
 
@@ -349,31 +350,31 @@ impl Device for MaestroDevice {
 
     async fn start_device_link(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: start_device_link not implemented".into()
+            "Maestro device: start_device_link not implemented".into(),
         ))
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: join_identity not implemented".into()
+            "Maestro device: join_identity not implemented".into(),
         ))
     }
 
     async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: complete_device_link not implemented".into()
+            "Maestro device: complete_device_link not implemented".into(),
         ))
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: finish_device_join not implemented".into()
+            "Maestro device: finish_device_join not implemented".into(),
         ))
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: list_devices not implemented".into()
+            "Maestro device: list_devices not implemented".into(),
         ))
     }
 
@@ -400,7 +401,7 @@ impl Device for MaestroDevice {
 
     async fn get_contact(&self, _name_or_id: &str) -> E2eResult<Option<Contact>> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: get_contact not implemented".into()
+            "Maestro device: get_contact not implemented".into(),
         ))
     }
 
@@ -408,31 +409,31 @@ impl Device for MaestroDevice {
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: get_card not implemented".into()
+            "Maestro device: get_card not implemented".into(),
         ))
     }
 
     async fn add_field(&self, _field_type: &str, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: add_field not implemented".into()
+            "Maestro device: add_field not implemented".into(),
         ))
     }
 
     async fn edit_field(&self, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_field not implemented".into()
+            "Maestro device: edit_field not implemented".into(),
         ))
     }
 
     async fn remove_field(&self, _label: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: remove_field not implemented".into()
+            "Maestro device: remove_field not implemented".into(),
         ))
     }
 
     async fn edit_name(&self, _name: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_name not implemented".into()
+            "Maestro device: edit_name not implemented".into(),
         ))
     }
 
@@ -457,14 +458,14 @@ impl Device for MaestroDevice {
         // iOS: xcrun simctl terminate + launch with background state
         // Android: adb shell input keyevent KEYCODE_HOME
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: background_app not implemented".into()
+            "Maestro device: background_app not implemented".into(),
         ))
     }
 
     async fn foreground_app(&self) -> E2eResult<()> {
         // Would relaunch the app
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: foreground_app not implemented".into()
+            "Maestro device: foreground_app not implemented".into(),
         ))
     }
 
@@ -472,7 +473,7 @@ impl Device for MaestroDevice {
         // iOS: xcrun simctl terminate booted <app_id>
         // Android: adb shell am force-stop <package>
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: kill_app not implemented".into()
+            "Maestro device: kill_app not implemented".into(),
         ))
     }
 
@@ -480,7 +481,7 @@ impl Device for MaestroDevice {
         // iOS: xcrun simctl launch booted <app_id>
         // Android: adb shell am start -n <package>/<activity>
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: launch_app not implemented".into()
+            "Maestro device: launch_app not implemented".into(),
         ))
     }
 
@@ -489,13 +490,13 @@ impl Device for MaestroDevice {
     async fn start_proximity_verification(&self) -> E2eResult<String> {
         // Mobile devices support proximity verification via audio
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not implemented".into()
+            "Maestro device: proximity verification not implemented".into(),
         ))
     }
 
     async fn verify_proximity(&self, _challenge: &str) -> E2eResult<bool> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not implemented".into()
+            "Maestro device: proximity verification not implemented".into(),
         ))
     }
 
@@ -543,7 +544,10 @@ mod tests {
             assert!(result.is_ok(), "Expected Ok when Maestro is installed");
         } else {
             // If Maestro is not installed, device creation should fail
-            assert!(result.is_err(), "Expected Err when Maestro is not installed");
+            assert!(
+                result.is_err(),
+                "Expected Err when Maestro is not installed"
+            );
         }
     }
 }

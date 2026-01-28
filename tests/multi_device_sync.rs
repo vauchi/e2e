@@ -28,11 +28,17 @@ async fn smoke_card_update() {
     orch.add_user("Alice", 3).expect("Failed to add Alice");
     orch.add_user("Bob", 2).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     // Initial exchange
-    orch.exchange("Alice", "Bob").await.expect("Exchange failed");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange failed");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -40,7 +46,9 @@ async fn smoke_card_update() {
     // Step 1: Alice updates her card on device 0
     {
         let alice = alice.read().await;
-        alice.add_field("email", "Email", "alice@example.com").await
+        alice
+            .add_field("email", "Email", "alice@example.com")
+            .await
             .expect("Failed to add field");
     }
 
@@ -74,7 +82,8 @@ async fn smoke_card_update() {
     // Step 4: Bob updates his card
     {
         let bob = bob.read().await;
-        bob.add_field("phone", "Phone", "+1-555-0123").await
+        bob.add_field("phone", "Phone", "+1-555-0123")
+            .await
             .expect("Failed to add Bob's field");
     }
 
@@ -109,7 +118,9 @@ async fn integration_device_receives_contacts() {
     orch.add_user("Bob", 1).expect("Failed to add Bob");
     orch.add_user("Carol", 1).expect("Failed to add Carol");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
 
     let alice = orch.user("Alice").unwrap();
     let bob = orch.user("Bob").unwrap();
@@ -121,14 +132,23 @@ async fn integration_device_receives_contacts() {
         let bob = bob.read().await;
         let carol = carol.read().await;
 
-        alice.exchange_with(&bob).await.expect("Exchange with Bob failed");
-        alice.exchange_with(&carol).await.expect("Exchange with Carol failed");
+        alice
+            .exchange_with(&bob)
+            .await
+            .expect("Exchange with Bob failed");
+        alice
+            .exchange_with(&carol)
+            .await
+            .expect("Exchange with Carol failed");
     }
 
     // Verify Alice has 2 contacts
     {
         let alice = alice.read().await;
-        let contacts = alice.list_contacts().await.expect("Failed to list contacts");
+        let contacts = alice
+            .list_contacts()
+            .await
+            .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 2, "Alice should have 2 contacts");
     }
 
@@ -147,8 +167,12 @@ async fn integration_concurrent_updates() {
     orch.add_user("Alice", 3).expect("Failed to add Alice");
     orch.add_user("Bob", 2).expect("Failed to add Bob");
 
-    orch.create_all_identities().await.expect("Failed to create identities");
-    orch.link_all_devices().await.expect("Failed to link devices");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link devices");
 
     let alice = orch.user("Alice").unwrap();
 
@@ -167,7 +191,9 @@ async fn integration_concurrent_updates() {
 
     // Wait for all updates to complete
     for task in update_tasks {
-        task.await.expect("Task panicked").expect("Add field failed");
+        task.await
+            .expect("Task panicked")
+            .expect("Add field failed");
     }
 
     // Sync all devices
