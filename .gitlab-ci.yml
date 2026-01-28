@@ -6,6 +6,11 @@
 #
 # End-to-end testing infrastructure
 #
+# Performance optimizations:
+#   - Change-based rules: Jobs run only when relevant files change
+#   - Timeouts: Prevent runaway jobs from blocking runners
+#   - Read-only cache for lint jobs
+#
 # Note: E2E tests require relay and CLI binaries, so actual test execution
 # runs from the meta-repo (vauchi/vauchi). This pipeline only validates
 # the test code itself (lint, security).
@@ -35,26 +40,30 @@ variables:
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
 # ============================================================
-# Lint Stage
+# Lint Stage (runs on Rust code changes)
 # ============================================================
 
 lint:format:
-  extends: [.rust-job, .mr-or-main]
+  extends: [.rust-job, .validation-rust, .timeout-quick]
   stage: lint
+  cache:
+    policy: pull  # Read-only cache for lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.rust-job, .mr-or-main]
+  extends: [.rust-job, .validation-rust, .timeout-quick]
   stage: lint
+  cache:
+    policy: pull  # Read-only cache for lint
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
   allow_failure: true  # May fail on git dependency issues
 
 # ============================================================
-# Security Stage
+# Security Stage (change-based)
 # ============================================================
 
 # GitLab security templates configuration
@@ -64,6 +73,9 @@ semgrep-sast:
   tags: [docker]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/*.rs"
+        - ".gitlab-ci.yml"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 secret_detection:
