@@ -2,12 +2,21 @@
 #
 # End-to-end testing infrastructure
 #
+# Note: E2E tests require relay and CLI binaries, so actual test execution
+# runs from the meta-repo (vauchi/vauchi). This pipeline only validates
+# the test code itself (lint, security).
+#
 # GitLab Ultimate Features:
 #   - SAST: Static application security testing
 #   - Secret Detection: Prevent credential leaks
 
-# GitLab Ultimate Templates
+# Shared templates + GitLab Ultimate Templates
 include:
+  - project: 'vauchi/scripts'
+    ref: main
+    file:
+      - '/ci-templates/rust-base.yml'
+      - '/ci-templates/mr-rules.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
@@ -16,50 +25,27 @@ stages:
   - security
 
 variables:
-  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-  RUST_BACKTRACE: "1"
-
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
-
-.rust-cache: &rust-cache
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-rust
-    paths:
-      - .cargo/bin/
-      - .cargo/registry/index/
-      - .cargo/registry/cache/
-      - .cargo/git/db/
-      - target/
-
-.rust-job:
-  image: rust:latest
-  <<: *rust-cache
 
 # ============================================================
 # Lint Stage
 # ============================================================
 
 lint:format:
-  extends: .rust-job
+  extends: [.rust-job, .mr-or-main]
   stage: lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
 
 lint:clippy:
-  extends: .rust-job
+  extends: [.rust-job, .mr-or-main]
   stage: lint
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
   allow_failure: true  # May fail on git dependency issues
 
 # ============================================================
@@ -73,13 +59,10 @@ semgrep-sast:
   tags: [docker]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 secret_detection:
   tags: [docker]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-
-# Note: E2E tests require relay and CLI binaries, so they run from the meta-repo
-# See vauchi/vauchi CI for e2e:smoke and e2e:release jobs
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
