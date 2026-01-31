@@ -26,6 +26,7 @@ include:
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/mr-rules.yml'
+      - '/ci-templates/reuse.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
