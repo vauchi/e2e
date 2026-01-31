@@ -47,6 +47,7 @@ variables:
 lint:format:
   extends: [.rust-job, .validation-rust, .timeout-quick]
   stage: lint
+  needs: []
   cache:
     policy: pull  # Read-only cache for lint
   script:
@@ -56,6 +57,7 @@ lint:format:
 lint:clippy:
   extends: [.rust-job, .validation-rust, .timeout-quick]
   stage: lint
+  needs: []
   cache:
     policy: pull  # Read-only cache for lint
   script:
@@ -72,15 +74,19 @@ lint:clippy:
 
 semgrep-sast:
   tags: [docker]
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - "**/*.rs"
-        - ".gitlab-ci.yml"
+        compare_to: refs/heads/main
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 secret_detection:
   tags: [docker]
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
