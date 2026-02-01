@@ -92,10 +92,7 @@ async fn integration_contact_verification() {
     {
         let alice = alice.read().await;
         let bob = bob.read().await;
-        alice
-            .exchange_with(&bob)
-            .await
-            .expect("Exchange failed");
+        alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
     // Alice verifies Bob's fingerprint

@@ -132,10 +132,7 @@ async fn integration_label_visibility_sync() {
     {
         let alice = alice.read().await;
         let bob = bob.read().await;
-        alice
-            .exchange_with(&bob)
-            .await
-            .expect("Exchange failed");
+        alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
     // Create label and assign Bob
@@ -228,10 +225,7 @@ async fn smoke_per_contact_visibility() {
     {
         let alice = alice.read().await;
         let bob = bob.read().await;
-        alice
-            .exchange_with(&bob)
-            .await
-            .expect("Exchange failed");
+        alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
     // Hide private phone from Bob

@@ -611,7 +611,6 @@ impl ScenarioExecutor {
             }
 
             // === Visibility Labels ===
-
             Action::CreateLabel => {
                 let name = self.get_param_string(&step.params, "name")?;
 
@@ -729,7 +728,6 @@ impl ScenarioExecutor {
             }
 
             // === Contact Visibility ===
-
             Action::HideFieldFromContact => {
                 let contact = self.get_param_string(&step.params, "contact")?;
                 let field = self.get_param_string(&step.params, "field")?;
@@ -773,7 +771,6 @@ impl ScenarioExecutor {
             }
 
             // === Contact Verification ===
-
             Action::VerifyContact => {
                 let contact = self.get_param_string(&step.params, "contact")?;
 
@@ -791,7 +788,6 @@ impl ScenarioExecutor {
             }
 
             // === Recovery ===
-
             Action::CreateRecoveryClaim => {
                 let old_public_key = self.get_param_string(&step.params, "old_public_key")?;
                 let old_public_key = self.interpolate_var(&old_public_key);
@@ -803,9 +799,9 @@ impl ScenarioExecutor {
                 let user = self.get_user(user_name)?;
                 let user = user.read().await;
                 let idx = device_idx.unwrap_or(0);
-                let device = user.device(idx).ok_or_else(|| {
-                    E2eError::InvalidActor(format!("Device {} not found", idx))
-                })?;
+                let device = user
+                    .device(idx)
+                    .ok_or_else(|| E2eError::InvalidActor(format!("Device {} not found", idx)))?;
                 let claim = device
                     .read()
                     .await
@@ -825,9 +821,9 @@ impl ScenarioExecutor {
                 let user = self.get_user(user_name)?;
                 let user = user.read().await;
                 let idx = device_idx.unwrap_or(0);
-                let device = user.device(idx).ok_or_else(|| {
-                    E2eError::InvalidActor(format!("Device {} not found", idx))
-                })?;
+                let device = user
+                    .device(idx)
+                    .ok_or_else(|| E2eError::InvalidActor(format!("Device {} not found", idx)))?;
                 let voucher = device.read().await.vouch_for_recovery(&claim).await?;
                 Ok(Some(voucher))
             }
@@ -844,11 +840,7 @@ impl ScenarioExecutor {
                     let device = user.device(idx).ok_or_else(|| {
                         E2eError::InvalidActor(format!("Device {} not found", idx))
                     })?;
-                    device
-                        .read()
-                        .await
-                        .add_recovery_voucher(&voucher)
-                        .await?;
+                    device.read().await.add_recovery_voucher(&voucher).await?;
                 }
                 Ok(None)
             }
@@ -872,7 +864,6 @@ impl ScenarioExecutor {
             }
 
             // === Backup ===
-
             Action::ExportBackup => {
                 let password = self.get_param_string(&step.params, "password")?;
 
@@ -883,9 +874,9 @@ impl ScenarioExecutor {
                 let user = self.get_user(user_name)?;
                 let user = user.read().await;
                 let idx = device_idx.unwrap_or(0);
-                let device = user.device(idx).ok_or_else(|| {
-                    E2eError::InvalidActor(format!("Device {} not found", idx))
-                })?;
+                let device = user
+                    .device(idx)
+                    .ok_or_else(|| E2eError::InvalidActor(format!("Device {} not found", idx)))?;
                 let path = device.read().await.export_backup(&password).await?;
                 Ok(Some(path))
             }
@@ -903,11 +894,7 @@ impl ScenarioExecutor {
                     let device = user.device(idx).ok_or_else(|| {
                         E2eError::InvalidActor(format!("Device {} not found", idx))
                     })?;
-                    device
-                        .read()
-                        .await
-                        .import_backup(&path, &password)
-                        .await?;
+                    device.read().await.import_backup(&path, &password).await?;
                 }
                 Ok(None)
             }
