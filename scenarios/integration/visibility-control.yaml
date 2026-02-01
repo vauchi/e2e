@@ -1,0 +1,162 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Visibility Control - Integration test
+# Tests: Per-contact and per-label field visibility with sync propagation
+# Feature: visibility_control.feature
+
+name: "Per-Contact Visibility Control"
+description: |
+  Tests granular field visibility:
+  1. Alice adds multiple fields to her card
+  2. Alice hides specific fields from specific contacts
+  3. Sync propagates visibility changes
+  4. Contacts only see fields they're authorized to see
+feature: "visibility_control.feature"
+tags: ["integration", "visibility", "sync"]
+timeout: 120s
+
+participants:
+  alice:
+    devices: 1
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+  carol:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Setup identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: create_identity
+    actor: carol
+    params:
+      name: "Carol"
+
+  # Alice adds multiple fields
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Work"
+      value: "alice@corp.com"
+
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Personal"
+      value: "alice@personal.com"
+
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "phone"
+      label: "Mobile"
+      value: "+1-555-0101"
+
+  # Exchange contacts
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_bob
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_bob}"
+
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_carol
+
+  - type: action
+    action: complete_exchange
+    actor: carol
+    params:
+      qr: "${qr_carol}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob, carol]
+
+  # Alice hides personal email from Bob (work colleague)
+  - type: action
+    action: hide_field_from_contact
+    actor: alice
+    params:
+      contact: "Bob"
+      field: "Personal"
+
+  # Alice hides work email from Carol (personal friend)
+  - type: action
+    action: hide_field_from_contact
+    actor: alice
+    params:
+      contact: "Carol"
+      field: "Work"
+
+  # Sync visibility changes
+  - type: action
+    action: sync
+    actor: alice
+
+  - type: wait
+    duration: 500ms
+    reason: "Allow relay to process visibility updates"
+
+  - type: action
+    action: sync
+    actor: [bob, carol]
+
+  # Verify Alice's card still has all fields
+  - type: assertion
+    assertion: card_has_field
+    actor: alice
+    params:
+      field: "Work"
+
+  - type: assertion
+    assertion: card_has_field
+    actor: alice
+    params:
+      field: "Personal"
+
+  - type: assertion
+    assertion: card_has_field
+    actor: alice
+    params:
+      field: "Mobile"
+
+manual_instructions:
+  - "Alice: Create identity, add Work Email, Personal Email, and Mobile Phone"
+  - "Alice: Exchange contacts with Bob and Carol"
+  - "All: Sync"
+  - "Alice: Contacts > Bob > Hide 'Personal' email"
+  - "Alice: Contacts > Carol > Hide 'Work' email"
+  - "Alice: Sync"
+  - "Bob: Sync — verify sees Work email and Mobile, but NOT Personal email"
+  - "Carol: Sync — verify sees Personal email and Mobile, but NOT Work email"

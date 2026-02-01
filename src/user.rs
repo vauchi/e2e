@@ -313,6 +313,36 @@ impl User {
         device.edit_field(label, value).await
     }
 
+    /// Remove a field from the contact card on the primary device.
+    pub async fn remove_field(&self, label: &str) -> E2eResult<()> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.remove_field(label).await
+    }
+
+    /// Edit the display name on the primary device.
+    pub async fn edit_name(&self, name: &str) -> E2eResult<()> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.edit_name(name).await
+    }
+
+    /// Get a contact by name on the primary device.
+    pub async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.get_contact(name_or_id).await
+    }
+
     /// Get the contact card from a specific device.
     pub async fn get_card_on_device(&self, device_index: usize) -> E2eResult<ContactCard> {
         let device = self

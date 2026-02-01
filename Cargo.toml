@@ -89,3 +89,11 @@ path = "tests/offline_catchup.rs"
 [[test]]
 name = "cross_platform"
 path = "tests/cross_platform.rs"
+
+[[test]]
+name = "visibility_labels"
+path = "tests/visibility_labels.rs"
+
+[[test]]
+name = "recovery_flow"
+path = "tests/recovery_flow.rs"

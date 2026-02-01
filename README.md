@@ -130,7 +130,11 @@ RUST_LOG=debug cargo test -p vauchi-e2e-tests -- --ignored --nocapture
 | Multi-device linking | 1 | Working | Device pairing |
 | Contact sync across devices | 1 | Failing | Multi-device sync issue |
 | Five user exchange | 1 | Failing | Multi-device sync issue |
-| iOS Simulator | 2 | Placeholder | Requires Maestro flows |
+| Visibility labels | 1 | New | Label CRUD, field visibility per label |
+| Recovery flow | 1 | New | Social recovery with vouchers |
+| Per-contact visibility | 1 | New | Hide/show fields per contact |
+| Backup & restore | 1 | New | Identity export/import |
+| iOS Simulator | 2 | Placeholder | Maestro flows for device linking, labels |
 | Android Emulator | 2 | Placeholder | Requires Maestro flows |
 | Desktop (Tauri) | 3 | Placeholder | Requires WebdriverIO |
 | TUI | 4 | Placeholder | Requires expectrl |

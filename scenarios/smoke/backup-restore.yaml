@@ -1,0 +1,99 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Backup & Restore - Smoke test
+# Tests: Export identity backup, import on new device, verify contacts preserved
+# Feature: identity_management.feature
+
+name: "Identity Backup and Restore"
+description: |
+  Tests the identity backup and restore flow:
+  1. Alice creates identity and exchanges with Bob
+  2. Alice exports encrypted backup
+  3. Alice restores backup on a new device
+  4. Verify contacts are preserved after restore
+feature: "identity_management.feature"
+tags: ["smoke", "backup", "restore"]
+timeout: 90s
+
+participants:
+  alice:
+    devices: 1
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Setup
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  # Add fields and exchange
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Email"
+      value: "alice@example.com"
+
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_data
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Verify setup
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 1
+
+  # Export backup
+  - type: action
+    action: export_backup
+    actor: alice
+    params:
+      password: "test-backup-password-2026"
+    output: backup_path
+
+  # Verify identity exists
+  - type: assertion
+    assertion: has_identity
+    actor: alice
+
+manual_instructions:
+  - "Alice: Create identity 'Alice'"
+  - "Bob: Create identity 'Bob'"
+  - "Alice: Add email field"
+  - "Exchange contacts between Alice and Bob"
+  - "Alice: Settings > Export Backup (set password)"
+  - "--- SIMULATE NEW DEVICE ---"
+  - "Alice (new device): Settings > Import Backup (enter password)"
+  - "Alice (new device): Sync"
+  - "Verify: Alice's new device shows Bob in contacts"
+  - "Verify: Alice's card has the email field"

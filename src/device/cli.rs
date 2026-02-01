@@ -544,6 +544,150 @@ impl Device for CliDevice {
             .await?;
         Ok(())
     }
+
+    // === Visibility Labels ===
+
+    async fn create_label(&self, name: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "create", name])
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_label(&self, name: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "delete", name])
+            .await?;
+        Ok(())
+    }
+
+    async fn list_labels(&self) -> E2eResult<Vec<String>> {
+        let output = self.run_command_success(&["labels", "list"]).await?;
+        let mut labels = Vec::new();
+        for line in output.lines() {
+            let line = line.trim();
+            if !line.is_empty()
+                && !line.starts_with("Label")
+                && !line.starts_with("No labels")
+                && !line.starts_with('─')
+                && !line.starts_with('╭')
+                && !line.starts_with('├')
+                && !line.starts_with('╰')
+            {
+                if line.starts_with('│') {
+                    let parts: Vec<&str> = line
+                        .split('│')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if parts.len() >= 2 {
+                        let first = parts[0];
+                        if first.parse::<usize>().is_ok() {
+                            labels.push(parts[1].to_string());
+                        }
+                    }
+                } else {
+                    labels.push(line.to_string());
+                }
+            }
+        }
+        Ok(labels)
+    }
+
+    async fn add_contact_to_label(&self, label: &str, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "add-contact", label, contact])
+            .await?;
+        Ok(())
+    }
+
+    async fn remove_contact_from_label(&self, label: &str, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "remove-contact", label, contact])
+            .await?;
+        Ok(())
+    }
+
+    async fn show_field_to_label(&self, label: &str, field: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "show-field", label, field])
+            .await?;
+        Ok(())
+    }
+
+    async fn hide_field_from_label(&self, label: &str, field: &str) -> E2eResult<()> {
+        self.run_command_success(&["labels", "hide-field", label, field])
+            .await?;
+        Ok(())
+    }
+
+    // === Contact Visibility ===
+
+    async fn hide_field_from_contact(&self, contact: &str, field: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "hide", contact, field])
+            .await?;
+        Ok(())
+    }
+
+    async fn unhide_field_to_contact(&self, contact: &str, field: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "unhide", contact, field])
+            .await?;
+        Ok(())
+    }
+
+    // === Contact Verification ===
+
+    async fn verify_contact(&self, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "verify", contact])
+            .await?;
+        Ok(())
+    }
+
+    // === Recovery ===
+
+    async fn create_recovery_claim(&self, old_public_key: &str) -> E2eResult<String> {
+        let output = self
+            .run_command_success(&["recovery", "claim", old_public_key])
+            .await?;
+        Self::extract_qr_data(&output)
+    }
+
+    async fn vouch_for_recovery(&self, claim_data: &str) -> E2eResult<String> {
+        let output = self
+            .run_command_success(&["recovery", "vouch", claim_data])
+            .await?;
+        Self::extract_qr_data(&output)
+    }
+
+    async fn add_recovery_voucher(&self, voucher_data: &str) -> E2eResult<()> {
+        self.run_command_success(&["recovery", "add-voucher", voucher_data])
+            .await?;
+        Ok(())
+    }
+
+    async fn get_recovery_proof(&self) -> E2eResult<Option<String>> {
+        let output = self.run_command(&["recovery", "proof"]).await?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            if stdout.contains("not complete") || stdout.contains("No recovery") {
+                return Ok(None);
+            }
+            Ok(Self::extract_qr_data(&stdout).ok())
+        } else {
+            Ok(None)
+        }
+    }
+
+    // === Backup ===
+
+    async fn export_backup(&self, password: &str) -> E2eResult<String> {
+        let backup_path = self.data_dir.path().join("backup.vauchi");
+        let path_str = backup_path.to_string_lossy().to_string();
+        self.run_command_success(&["export", &path_str, "--password", password])
+            .await?;
+        Ok(path_str)
+    }
+
+    async fn import_backup(&self, path: &str, password: &str) -> E2eResult<()> {
+        self.run_command_success(&["import", path, "--password", password])
+            .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

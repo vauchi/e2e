@@ -195,6 +195,128 @@ pub trait Device: Send + Sync {
     /// Update the display name.
     async fn edit_name(&self, name: &str) -> E2eResult<()>;
 
+    // === Visibility Labels ===
+
+    /// Create a visibility label.
+    async fn create_label(&self, _name: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Delete a visibility label.
+    async fn delete_label(&self, _name: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// List all visibility labels.
+    async fn list_labels(&self) -> E2eResult<Vec<String>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Add a contact to a label.
+    async fn add_contact_to_label(&self, _label: &str, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Remove a contact from a label.
+    async fn remove_contact_from_label(&self, _label: &str, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Show a field to contacts in a label.
+    async fn show_field_to_label(&self, _label: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Hide a field from contacts in a label.
+    async fn hide_field_from_label(&self, _label: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    // === Contact Visibility ===
+
+    /// Hide a field from a specific contact.
+    async fn hide_field_from_contact(&self, _contact: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact visibility not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Show a field to a specific contact.
+    async fn unhide_field_to_contact(&self, _contact: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact visibility not supported on this device type".to_string(),
+        ))
+    }
+
+    // === Contact Verification ===
+
+    /// Mark a contact's fingerprint as verified.
+    async fn verify_contact(&self, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact verification not supported on this device type".to_string(),
+        ))
+    }
+
+    // === Recovery ===
+
+    /// Create a recovery claim (returns claim data).
+    async fn create_recovery_claim(&self, _old_public_key: &str) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Recovery not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Vouch for someone's recovery claim (returns voucher data).
+    async fn vouch_for_recovery(&self, _claim_data: &str) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Recovery not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Add a voucher to a recovery proof.
+    async fn add_recovery_voucher(&self, _voucher_data: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Recovery not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Get recovery proof (returns proof data if complete).
+    async fn get_recovery_proof(&self) -> E2eResult<Option<String>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Recovery not supported on this device type".to_string(),
+        ))
+    }
+
+    // === Backup ===
+
+    /// Export identity backup (returns backup file path).
+    async fn export_backup(&self, _password: &str) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Backup not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Import identity from backup.
+    async fn import_backup(&self, _path: &str, _password: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Backup not supported on this device type".to_string(),
+        ))
+    }
+
     // === Network Simulation ===
 
     /// Set network conditions for this device.

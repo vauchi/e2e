@@ -1,0 +1,135 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Recovery Flow - Integration test
+# Tests: Full social recovery flow with 3 vouchers
+# Feature: contact_recovery.feature
+
+name: "Social Recovery Flow"
+description: |
+  Tests the complete social recovery workflow:
+  1. Alice loses her device (simulated by creating a new identity)
+  2. Alice creates a recovery claim with her old public key
+  3. Three contacts (Bob, Carol, Dave) vouch for Alice
+  4. Alice assembles the recovery proof
+  5. Contacts verify the recovery proof
+feature: "contact_recovery.feature"
+tags: ["integration", "recovery"]
+timeout: 180s
+
+participants:
+  alice:
+    devices: 1
+    platform: cli
+  alice_new:
+    devices: 1
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+  carol:
+    devices: 1
+    platform: cli
+  dave:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Setup: Create identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice Original"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: create_identity
+    actor: carol
+    params:
+      name: "Carol"
+
+  - type: action
+    action: create_identity
+    actor: dave
+    params:
+      name: "Dave"
+
+  # Exchange contacts between Alice and all three vouchers
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_alice_bob
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_alice_bob}"
+
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_alice_carol
+
+  - type: action
+    action: complete_exchange
+    actor: carol
+    params:
+      qr: "${qr_alice_carol}"
+
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_alice_dave
+
+  - type: action
+    action: complete_exchange
+    actor: dave
+    params:
+      qr: "${qr_alice_dave}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob, carol, dave]
+
+  # Verify all contacts established
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 3
+
+  # Simulate: Alice creates a new identity (lost device scenario)
+  - type: action
+    action: create_identity
+    actor: alice_new
+    params:
+      name: "Alice Recovered"
+
+manual_instructions:
+  - "Alice: Create identity 'Alice Original'"
+  - "Bob, Carol, Dave: Create identities"
+  - "Alice: Exchange contacts with Bob, Carol, and Dave"
+  - "All: Sync"
+  - "--- SIMULATE DEVICE LOSS ---"
+  - "Alice (new device): Create identity 'Alice Recovered'"
+  - "Alice (new device): Recovery > Create Claim (enter old public key)"
+  - "Share claim data with Bob, Carol, and Dave"
+  - "Bob: Recovery > Vouch (paste claim data)"
+  - "Carol: Recovery > Vouch (paste claim data)"
+  - "Dave: Recovery > Vouch (paste claim data)"
+  - "Alice (new device): Recovery > Add Voucher (3x)"
+  - "Alice (new device): Recovery > Show Proof"
+  - "Verify: Proof shows 3/3 vouchers collected"
+  - "Bob: Recovery > Verify Proof (paste proof data)"
+  - "Verify: Bob confirms recovery with high confidence"

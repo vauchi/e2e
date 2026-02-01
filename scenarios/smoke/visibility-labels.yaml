@@ -1,0 +1,177 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Visibility Labels - Smoke test
+# Tests: Create labels, assign contacts, control field visibility per label
+# Feature: visibility_labels.feature
+
+name: "Visibility Labels"
+description: |
+  Tests the visibility label system: create labels, assign contacts to labels,
+  and control which fields are visible to contacts in each label.
+feature: "visibility_labels.feature"
+tags: ["smoke", "visibility", "labels"]
+timeout: 90s
+
+participants:
+  alice:
+    devices: 1
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+  carol:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Setup identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: create_identity
+    actor: carol
+    params:
+      name: "Carol"
+
+  # Alice adds fields to her card
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Work Email"
+      value: "alice@work.com"
+
+  - type: action
+    action: add_field
+    actor: alice
+    params:
+      field_type: "phone"
+      label: "Personal Phone"
+      value: "+1-555-0101"
+
+  # Exchange contacts
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_alice_bob
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_alice_bob}"
+
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: qr_alice_carol
+
+  - type: action
+    action: complete_exchange
+    actor: carol
+    params:
+      qr: "${qr_alice_carol}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob, carol]
+
+  # Alice creates labels
+  - type: action
+    action: create_label
+    actor: alice
+    params:
+      name: "Work"
+
+  - type: action
+    action: create_label
+    actor: alice
+    params:
+      name: "Friends"
+
+  # Verify labels were created
+  - type: assertion
+    assertion: label_count
+    actor: alice
+    params:
+      count: 2
+
+  # Assign Bob to Work, Carol to Friends
+  - type: action
+    action: add_contact_to_label
+    actor: alice
+    params:
+      label: "Work"
+      contact: "Bob"
+
+  - type: action
+    action: add_contact_to_label
+    actor: alice
+    params:
+      label: "Friends"
+      contact: "Carol"
+
+  # Show work email only to Work label
+  - type: action
+    action: show_field_to_label
+    actor: alice
+    params:
+      label: "Work"
+      field: "Work Email"
+
+  # Hide personal phone from Work label
+  - type: action
+    action: hide_field_from_label
+    actor: alice
+    params:
+      label: "Work"
+      field: "Personal Phone"
+
+  # Sync to propagate visibility changes
+  - type: action
+    action: sync
+    actor: alice
+
+  - type: wait
+    duration: 500ms
+    reason: "Allow relay to process visibility updates"
+
+  - type: action
+    action: sync
+    actor: [bob, carol]
+
+  # Verify Alice still has both contacts
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 2
+
+manual_instructions:
+  - "Alice: Create identity"
+  - "Bob, Carol: Create identities"
+  - "Alice: Add Work Email and Personal Phone to card"
+  - "Alice: Exchange contacts with Bob and Carol"
+  - "Alice: Create 'Work' and 'Friends' labels"
+  - "Alice: Add Bob to Work label, Carol to Friends label"
+  - "Alice: Show Work Email to Work label only"
+  - "Alice: Hide Personal Phone from Work label"
+  - "Alice: Sync"
+  - "Verify: Bob sees Work Email but not Personal Phone"
+  - "Verify: Carol sees both fields (or as per default visibility)"

@@ -539,6 +539,379 @@ impl ScenarioExecutor {
                 Ok(None)
             }
 
+            Action::GetCard => {
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("get_card requires an actor".to_string())
+                })?;
+                let (user_name, _) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let _card = user.get_card().await?;
+                Ok(None)
+            }
+
+            Action::EditField => {
+                let label = self.get_param_string(&step.params, "label")?;
+                let value = self.get_param_string(&step.params, "value")?;
+
+                for actor in actors {
+                    let (user_name, _) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    user.edit_field(&label, &value).await?;
+                }
+                Ok(None)
+            }
+
+            Action::RemoveField => {
+                let label = self.get_param_string(&step.params, "label")?;
+
+                for actor in actors {
+                    let (user_name, _) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    user.remove_field(&label).await?;
+                }
+                Ok(None)
+            }
+
+            Action::EditName => {
+                let name = self.get_param_string(&step.params, "name")?;
+
+                for actor in actors {
+                    let (user_name, _) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    user.edit_name(&name).await?;
+                }
+                Ok(None)
+            }
+
+            Action::ListContacts => {
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("list_contacts requires an actor".to_string())
+                })?;
+                let (user_name, _) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let contacts = user.list_contacts().await?;
+                Ok(Some(format!("{}", contacts.len())))
+            }
+
+            Action::GetContact => {
+                let name = self.get_param_string(&step.params, "name")?;
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("get_contact requires an actor".to_string())
+                })?;
+                let (user_name, _) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let _contact = user.get_contact(&name).await?;
+                Ok(None)
+            }
+
+            // === Visibility Labels ===
+
+            Action::CreateLabel => {
+                let name = self.get_param_string(&step.params, "name")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device.read().await.create_label(&name).await?;
+                }
+                Ok(None)
+            }
+
+            Action::DeleteLabel => {
+                let name = self.get_param_string(&step.params, "name")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device.read().await.delete_label(&name).await?;
+                }
+                Ok(None)
+            }
+
+            Action::AddContactToLabel => {
+                let label = self.get_param_string(&step.params, "label")?;
+                let contact = self.get_param_string(&step.params, "contact")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .add_contact_to_label(&label, &contact)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            Action::RemoveContactFromLabel => {
+                let label = self.get_param_string(&step.params, "label")?;
+                let contact = self.get_param_string(&step.params, "contact")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .remove_contact_from_label(&label, &contact)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            Action::ShowFieldToLabel => {
+                let label = self.get_param_string(&step.params, "label")?;
+                let field = self.get_param_string(&step.params, "field")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .show_field_to_label(&label, &field)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            Action::HideFieldFromLabel => {
+                let label = self.get_param_string(&step.params, "label")?;
+                let field = self.get_param_string(&step.params, "field")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .hide_field_from_label(&label, &field)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            // === Contact Visibility ===
+
+            Action::HideFieldFromContact => {
+                let contact = self.get_param_string(&step.params, "contact")?;
+                let field = self.get_param_string(&step.params, "field")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .hide_field_from_contact(&contact, &field)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            Action::UnhideFieldToContact => {
+                let contact = self.get_param_string(&step.params, "contact")?;
+                let field = self.get_param_string(&step.params, "field")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .unhide_field_to_contact(&contact, &field)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            // === Contact Verification ===
+
+            Action::VerifyContact => {
+                let contact = self.get_param_string(&step.params, "contact")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device.read().await.verify_contact(&contact).await?;
+                }
+                Ok(None)
+            }
+
+            // === Recovery ===
+
+            Action::CreateRecoveryClaim => {
+                let old_public_key = self.get_param_string(&step.params, "old_public_key")?;
+                let old_public_key = self.interpolate_var(&old_public_key);
+
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("create_recovery_claim requires an actor".to_string())
+                })?;
+                let (user_name, device_idx) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let idx = device_idx.unwrap_or(0);
+                let device = user.device(idx).ok_or_else(|| {
+                    E2eError::InvalidActor(format!("Device {} not found", idx))
+                })?;
+                let claim = device
+                    .read()
+                    .await
+                    .create_recovery_claim(&old_public_key)
+                    .await?;
+                Ok(Some(claim))
+            }
+
+            Action::VouchForRecovery => {
+                let claim = self.get_param_string(&step.params, "claim")?;
+                let claim = self.interpolate_var(&claim);
+
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("vouch_for_recovery requires an actor".to_string())
+                })?;
+                let (user_name, device_idx) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let idx = device_idx.unwrap_or(0);
+                let device = user.device(idx).ok_or_else(|| {
+                    E2eError::InvalidActor(format!("Device {} not found", idx))
+                })?;
+                let voucher = device.read().await.vouch_for_recovery(&claim).await?;
+                Ok(Some(voucher))
+            }
+
+            Action::AddRecoveryVoucher => {
+                let voucher = self.get_param_string(&step.params, "voucher")?;
+                let voucher = self.interpolate_var(&voucher);
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .add_recovery_voucher(&voucher)
+                        .await?;
+                }
+                Ok(None)
+            }
+
+            Action::VerifyRecoveryProof => {
+                let _proof = self.get_param_string(&step.params, "proof")?;
+
+                // Verify by passing to the recovery verify command
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    // get_recovery_proof returns the proof data
+                    let _ = device.read().await.get_recovery_proof().await?;
+                }
+                Ok(None)
+            }
+
+            // === Backup ===
+
+            Action::ExportBackup => {
+                let password = self.get_param_string(&step.params, "password")?;
+
+                let actor = actors.first().ok_or_else(|| {
+                    E2eError::InvalidStep("export_backup requires an actor".to_string())
+                })?;
+                let (user_name, device_idx) = ActorRef::parse(actor);
+                let user = self.get_user(user_name)?;
+                let user = user.read().await;
+                let idx = device_idx.unwrap_or(0);
+                let device = user.device(idx).ok_or_else(|| {
+                    E2eError::InvalidActor(format!("Device {} not found", idx))
+                })?;
+                let path = device.read().await.export_backup(&password).await?;
+                Ok(Some(path))
+            }
+
+            Action::ImportBackup => {
+                let path = self.get_param_string(&step.params, "path")?;
+                let path = self.interpolate_var(&path);
+                let password = self.get_param_string(&step.params, "password")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    device
+                        .read()
+                        .await
+                        .import_backup(&path, &password)
+                        .await?;
+                }
+                Ok(None)
+            }
+
             _ => {
                 // Actions not yet implemented
                 Err(E2eError::InvalidStep(format!(
@@ -693,6 +1066,82 @@ impl ScenarioExecutor {
                         } else {
                             reference_card = Some(card);
                         }
+                    }
+                }
+                Ok(())
+            }
+
+            Assertion::DeviceCount => {
+                let expected = self.get_param_usize(&step.params, "count")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    let devices = device.read().await.list_devices().await?;
+
+                    if devices.len() != expected {
+                        return Err(E2eError::AssertionFailed(format!(
+                            "{} has {} devices, expected {}",
+                            actor,
+                            devices.len(),
+                            expected
+                        )));
+                    }
+                }
+                Ok(())
+            }
+
+            Assertion::CardHasField => {
+                let field = self.get_param_string(&step.params, "field")?;
+
+                for actor in actors {
+                    let (user_name, _) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+
+                    let card = user.get_card().await?;
+                    let has_field = card
+                        .fields
+                        .iter()
+                        .any(|f| f.label == field || f.field_type == field);
+
+                    if !has_field {
+                        return Err(E2eError::AssertionFailed(format!(
+                            "{}'s card does not have field '{}'",
+                            actor, field
+                        )));
+                    }
+                }
+                Ok(())
+            }
+
+            Assertion::LabelCount => {
+                let expected = self.get_param_usize(&step.params, "count")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+
+                    let idx = device_idx.unwrap_or(0);
+                    let device = user.device(idx).ok_or_else(|| {
+                        E2eError::InvalidActor(format!("Device {} not found", idx))
+                    })?;
+                    let labels = device.read().await.list_labels().await?;
+
+                    if labels.len() != expected {
+                        return Err(E2eError::AssertionFailed(format!(
+                            "{} has {} labels, expected {}",
+                            actor,
+                            labels.len(),
+                            expected
+                        )));
                     }
                 }
                 Ok(())

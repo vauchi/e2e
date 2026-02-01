@@ -268,6 +268,31 @@ pub enum Action {
     StopRelay,
     RestartRelay,
 
+    // Visibility labels
+    CreateLabel,
+    DeleteLabel,
+    AddContactToLabel,
+    RemoveContactFromLabel,
+    ShowFieldToLabel,
+    HideFieldFromLabel,
+
+    // Contact visibility
+    HideFieldFromContact,
+    UnhideFieldToContact,
+
+    // Contact verification
+    VerifyContact,
+
+    // Recovery
+    CreateRecoveryClaim,
+    VouchForRecovery,
+    AddRecoveryVoucher,
+    VerifyRecoveryProof,
+
+    // Backup
+    ExportBackup,
+    ImportBackup,
+
     // Utilities
     Wait,
     Log,
@@ -353,6 +378,11 @@ pub enum Assertion {
     RelayConnected,
     SyncSucceeded,
     SyncFailed,
+    LabelCount,
+    LabelHasContact,
+    FieldVisibleToContact,
+    FieldHiddenFromContact,
+    RecoveryProofComplete,
 }
 
 /// Wait for a duration.

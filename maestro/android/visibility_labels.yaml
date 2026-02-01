@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Visibility Labels
+# Creates a label and assigns a contact to it
+
+appId: com.vauchi.app
+
+---
+
+# Navigate to Labels
+- tapOn: "Settings"
+- tapOn: "Visibility Labels"
+
+# Create a new label
+- tapOn: "Create Label"
+- inputText: "${LABEL_NAME}"
+- hideKeyboard
+- tapOn: "Save"
+- waitForAnimationToEnd
+
+# Verify label was created
+- assertVisible: "${LABEL_NAME}"
+
+# Add a contact to the label
+- tapOn: "${LABEL_NAME}"
+- tapOn: "Add Contact"
+- tapOn: "${CONTACT_NAME}"
+- tapOn: "Done"
+- hideKeyboard
+- waitForAnimationToEnd
+
+# Verify contact was added
+- assertVisible: "${CONTACT_NAME}"
+
+# Go back
+- pressKey: back

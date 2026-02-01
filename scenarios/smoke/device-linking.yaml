@@ -1,0 +1,105 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Device Linking - Smoke test
+# Tests: Link a new device to an existing identity, verify sync
+# Feature: device_management.feature
+
+name: "Device Linking"
+description: |
+  Tests the device linking flow: generate QR on primary device,
+  scan on secondary device, complete handshake, verify contacts sync.
+feature: "device_management.feature"
+tags: ["smoke", "device-linking"]
+timeout: 90s
+
+participants:
+  alice:
+    devices: 2
+    platform: cli
+  bob:
+    devices: 1
+    platform: cli
+
+relay_config:
+  count: 1
+
+steps:
+  # Create identities
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  # Exchange contacts on primary device
+  - type: action
+    action: generate_qr
+    actor: alice.device0
+    output: qr_data
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${qr_data}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  # Verify Alice's primary device has Bob
+  - type: assertion
+    assertion: contact_count
+    actor: alice.device0
+    params:
+      count: 1
+
+  # Link Alice's second device
+  - type: action
+    action: link_devices
+    actor: alice
+
+  # Verify device count
+  - type: assertion
+    assertion: device_count
+    actor: alice
+    params:
+      count: 2
+
+  # Sync all of Alice's devices
+  - type: action
+    action: sync_all
+    actor: alice
+
+  - type: wait
+    duration: 1s
+    reason: "Allow device sync to propagate"
+
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Verify Alice's second device also has Bob
+  - type: assertion
+    assertion: contact_count
+    actor: alice.device1
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice (Device 1): Create identity 'Alice'"
+  - "Bob: Create identity 'Bob'"
+  - "Alice (Device 1): Exchange contacts with Bob"
+  - "Alice (Device 1): Device > Link New Device (shows QR)"
+  - "Alice (Device 2): Device > Join Identity (scan QR)"
+  - "Complete the device linking handshake"
+  - "Alice (Device 2): Sync"
+  - "Verify: Alice's Device 2 shows Bob in contacts"

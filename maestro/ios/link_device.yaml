@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Device Linking
+# Generates a device link QR code for a new device to join
+
+appId: com.vauchi.app
+
+---
+
+# Navigate to Devices screen
+- tapOn: "Settings"
+- tapOn: "Linked Devices"
+
+# Generate link QR
+- tapOn: "Link New Device"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify QR code is displayed
+- assertVisible: "Scan this QR"
+
+# Copy the link data for automation
+- runFlow:
+    when:
+      visible: "Copy Link Data"
+    commands:
+      - tapOn: "Copy Link Data"
+      - copyTextFrom:
+          id: "device_link_data"
