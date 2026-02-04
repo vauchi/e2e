@@ -52,7 +52,7 @@ async fn integration_five_user_exchange() {
     for name in ["Alice", "Bob", "Carol", "Dave", "Eve"] {
         orch.verify_contact_count(name, 4)
             .await
-            .expect(&format!("{} should have 4 contacts", name));
+            .unwrap_or_else(|_| panic!("{} should have 4 contacts", name));
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");

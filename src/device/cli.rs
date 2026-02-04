@@ -351,8 +351,8 @@ impl CliDevice {
             }
 
             // Also check for data after "Data:" label
-            if line.starts_with("Data:") {
-                let data = line[5..].trim();
+            if let Some(data) = line.strip_prefix("Data:") {
+                let data = data.trim();
                 if !data.is_empty() {
                     return Ok(data.to_string());
                 }

@@ -32,7 +32,7 @@ impl ScenarioLoader {
     }
 
     /// Create a loader for the default scenarios directory.
-    pub fn default() -> Self {
+    pub fn new_default() -> Self {
         // Try to find the scenarios directory relative to the crate
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
         let scenarios_dir = PathBuf::from(manifest_dir).join("scenarios");
@@ -97,7 +97,7 @@ impl ScenarioLoader {
 
             if path
                 .extension()
-                .map_or(false, |ext| ext == "yaml" || ext == "yml")
+                .is_some_and(|ext| ext == "yaml" || ext == "yml")
             {
                 let name = format!("{}/{}", subdir, path.file_stem().unwrap().to_string_lossy());
                 names.push(name);
@@ -157,7 +157,7 @@ impl ScenarioLoader {
 
                 if path
                     .extension()
-                    .map_or(false, |ext| ext == "yaml" || ext == "yml")
+                    .is_some_and(|ext| ext == "yaml" || ext == "yml")
                 {
                     let content = std::fs::read_to_string(&path).ok();
                     let info = if let Some(content) = content {
