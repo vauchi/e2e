@@ -2,6 +2,9 @@
 /target/
 Cargo.lock
 
+# Local cargo config (path overrides for local dev, not for CI)
+.cargo/config.toml
+
 # IDE
 .idea/
 .vscode/
