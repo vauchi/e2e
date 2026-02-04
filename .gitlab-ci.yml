@@ -64,16 +64,13 @@ lint:clippy:
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
-  allow_failure: true  # May fail on git dependency issues
 
 # ============================================================
 # Security Stage (change-based)
 # ============================================================
 
 # Rust security audit (runs on dependency changes)
-# NOTE: allow_failure because e2e uses path deps (../core, ../relay) which
-# are unavailable in CI. Cargo resolves the workspace before installing tools.
-# Fix: migrate Cargo.toml to git deps with .cargo/config.toml path overrides.
+# Rust security audit (runs on dependency changes)
 security:audit:
   extends: [.rust-job, .validation-deps, .timeout-quick]
   stage: security
@@ -83,7 +80,6 @@ security:audit:
   script:
     - cargo install cargo-audit || true
     - cargo audit
-  allow_failure: true  # Path deps unavailable in CI (same as lint:clippy)
 
 # Full cargo-deny check: advisories, licenses, bans, sources
 security:deny:
@@ -98,7 +94,6 @@ security:deny:
   script:
     - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check
-  allow_failure: true  # Path deps unavailable in CI (same as lint:clippy)
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules

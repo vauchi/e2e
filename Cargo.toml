@@ -14,10 +14,8 @@ license = "AGPL-3.0-or-later"
 junit = []
 
 [dependencies]
-# Core library - path dependency for local development
-# Switch to git dependency after repos are created on GitLab:
-# vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.1.0" }
-vauchi-core = { path = "../core/vauchi-core" }
+# Core library - use git dependency for CI, patched to local path via .cargo/config.toml
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", branch = "main" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
@@ -65,10 +63,8 @@ reqwest = { version = "0.12", features = ["json"] }
 rand = "0.8"
 
 [dev-dependencies]
-# Relay for integration tests - path dependency for local development
-# Switch to git dependency after repos are created on GitLab:
-# vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", tag = "v0.1.0" }
-vauchi-relay = { path = "../relay" }
+# Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
+vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 
 [[test]]
 name = "five_user_exchange"
