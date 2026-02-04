@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# cargo-deny configuration for vauchi-e2e-tests
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+]
+
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore = [
+    # rustls-pemfile is unmaintained — transitive via tungstenite/rustls-native-certs.
+    # No fix available until tungstenite updates. Tracked upstream.
+    "RUSTSEC-2025-0134",
+    # bincode v1 is unmaintained — transitive via vauchi-core. Migrate tracked upstream.
+    "RUSTSEC-2025-0141",
+    # paste is unmaintained — transitive via uniffi. No action available.
+    "RUSTSEC-2024-0436",
+]
+
+[licenses]
+version = 2
+allow = [
+    "GPL-3.0-or-later",
+    "AGPL-3.0-or-later",
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",  # webpki-roots (Mozilla CA certs)
+]
+confidence-threshold = 0.8
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"  # path deps (vauchi-core, vauchi-relay) have no version spec
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+# Deny specific crates known to be problematic
+deny = [
+    # No direct openssl usage — allowed only via native-tls (transitive from vauchi-core)
+    { name = "openssl", wrappers = ["native-tls"] },
+    { name = "openssl-sys", wrappers = ["native-tls", "openssl"] },
+]
+
+# Allow specific duplicates that are common and unavoidable
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

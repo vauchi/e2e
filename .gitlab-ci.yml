@@ -25,6 +25,7 @@ include:
     ref: main
     file:
       - '/ci-templates/rust-base.yml'
+      - '/ci-templates/security.yml'
       - '/ci-templates/mr-rules.yml'
       - '/ci-templates/reuse.yml'
   - template: Security/SAST.gitlab-ci.yml
@@ -68,6 +69,31 @@ lint:clippy:
 # ============================================================
 # Security Stage (change-based)
 # ============================================================
+
+# Rust security audit (runs on dependency changes)
+security:audit:
+  extends: [.rust-job, .validation-deps, .timeout-quick]
+  stage: security
+  needs: []
+  cache:
+    policy: pull  # Read-only cache
+  script:
+    - cargo install cargo-audit || true
+    - cargo audit
+
+# Full cargo-deny check: advisories, licenses, bans, sources
+security:deny:
+  extends: [.rust-job, .timeout-quick]
+  stage: security
+  needs: []
+  cache:
+    policy: pull
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
+    - cargo deny check
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules
