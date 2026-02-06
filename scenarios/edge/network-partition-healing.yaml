@@ -1,0 +1,517 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Network Partition Healing - Edge case test
+# Tests: Recovery after network split between relays and devices
+# Feature: relay_network.feature, sync_updates.feature
+
+name: "Network Partition Healing"
+description: |
+  Tests system recovery after network partitions where different devices
+  connect to different relays that cannot communicate with each other.
+  Verifies eventual consistency when partition heals.
+feature: "relay_network.feature"
+tags: ["edge", "network", "partition", "relay", "recovery"]
+timeout: 300s
+
+participants:
+  alice:
+    devices: 2
+    platform: any
+  bob:
+    devices: 2
+    platform: any
+  charlie:
+    devices: 1
+    platform: any
+
+relay_config:
+  count: 3
+  topology: mesh
+  # Three relays in mesh topology for partition testing
+
+steps:
+  # === Setup: Create identities and establish contacts ===
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: create_identity
+    actor: charlie
+    params:
+      name: "Charlie"
+
+  - type: action
+    action: link_devices
+    actor: alice
+
+  - type: action
+    action: link_devices
+    actor: bob
+
+  # Exchange contacts
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: alice_qr
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${alice_qr}"
+
+  - type: action
+    action: generate_qr
+    actor: bob
+    output: bob_qr
+
+  - type: action
+    action: complete_exchange
+    actor: charlie
+    params:
+      qr: "${bob_qr}"
+
+  # Initial sync on all relays
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+    timeout: 30s
+
+  # Verify initial state
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 1
+
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 2
+
+  - type: assertion
+    assertion: contact_count
+    actor: charlie
+    params:
+      count: 1
+
+  # === Scenario 1: Split-brain partition ===
+  # Create network partition: relay0 isolated from relay1,relay2
+
+  - type: action
+    action: partition_network
+    params:
+      partition_a: [relay0]
+      partition_b: [relay1, relay2]
+
+  # Force devices to specific relays
+  - type: action
+    action: set_relay_preference
+    actor: alice.device0
+    params:
+      relay_index: 0
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: alice.device1
+    params:
+      relay_index: 1
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: bob.device0
+    params:
+      relay_index: 0
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: bob.device1
+    params:
+      relay_index: 2
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: charlie.device0
+    params:
+      relay_index: 1
+      exclusive: true
+
+  # Make edits during partition
+  # Partition A (relay0): alice.device0, bob.device0
+  - type: action
+    action: add_field
+    actor: alice.device0
+    params:
+      field_type: "phone"
+      label: "Partition A Phone"
+      value: "+1-PARTITION-A"
+
+  - type: action
+    action: add_field
+    actor: bob.device0
+    params:
+      field_type: "email"
+      label: "Partition A Email"
+      value: "bob-partition-a@test.com"
+
+  # Partition B (relay1,relay2): alice.device1, bob.device1, charlie
+  - type: action
+    action: add_field
+    actor: alice.device1
+    params:
+      field_type: "website"
+      label: "Partition B Website"
+      value: "https://partition-b.alice.dev"
+
+  - type: action
+    action: add_field
+    actor: bob.device1
+    params:
+      field_type: "phone"
+      label: "Partition B Phone"
+      value: "+1-PARTITION-B"
+
+  # Sync within each partition
+  - type: action
+    action: sync
+    actor: [alice.device0, bob.device0]
+    timeout: 15s
+
+  - type: action
+    action: sync
+    actor: [alice.device1, bob.device1, charlie.device0]
+    timeout: 15s
+
+  # Verify partition isolation - each partition sees only its updates
+  - type: assertion
+    assertion: has_field
+    actor: alice.device0
+    params:
+      field_type: "phone"
+      label: "Partition A Phone"
+
+  - type: assertion
+    assertion: missing_field
+    actor: alice.device0
+    params:
+      field_type: "website"
+      label: "Partition B Website"
+
+  - type: assertion
+    assertion: has_field
+    actor: alice.device1
+    params:
+      field_type: "website"
+      label: "Partition B Website"
+
+  - type: assertion
+    assertion: missing_field
+    actor: alice.device1
+    params:
+      field_type: "phone"
+      label: "Partition A Phone"
+
+  # === Heal the partition ===
+  - type: action
+    action: heal_partition
+
+  - type: wait
+    duration: 3s
+    reason: "Allow relay mesh to reconnect"
+
+  # Clear relay preferences to allow full connectivity
+  - type: action
+    action: clear_relay_preference
+    actor: [alice, bob, charlie]
+
+  # Sync all devices - should merge both partition's data
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+    timeout: 60s
+
+  - type: wait
+    duration: 3s
+    reason: "Allow full sync propagation"
+
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+
+  # === Verify healing: All devices should have all updates ===
+  # Alice should have both partition's updates
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "phone"
+      label: "Partition A Phone"
+      all_devices: true
+
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "website"
+      label: "Partition B Website"
+      all_devices: true
+
+  # Bob should have all updates from both partitions
+  - type: assertion
+    assertion: has_field
+    actor: bob
+    params:
+      field_type: "email"
+      label: "Partition A Email"
+      all_devices: true
+
+  - type: assertion
+    assertion: has_field
+    actor: bob
+    params:
+      field_type: "phone"
+      label: "Partition B Phone"
+      all_devices: true
+
+  # Charlie should see all of Bob's updates
+  - type: assertion
+    assertion: contact_field_exists
+    actor: charlie
+    params:
+      contact_name: "Bob"
+      field_type: "email"
+      label: "Partition A Email"
+
+  - type: assertion
+    assertion: contact_field_exists
+    actor: charlie
+    params:
+      contact_name: "Bob"
+      field_type: "phone"
+      label: "Partition B Phone"
+
+  # All cards should be converged
+  - type: assertion
+    assertion: cards_converged
+    actor: alice
+
+  - type: assertion
+    assertion: cards_converged
+    actor: bob
+
+  # === Scenario 2: Cascading partition recovery ===
+  # Test recovery when partitions heal one relay at a time
+
+  # Create three-way partition: each relay isolated
+  - type: action
+    action: partition_network
+    params:
+      partition_a: [relay0]
+      partition_b: [relay1]
+      partition_c: [relay2]
+
+  # Make edits on each isolated relay
+  - type: action
+    action: set_relay_preference
+    actor: alice.device0
+    params:
+      relay_index: 0
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: bob.device0
+    params:
+      relay_index: 1
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: charlie.device0
+    params:
+      relay_index: 2
+      exclusive: true
+
+  - type: action
+    action: add_field
+    actor: alice.device0
+    params:
+      field_type: "note"
+      label: "Cascade Test A"
+      value: "From relay 0"
+
+  - type: action
+    action: add_field
+    actor: bob.device0
+    params:
+      field_type: "note"
+      label: "Cascade Test B"
+      value: "From relay 1"
+
+  - type: action
+    action: sync
+    actor: [alice.device0, bob.device0, charlie.device0]
+    timeout: 15s
+
+  # Heal partition incrementally: first connect relay0 and relay1
+  - type: action
+    action: partial_heal
+    params:
+      connect: [relay0, relay1]
+
+  - type: wait
+    duration: 2s
+
+  - type: action
+    action: sync
+    actor: [alice.device0, bob.device0]
+    timeout: 15s
+
+  # Now connect all three relays
+  - type: action
+    action: heal_partition
+
+  - type: wait
+    duration: 2s
+
+  - type: action
+    action: clear_relay_preference
+    actor: [alice, bob, charlie]
+
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+    timeout: 60s
+
+  # Verify all data cascaded through
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "note"
+      label: "Cascade Test A"
+      all_devices: true
+
+  - type: assertion
+    assertion: cards_converged
+    actor: [alice, bob]
+
+  # === Scenario 3: Long partition with significant drift ===
+  # Simulate extended partition with multiple rounds of edits
+
+  - type: action
+    action: partition_network
+    params:
+      partition_a: [relay0]
+      partition_b: [relay1, relay2]
+
+  - type: action
+    action: set_relay_preference
+    actor: alice
+    params:
+      relay_index: 0
+      exclusive: true
+
+  - type: action
+    action: set_relay_preference
+    actor: bob
+    params:
+      relay_index: 1
+      exclusive: true
+
+  # Multiple rounds of edits during partition
+  - type: loop
+    count: 3
+    steps:
+      - type: action
+        action: add_field
+        actor: alice.device0
+        params:
+          field_type: "custom"
+          label: "Drift Test ${loop_index}"
+          value: "Alice edit ${loop_index}"
+
+      - type: action
+        action: add_field
+        actor: bob.device0
+        params:
+          field_type: "custom"
+          label: "Drift Test ${loop_index}"
+          value: "Bob edit ${loop_index}"
+
+      - type: action
+        action: sync
+        actor: [alice.device0, bob.device0]
+        timeout: 10s
+
+  # Heal and reconcile
+  - type: action
+    action: heal_partition
+
+  - type: action
+    action: clear_relay_preference
+    actor: [alice, bob, charlie]
+
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+    timeout: 90s
+
+  - type: wait
+    duration: 5s
+    reason: "Allow full reconciliation"
+
+  - type: action
+    action: sync_all
+    actor: [alice, bob, charlie]
+
+  # Final convergence check
+  - type: assertion
+    assertion: cards_converged
+    actor: alice
+
+  - type: assertion
+    assertion: cards_converged
+    actor: bob
+
+manual_instructions:
+  - "Setup: Create identities for Alice (2 devices), Bob (2 devices), Charlie (1 device)"
+  - "Link devices within each user"
+  - "Exchange contacts: Alice <-> Bob, Bob <-> Charlie"
+  - "Sync all devices"
+  - "--- Scenario 1: Split-brain ---"
+  - "Network admin: Create firewall rule blocking relay0 from relay1/relay2"
+  - "Alice Device 1: Connect only to relay0, add phone field"
+  - "Alice Device 2: Connect only to relay1, add website field"
+  - "Bob Device 1: Connect only to relay0, add email field"
+  - "Bob Device 2: Connect only to relay2, add phone field"
+  - "Sync within each partition group"
+  - "Verify: Partition A devices don't see Partition B changes"
+  - "Network admin: Remove firewall rule (heal partition)"
+  - "All devices: Sync"
+  - "Verify: All devices see all changes from both partitions"
+  - "--- Scenario 2: Cascading heal ---"
+  - "Create three-way partition (each relay isolated)"
+  - "Make edits on devices connected to each relay"
+  - "Heal incrementally: connect relay0+relay1 first, then add relay2"
+  - "Verify: Changes cascade through the network"
+  - "--- Scenario 3: Extended partition ---"
+  - "Create partition, make multiple rounds of edits"
+  - "Heal partition"
+  - "Verify: All historical changes sync correctly"

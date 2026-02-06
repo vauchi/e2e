@@ -1,0 +1,353 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Sync Conflict Resolution - Edge case test
+# Tests: Concurrent edits on multiple devices with various conflict scenarios
+# Feature: sync_updates.feature
+
+name: "Sync Conflict Resolution"
+description: |
+  Tests conflict resolution when multiple devices make concurrent edits
+  to the same card fields while offline. Verifies last-write-wins semantics,
+  field-level merging, and eventual consistency across all devices.
+feature: "sync_updates.feature"
+tags: ["edge", "conflict", "sync", "multi-device"]
+timeout: 180s
+
+participants:
+  alice:
+    devices: 3
+    platform: any
+  bob:
+    devices: 2
+    platform: any
+
+relay_config:
+  count: 2
+  # Two relays for redundancy testing
+
+steps:
+  # === Setup: Create identities and link devices ===
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  - type: action
+    action: link_devices
+    actor: alice
+
+  - type: action
+    action: link_devices
+    actor: bob
+
+  # Initial sync to propagate to all devices
+  - type: action
+    action: sync_all
+    actor: [alice, bob]
+
+  # Exchange contacts so they can receive updates
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: alice_qr
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${alice_qr}"
+
+  - type: action
+    action: sync_all
+    actor: [alice, bob]
+
+  # === Scenario 1: Same field edited on different devices ===
+  # Take all Alice devices offline
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: false
+      mode: offline
+
+  # Device 0: Change phone to value A
+  - type: action
+    action: update_field
+    actor: alice.device0
+    params:
+      field_type: "phone"
+      label: "Mobile"
+      value: "+1-000-0000"
+      timestamp_offset: 0s
+
+  # Device 1: Change same phone to value B (later timestamp)
+  - type: action
+    action: update_field
+    actor: alice.device1
+    params:
+      field_type: "phone"
+      label: "Mobile"
+      value: "+1-111-1111"
+      timestamp_offset: 1s
+
+  # Device 2: Change same phone to value C (latest timestamp)
+  - type: action
+    action: update_field
+    actor: alice.device2
+    params:
+      field_type: "phone"
+      label: "Mobile"
+      value: "+1-222-2222"
+      timestamp_offset: 2s
+
+  # Bring all devices online
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: true
+      mode: normal
+
+  # Sync all devices
+  - type: action
+    action: sync_all
+    actor: alice
+    timeout: 30s
+
+  # Wait for convergence
+  - type: wait
+    duration: 2s
+    reason: "Allow sync propagation"
+
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Verify all devices converged to latest value (device2's edit)
+  - type: assertion
+    assertion: field_value
+    actor: alice
+    params:
+      field_type: "phone"
+      label: "Mobile"
+      expected_value: "+1-222-2222"
+      all_devices: true
+
+  # === Scenario 2: Different fields edited concurrently (should merge) ===
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: false
+      mode: offline
+
+  # Device 0: Add email field
+  - type: action
+    action: add_field
+    actor: alice.device0
+    params:
+      field_type: "email"
+      label: "Work"
+      value: "alice@work.com"
+
+  # Device 1: Add website field
+  - type: action
+    action: add_field
+    actor: alice.device1
+    params:
+      field_type: "website"
+      label: "Portfolio"
+      value: "https://alice.dev"
+
+  # Device 2: Update display name
+  - type: action
+    action: update_field
+    actor: alice.device2
+    params:
+      field_type: "name"
+      value: "Alice Anderson"
+
+  # Bring online and sync
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: true
+      mode: normal
+
+  - type: action
+    action: sync_all
+    actor: alice
+    timeout: 30s
+
+  - type: wait
+    duration: 2s
+    reason: "Allow sync propagation"
+
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Verify all fields were merged (non-conflicting edits)
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Work"
+      all_devices: true
+
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "website"
+      label: "Portfolio"
+      all_devices: true
+
+  - type: assertion
+    assertion: field_value
+    actor: alice
+    params:
+      field_type: "name"
+      expected_value: "Alice Anderson"
+      all_devices: true
+
+  # === Scenario 3: Delete vs Edit conflict ===
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: false
+      mode: offline
+
+  # Device 0: Delete the email field
+  - type: action
+    action: delete_field
+    actor: alice.device0
+    params:
+      field_type: "email"
+      label: "Work"
+      timestamp_offset: 0s
+
+  # Device 1: Edit the same email field (later timestamp)
+  - type: action
+    action: update_field
+    actor: alice.device1
+    params:
+      field_type: "email"
+      label: "Work"
+      value: "alice@newwork.com"
+      timestamp_offset: 1s
+
+  # Bring online and sync
+  - type: action
+    action: set_network
+    actor: alice
+    params:
+      internet: true
+      mode: normal
+
+  - type: action
+    action: sync_all
+    actor: alice
+
+  - type: wait
+    duration: 2s
+
+  - type: action
+    action: sync_all
+    actor: alice
+
+  # Last-write-wins: edit should win over delete
+  - type: assertion
+    assertion: has_field
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Work"
+      all_devices: true
+
+  - type: assertion
+    assertion: field_value
+    actor: alice
+    params:
+      field_type: "email"
+      label: "Work"
+      expected_value: "alice@newwork.com"
+      all_devices: true
+
+  # === Scenario 4: Cross-user update propagation during conflict ===
+  # Bob should receive Alice's final converged state
+  - type: action
+    action: sync_all
+    actor: bob
+    timeout: 30s
+
+  - type: wait
+    duration: 2s
+
+  - type: action
+    action: sync_all
+    actor: bob
+
+  # Verify Bob sees Alice's final converged card
+  - type: assertion
+    assertion: contact_field_value
+    actor: bob
+    params:
+      contact_name: "Alice Anderson"
+      field_type: "phone"
+      label: "Mobile"
+      expected_value: "+1-222-2222"
+      all_devices: true
+
+  # All devices should be fully converged
+  - type: assertion
+    assertion: cards_converged
+    actor: alice
+
+  - type: assertion
+    assertion: cards_converged
+    actor: bob
+
+manual_instructions:
+  - "Alice: Create identity on Device 1"
+  - "Alice: Link Device 2 and Device 3"
+  - "Bob: Create identity on Device 1"
+  - "Bob: Link Device 2"
+  - "Exchange contacts between Alice and Bob"
+  - "Sync all devices"
+  - "--- Scenario 1: Same Field Conflict ---"
+  - "All Alice devices: Enable airplane mode"
+  - "Alice Device 1: Add/edit phone to +1-000-0000"
+  - "Alice Device 2: Edit same phone to +1-111-1111"
+  - "Alice Device 3: Edit same phone to +1-222-2222"
+  - "All Alice devices: Disable airplane mode"
+  - "Sync all devices"
+  - "Verify: All Alice devices show +1-222-2222 (last write wins)"
+  - "--- Scenario 2: Different Fields (Merge) ---"
+  - "All Alice devices: Enable airplane mode"
+  - "Device 1: Add email field"
+  - "Device 2: Add website field"
+  - "Device 3: Change display name"
+  - "All devices: Disable airplane mode and sync"
+  - "Verify: All three changes are present on all devices"
+  - "--- Scenario 3: Delete vs Edit ---"
+  - "All Alice devices: Enable airplane mode"
+  - "Device 1: Delete email field"
+  - "Device 2: Edit email field"
+  - "Disable airplane mode and sync"
+  - "Verify: Email field exists with edited value (edit wins)"
+  - "--- Scenario 4: Cross-user Propagation ---"
+  - "Bob: Sync all devices"
+  - "Verify: Bob sees Alice's final converged card on all devices"

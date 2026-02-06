@@ -1,0 +1,183 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Exchange Error Paths - Edge case test
+# Tests: QR expiration, self-exchange attempt, malformed QR data
+# Feature: contact_exchange.feature
+
+name: "Exchange Error Paths"
+description: |
+  Tests various error conditions in the contact exchange flow.
+  Verifies that the application handles invalid and expired QR codes gracefully,
+  prevents self-exchange, and rejects malformed data.
+feature: "contact_exchange.feature"
+tags: ["edge", "error-handling", "exchange"]
+timeout: 180s
+
+participants:
+  alice:
+    devices: 1
+    platform: any
+  bob:
+    devices: 1
+    platform: any
+
+relay_config:
+  count: 1
+
+steps:
+  # === Setup ===
+  - type: action
+    action: create_identity
+    actor: alice
+    params:
+      name: "Alice"
+
+  - type: action
+    action: create_identity
+    actor: bob
+    params:
+      name: "Bob"
+
+  # === Test 1: QR Expiration ===
+  # Generate QR with short TTL
+  - type: action
+    action: generate_qr
+    actor: alice
+    params:
+      ttl: 5s
+    output: expired_qr
+
+  # Wait for QR to expire
+  - type: wait
+    duration: 6s
+    reason: "Wait for QR to expire"
+
+  # Attempt to use expired QR - should fail
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${expired_qr}"
+    expect_error: "QR code expired"
+
+  # Verify Bob has no contacts (exchange failed)
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 0
+
+  # === Test 2: Self-Exchange Prevention ===
+  # Alice generates fresh QR
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: alice_qr
+
+  # Alice tries to scan her own QR - should fail
+  - type: action
+    action: complete_exchange
+    actor: alice
+    params:
+      qr: "${alice_qr}"
+    expect_error: "Cannot exchange with yourself"
+
+  # Verify Alice has no contacts
+  - type: assertion
+    assertion: contact_count
+    actor: alice
+    params:
+      count: 0
+
+  # === Test 3: Malformed QR Data ===
+  # Attempt exchange with completely invalid data
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "not-valid-base64-or-json"
+    expect_error: "Invalid QR data"
+
+  # Attempt exchange with valid base64 but invalid structure
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "eyJpbnZhbGlkIjoiZGF0YSJ9"  # {"invalid":"data"} in base64
+    expect_error: "Invalid QR format"
+
+  # Attempt exchange with truncated signature
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr_mutation: "truncate_signature"
+      qr: "${alice_qr}"
+    expect_error: "Signature verification failed"
+
+  # Verify Bob still has no contacts
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 0
+
+  # === Test 4: Tampered QR Data ===
+  # Generate valid QR from Alice
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: valid_qr
+
+  # Attempt exchange with modified payload (signature will fail)
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${valid_qr}"
+      qr_mutation: "modify_public_key"
+    expect_error: "Signature verification failed"
+
+  # === Cleanup: Successful exchange to verify system still works ===
+  - type: action
+    action: generate_qr
+    actor: alice
+    output: final_qr
+
+  - type: action
+    action: complete_exchange
+    actor: bob
+    params:
+      qr: "${final_qr}"
+
+  - type: action
+    action: sync
+    actor: [alice, bob]
+
+  - type: assertion
+    assertion: contact_count
+    actor: bob
+    params:
+      count: 1
+
+manual_instructions:
+  - "Alice: Create identity"
+  - "Bob: Create identity"
+  - "--- Test 1: QR Expiration ---"
+  - "Alice: Generate QR code, wait 2 minutes"
+  - "Bob: Scan expired QR"
+  - "Verify: Bob sees 'QR code expired' error"
+  - "--- Test 2: Self-Exchange ---"
+  - "Alice: Generate QR code"
+  - "Alice: Try to scan your own QR"
+  - "Verify: Error 'Cannot exchange with yourself'"
+  - "--- Test 3: Malformed Data ---"
+  - "Bob: Open camera/QR scanner"
+  - "Scan a random QR code (not from Vauchi)"
+  - "Verify: Error about invalid format"
+  - "--- Test 4: Successful Recovery ---"
+  - "Alice: Generate fresh QR"
+  - "Bob: Scan Alice's QR"
+  - "Verify: Exchange completes successfully"
