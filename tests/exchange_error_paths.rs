@@ -492,13 +492,3 @@ async fn test_exchange_network_failure() {
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
-
-#[cfg(test)]
-mod tests {
-    /// Unit test to verify test module compiles correctly.
-    #[test]
-    fn test_module_compiles() {
-        // This test ensures the module compiles without issues
-        assert!(true);
-    }
-}
