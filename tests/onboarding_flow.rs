@@ -53,7 +53,9 @@ async fn test_welcome_screen_value_proposition() {
     // In a real app, this happens after tapping "Get Started"
     {
         let user = new_user.read().await;
-        user.create_identity().await.expect("Failed to create identity");
+        user.create_identity()
+            .await
+            .expect("Failed to create identity");
     }
 
     // After onboarding, user should have identity
@@ -90,7 +92,8 @@ async fn test_card_creation_wizard_steps() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
-    orch.add_user("WizardUser", 1).expect("Failed to add WizardUser");
+    orch.add_user("WizardUser", 1)
+        .expect("Failed to add WizardUser");
 
     let wizard_user = orch.user("WizardUser").unwrap();
 
@@ -128,7 +131,10 @@ async fn test_card_creation_wizard_steps() {
     // Step 4: Preview - verify card has all fields
     {
         let user = wizard_user.read().await;
-        let card = user.get_card().await.expect("Failed to get card for preview");
+        let card = user
+            .get_card()
+            .await
+            .expect("Failed to get card for preview");
 
         assert_eq!(card.name, "WizardUser", "Name should be set");
         assert_eq!(card.fields.len(), 2, "Should have phone and email fields");
@@ -141,7 +147,8 @@ async fn test_card_creation_wizard_steps() {
     }
 
     // Verify wizard can complete with minimum viable card (just name)
-    orch.add_user("MinimalUser", 1).expect("Failed to add MinimalUser");
+    orch.add_user("MinimalUser", 1)
+        .expect("Failed to add MinimalUser");
     let minimal_user = orch.user("MinimalUser").unwrap();
 
     {
@@ -173,7 +180,8 @@ async fn test_first_exchange_tutorial_overlay() {
     orch.start().await.expect("Failed to start orchestrator");
 
     // Create two users for exchange
-    orch.add_user("FirstTimer", 1).expect("Failed to add FirstTimer");
+    orch.add_user("FirstTimer", 1)
+        .expect("Failed to add FirstTimer");
     orch.add_user("ExperiencedUser", 1)
         .expect("Failed to add ExperiencedUser");
 
@@ -227,11 +235,7 @@ async fn test_first_exchange_tutorial_overlay() {
     {
         let user = experienced.read().await;
         let contacts = user.list_contacts().await.expect("Failed to list contacts");
-        assert_eq!(
-            contacts.len(),
-            1,
-            "ExperiencedUser should have 1 contact"
-        );
+        assert_eq!(contacts.len(), 1, "ExperiencedUser should have 1 contact");
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -249,7 +253,8 @@ async fn test_demo_contact_visible_on_start() {
     orch.start().await.expect("Failed to start orchestrator");
 
     // Create a solo user (no one to exchange with)
-    orch.add_user("SoloUser", 1).expect("Failed to add SoloUser");
+    orch.add_user("SoloUser", 1)
+        .expect("Failed to add SoloUser");
 
     let solo_user = orch.user("SoloUser").unwrap();
 
@@ -291,7 +296,10 @@ async fn test_demo_contact_visible_on_start() {
     {
         let user = solo_user.read().await;
         let qr = user.generate_qr().await.expect("Failed to generate QR");
-        assert!(!qr.is_empty(), "User should be able to generate exchange QR");
+        assert!(
+            !qr.is_empty(),
+            "User should be able to generate exchange QR"
+        );
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -314,7 +322,8 @@ async fn test_time_to_value_under_2_minutes() {
     orch.start().await.expect("Failed to start orchestrator");
 
     // Phase 1: User creation and identity setup
-    orch.add_user("FastUser", 1).expect("Failed to add FastUser");
+    orch.add_user("FastUser", 1)
+        .expect("Failed to add FastUser");
     orch.add_user("Partner", 1).expect("Failed to add Partner");
 
     let fast_user = orch.user("FastUser").unwrap();
@@ -435,7 +444,8 @@ async fn smoke_skip_onboarding_for_restore() {
 
     // Create a "new device" that will restore via backup
     // This simulates skipping new user onboarding
-    orch.add_user("NewDevice", 1).expect("Failed to add NewDevice");
+    orch.add_user("NewDevice", 1)
+        .expect("Failed to add NewDevice");
 
     let new_device = orch.user("NewDevice").unwrap();
 

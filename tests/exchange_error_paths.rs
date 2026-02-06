@@ -140,10 +140,7 @@ async fn test_exchange_self_exchange() {
     };
 
     // Verify the exchange fails with self-exchange error
-    assert!(
-        exchange_result.is_err(),
-        "Self-exchange should be rejected"
-    );
+    assert!(exchange_result.is_err(), "Self-exchange should be rejected");
 
     let error_msg = exchange_result.unwrap_err().to_string().to_lowercase();
     assert!(
@@ -453,9 +450,7 @@ async fn test_exchange_network_failure() {
     };
 
     // Stop the relay to simulate network failure
-    orch.stop_relay(0)
-        .await
-        .expect("Failed to stop relay");
+    orch.stop_relay(0).await.expect("Failed to stop relay");
 
     // Bob attempts to complete exchange (should fail due to network)
     let bob = orch.user("Bob").unwrap();
