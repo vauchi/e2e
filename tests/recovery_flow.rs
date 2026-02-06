@@ -227,7 +227,10 @@ async fn integration_recovery_happy_path() {
             .await
             .expect("Failed to create recovery claim");
     }
-    assert!(!recovery_claim.is_empty(), "Recovery claim should not be empty");
+    assert!(
+        !recovery_claim.is_empty(),
+        "Recovery claim should not be empty"
+    );
 
     // Step 2: Bob vouches for Alice
     let voucher_bob: String;
@@ -298,7 +301,10 @@ async fn integration_recovery_happy_path() {
             .await
             .expect("Failed to get recovery proof");
     }
-    assert!(recovery_proof.is_some(), "Recovery proof should be complete with 3 vouchers");
+    assert!(
+        recovery_proof.is_some(),
+        "Recovery proof should be complete with 3 vouchers"
+    );
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
