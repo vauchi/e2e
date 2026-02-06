@@ -116,6 +116,14 @@ steps:
     params:
       name: "Alice Recovered"
 
+  # NOTE: Full recovery automation requires additional schema extensions:
+  # - get_public_key: Save Alice's old public key before "device loss"
+  # - trust_for_recovery: Mark contacts as trusted for recovery
+  # - get_recovery_proof: Get completed proof
+  # - recovery_proof_complete: Assert voucher count
+  # - recovery_verification_level: Assert verification confidence
+  # See tests/recovery_flow.rs for the programmatic equivalent.
+
 manual_instructions:
   - "Alice: Create identity 'Alice Original'"
   - "Bob, Carol, Dave: Create identities"
