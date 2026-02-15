@@ -331,9 +331,11 @@ pub mod helpers {
                     user_b_guard.name()
                 );
 
-                // User A generates QR, User B completes
-                let qr = user_a_guard.generate_qr().await?;
-                user_b_guard.complete_exchange(&qr).await?;
+                // Mutual exchange: both sides generate QR and complete
+                let qr_a = user_a_guard.generate_qr().await?;
+                user_b_guard.complete_exchange(&qr_a).await?;
+                let qr_b = user_b_guard.generate_qr().await?;
+                user_a_guard.complete_exchange(&qr_b).await?;
             }
         }
 

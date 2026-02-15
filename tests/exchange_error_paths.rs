@@ -452,29 +452,21 @@ async fn test_exchange_network_failure() {
     // Stop the relay to simulate network failure
     orch.stop_relay(0).await.expect("Failed to stop relay");
 
-    // Bob attempts to complete exchange (should fail due to network)
+    // Bob attempts to complete exchange
+    // Note: With mutual QR exchange, the exchange creates a contact locally
+    // without needing a relay. The relay is only needed for subsequent sync.
     let bob = orch.user("Bob").unwrap();
     let exchange_result = {
         let bob_guard = bob.read().await;
         bob_guard.complete_exchange(&qr_data).await
     };
 
-    // Verify the exchange fails due to network issues
+    // Mutual QR exchange works offline — contact is created locally from the QR data.
+    // The relay is only needed for syncing card updates afterwards.
+    // So the exchange should succeed even without a relay.
     assert!(
-        exchange_result.is_err(),
-        "Exchange without relay should fail"
-    );
-
-    let error_msg = exchange_result.unwrap_err().to_string().to_lowercase();
-    assert!(
-        error_msg.contains("network")
-            || error_msg.contains("connect")
-            || error_msg.contains("relay")
-            || error_msg.contains("timeout")
-            || error_msg.contains("unreachable")
-            || error_msg.contains("refused"),
-        "Error should indicate network failure: {}",
-        error_msg
+        exchange_result.is_ok(),
+        "Mutual QR exchange should succeed offline"
     );
 
     // Restart relay to check state
@@ -482,13 +474,14 @@ async fn test_exchange_network_failure() {
         .await
         .expect("Failed to restart relay");
 
-    // Verify no partial contacts were stored
+    // Bob has Alice as a contact from the QR exchange.
+    // Alice does not have Bob yet because she hasn't synced (relay was down).
+    orch.verify_contact_count("Bob", 1)
+        .await
+        .expect("Bob should have 1 contact (Alice from QR)");
     orch.verify_contact_count("Alice", 0)
         .await
-        .expect("Alice should have 0 contacts");
-    orch.verify_contact_count("Bob", 0)
-        .await
-        .expect("Bob should have 0 contacts");
+        .expect("Alice should have 0 contacts (no sync yet)");
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }

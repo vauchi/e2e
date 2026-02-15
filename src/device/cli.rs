@@ -146,11 +146,12 @@ impl CliDevice {
         for line in output.lines() {
             let line = line.trim();
 
-            // Skip empty lines, headers, and decorations
+            // Skip empty lines, headers, decorations, and CLI hints
             if line.is_empty()
                 || line.starts_with("Contacts")
                 || line.starts_with("No contacts")
                 || line.starts_with("ℹ")
+                || line.starts_with("vauchi")
                 // Skip Unicode box-drawing borders
                 || line.starts_with('╭')
                 || line.starts_with('├')
@@ -247,16 +248,14 @@ impl CliDevice {
                 continue;
             }
 
-            // Look for field lines with icons (space-separated format)
-            // Format: "  icon   Label        Value"
+            // Look for field lines with icons (column-aligned format)
+            // Format: "  mail   Work Email   alice@work.com"
+            //         "  phone  Personal Phone +15550101"
+            // Icon is first word; label and value follow but column gaps vary.
             if !in_header && !line.starts_with('─') {
-                // Split by whitespace and reassemble
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 3 {
-                    // First part is the icon, second is label, rest is value
                     let icon = parts[0];
-                    let label = parts[1];
-                    let value = parts[2..].join(" ");
 
                     // Determine field type from icon
                     let field_type = match icon {
@@ -268,11 +267,29 @@ impl CliDevice {
                         _ => "custom",
                     };
 
-                    fields.push(CardField {
-                        field_type: field_type.to_string(),
-                        label: label.to_string(),
-                        value,
-                    });
+                    // After the icon, find where the rest of the text starts
+                    let after_icon = line
+                        .trim_start()
+                        .strip_prefix(icon)
+                        .unwrap_or(line)
+                        .trim_start();
+
+                    // The value is the last whitespace-separated token(s) that
+                    // look like a value (email, phone, URL). The label is everything
+                    // before it. Use the last token as value for simple cases.
+                    let last_part = parts.last().unwrap();
+                    let label = after_icon
+                        .strip_suffix(last_part)
+                        .unwrap_or(after_icon)
+                        .trim();
+
+                    if !label.is_empty() {
+                        fields.push(CardField {
+                            field_type: field_type.to_string(),
+                            label: label.to_string(),
+                            value: last_part.to_string(),
+                        });
+                    }
                 }
             }
 
@@ -564,28 +581,40 @@ impl Device for CliDevice {
         let mut labels = Vec::new();
         for line in output.lines() {
             let line = line.trim();
-            if !line.is_empty()
-                && !line.starts_with("Label")
-                && !line.starts_with("No labels")
-                && !line.starts_with('─')
-                && !line.starts_with('╭')
-                && !line.starts_with('├')
-                && !line.starts_with('╰')
+            // Skip empty lines, headers, sub-info, and decorations
+            if line.is_empty()
+                || line.starts_with("Visibility")
+                || line.starts_with("Label")
+                || line.starts_with("No labels")
+                || line.starts_with("Contacts:")
+                || line.starts_with("ℹ")
+                || line.starts_with('─')
+                || line.starts_with('╭')
+                || line.starts_with('├')
+                || line.starts_with('╰')
             {
-                if line.starts_with('│') {
-                    let parts: Vec<&str> = line
-                        .split('│')
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    if parts.len() >= 2 {
-                        let first = parts[0];
-                        if first.parse::<usize>().is_ok() {
-                            labels.push(parts[1].to_string());
-                        }
-                    }
+                continue;
+            }
+
+            if line.starts_with('│') {
+                // Table format: │ # │ Name │ ... │
+                let parts: Vec<&str> = line
+                    .split('│')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if parts.len() >= 2 && parts[0].parse::<usize>().is_ok() {
+                    labels.push(parts[1].to_string());
+                }
+            } else {
+                // Plain format: "Friends (48312305)" — extract name before parenthetical ID
+                let name = if let Some(paren_pos) = line.find('(') {
+                    line[..paren_pos].trim().to_string()
                 } else {
-                    labels.push(line.to_string());
+                    line.to_string()
+                };
+                if !name.is_empty() && !name.starts_with("Name") {
+                    labels.push(name);
                 }
             }
         }

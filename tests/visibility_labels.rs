@@ -8,6 +8,10 @@
 //! 1. Create labels and assign contacts
 //! 2. Control field visibility per label
 //! 3. Verify visibility changes propagate via sync
+//!
+//! Note: After mutual QR exchange, contacts appear as "New Contact"
+//! until card updates are synced. Tests use contact ID prefixes
+//! when name-based lookup is ambiguous.
 
 use vauchi_e2e_tests::prelude::*;
 
@@ -48,15 +52,26 @@ async fn smoke_create_labels_and_assign() {
             .expect("Exchange with Carol failed");
     }
 
-    // Verify contacts
-    {
+    // Verify contacts and collect ID prefixes for label assignment
+    let (contact_id_1, contact_id_2) = {
         let alice = alice.read().await;
         let contacts = alice
             .list_contacts()
             .await
             .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 2, "Alice should have 2 contacts");
-    }
+
+        // Use contact ID prefixes since both are named "New Contact"
+        let id1 = contacts[0]
+            .id
+            .clone()
+            .expect("Contact should have ID");
+        let id2 = contacts[1]
+            .id
+            .clone()
+            .expect("Contact should have ID");
+        (id1, id2)
+    };
 
     // Create labels on Alice's device
     {
@@ -77,20 +92,20 @@ async fn smoke_create_labels_and_assign() {
         assert_eq!(labels.len(), 2, "Alice should have 2 labels");
     }
 
-    // Assign contacts to labels
+    // Assign contacts to labels using ID prefixes
     {
         let alice = alice.read().await;
         let device = alice.device(0).expect("No device");
         let device = device.read().await;
 
         device
-            .add_contact_to_label("Work", "Bob")
+            .add_contact_to_label("Work", &contact_id_1)
             .await
-            .expect("Failed to add Bob to Work");
+            .expect("Failed to add first contact to Work");
         device
-            .add_contact_to_label("Friends", "Carol")
+            .add_contact_to_label("Friends", &contact_id_2)
             .await
-            .expect("Failed to add Carol to Friends");
+            .expect("Failed to add second contact to Friends");
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -123,7 +138,7 @@ async fn integration_label_visibility_sync() {
             .await
             .expect("Failed to add work email");
         alice
-            .add_field("phone", "Personal Phone", "+1-555-0101")
+            .add_field("phone", "Personal Phone", "+15550101")
             .await
             .expect("Failed to add phone");
     }
@@ -135,7 +150,7 @@ async fn integration_label_visibility_sync() {
         alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
-    // Create label and assign Bob
+    // Create label and assign contact (use "New Contact" — only one contact)
     {
         let alice = alice.read().await;
         let device = alice.device(0).expect("No device");
@@ -146,9 +161,9 @@ async fn integration_label_visibility_sync() {
             .await
             .expect("Failed to create label");
         device
-            .add_contact_to_label("Colleagues", "Bob")
+            .add_contact_to_label("Colleagues", "New Contact")
             .await
-            .expect("Failed to add Bob");
+            .expect("Failed to add contact to label");
 
         // Show work email, hide personal phone for Colleagues
         device
@@ -181,7 +196,7 @@ async fn integration_label_visibility_sync() {
             "Alice should have work email"
         );
         assert!(
-            card.fields.iter().any(|f| f.value == "+1-555-0101"),
+            card.fields.iter().any(|f| f.value == "+15550101"),
             "Alice should have personal phone"
         );
     }
@@ -216,7 +231,7 @@ async fn smoke_per_contact_visibility() {
             .await
             .expect("Failed to add email");
         alice
-            .add_field("phone", "Private Phone", "+1-555-SECRET")
+            .add_field("phone", "Private Phone", "+15550199")
             .await
             .expect("Failed to add phone");
     }
@@ -228,13 +243,13 @@ async fn smoke_per_contact_visibility() {
         alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
-    // Hide private phone from Bob
+    // Hide private phone from contact (use "New Contact" — only one contact)
     {
         let alice = alice.read().await;
         let device = alice.device(0).expect("No device");
         let device = device.read().await;
         device
-            .hide_field_from_contact("Bob", "Private Phone")
+            .hide_field_from_contact("New Contact", "Private Phone")
             .await
             .expect("Failed to hide field");
     }

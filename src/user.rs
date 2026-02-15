@@ -355,17 +355,20 @@ impl User {
 
     /// Exchange contacts with another user.
     ///
-    /// This user generates a QR and the other user completes the exchange.
+    /// Performs mutual QR exchange: both users generate QRs and complete
+    /// each other's exchange, so both sides end up with a contact.
     pub async fn exchange_with(&self, other: &User) -> E2eResult<()> {
         info!("User '{}' exchanging with '{}'", self.name, other.name);
 
-        // This user generates QR
-        let qr = self.generate_qr().await?;
+        // This user generates QR and other completes
+        let my_qr = self.generate_qr().await?;
+        other.complete_exchange(&my_qr).await?;
 
-        // Other user completes exchange
-        other.complete_exchange(&qr).await?;
+        // Other generates QR and this user completes
+        let their_qr = other.generate_qr().await?;
+        self.complete_exchange(&their_qr).await?;
 
-        // Both sync to complete the exchange
+        // Both sync
         self.sync_all().await?;
         other.sync_all().await?;
 

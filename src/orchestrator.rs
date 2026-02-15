@@ -224,18 +224,26 @@ impl Orchestrator {
             .user(user_b_name)
             .ok_or_else(|| E2eError::user(format!("User '{}' not found", user_b_name)))?;
 
-        info!("Exchange: {} -> {}", user_a_name, user_b_name);
+        info!("Mutual exchange: {} <-> {}", user_a_name, user_b_name);
 
-        // User A generates QR
-        let qr = {
+        // User A generates QR, User B completes
+        let qr_a = {
             let user = user_a.read().await;
             user.generate_qr().await?
         };
-
-        // User B completes exchange
         {
             let user = user_b.read().await;
-            user.complete_exchange(&qr).await?;
+            user.complete_exchange(&qr_a).await?;
+        }
+
+        // User B generates QR, User A completes
+        let qr_b = {
+            let user = user_b.read().await;
+            user.generate_qr().await?
+        };
+        {
+            let user = user_a.read().await;
+            user.complete_exchange(&qr_b).await?;
         }
 
         // Both sync
