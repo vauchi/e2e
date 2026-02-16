@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: app.vauchi.mobile
+appId: com.vauchi
 name: Create Identity (Android)
 ---
 # Create a new identity with the given name
@@ -17,10 +17,10 @@ name: Create Identity (Android)
 - waitForAnimationToEnd
 
 # Check if we're on the welcome/onboarding screen
-- assertVisible: "Get Started"
+- assertVisible: "Create New Identity"
 
 # Tap to begin identity creation
-- tapOn: "Get Started"
+- tapOn: "Create New Identity"
 
 # Enter display name
 - assertVisible: "What's your name?"
@@ -30,7 +30,7 @@ name: Create Identity (Android)
 - hideKeyboard
 
 # Continue to next step
-- tapOn: "Continue"
+- tapOn: "Next"
 
 # Skip onboarding steps (Add Fields, Preview, Security)
 # These are optional steps we can fast-track
@@ -40,29 +40,10 @@ name: Create Identity (Android)
 - assertVisible: "Your info is private"
 - tapOn: "Finish setup"
 
-# Wait for identity generation (crypto operations)
+# Wait for identity generation and transition to main app
+# The "You're all set!" screen may flash briefly before auto-navigating
 - waitForAnimationToEnd:
-    timeout: 10000
+    timeout: 15000
 
-# Verify onboarding completed successfully
-- assertVisible: "You're all set!"
-
-# Wait for transition to main app
-- waitForAnimationToEnd:
-    timeout: 5000
-
-# Optional: Set custom relay if provided
-- runFlow:
-    when:
-      visible: "Settings"
-    commands:
-      - tapOn: "Settings"
-      - tapOn: "Relay Server"
-      - clearText
-      - inputText: ${VAUCHI_RELAY_URL}
-      - hideKeyboard
-      - tapOn: "Save"
-      - pressKey: back
-
-# Return to main screen
+# Verify we're on the home screen
 - assertVisible: "Your Card"

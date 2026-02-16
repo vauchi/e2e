@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: app.vauchi.mobile
+appId: app.vauchi.ios
 name: Complete Exchange
 ---
 # Complete a contact exchange using QR data from another user

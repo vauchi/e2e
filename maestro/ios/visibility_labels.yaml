@@ -5,7 +5,7 @@
 # iOS Maestro Flow: Visibility Labels
 # Creates a label and assigns a contact to it
 
-appId: com.vauchi.app
+appId: app.vauchi.ios
 
 ---
 

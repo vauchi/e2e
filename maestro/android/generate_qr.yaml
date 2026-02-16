@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: app.vauchi.mobile
+appId: com.vauchi
 name: Generate QR Code (Android)
 ---
 # Generate a QR code for contact exchange
@@ -16,41 +16,15 @@ name: Generate QR Code (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to exchange/share screen
-- tapOn: "Share"
+# Navigate to exchange screen from home
+- tapOn: "Exchange"
 
 # Wait for QR generation
 - waitForAnimationToEnd:
-    timeout: 5000
+    timeout: 10000
 
-# Verify QR code is displayed
-- assertVisible: "Scan this code"
+# Verify QR code section is displayed
+- assertVisible: "Your QR Code"
 
 # Take screenshot for QR extraction
 - takeScreenshot: /tmp/vauchi_qr_screenshot.png
-
-# If the app shows the QR data as text (for accessibility)
-- runFlow:
-    when:
-      visible: "Show Code"
-    commands:
-      - tapOn: "Show Code"
-      - copyTextFrom:
-          id: "qr_data_text"
-      - evalScript: |-
-          const fs = require('fs');
-          fs.writeFileSync('/tmp/vauchi_qr_data.txt', maestro.copiedText);
-
-# Alternative: Extract from content description (Android accessibility)
-- runFlow:
-    when:
-      visible:
-        id: "qr_code_view"
-    commands:
-      - evalScript: |-
-          // QR data should be in content description for testing
-          const element = maestro.findElement({ id: 'qr_code_view' });
-          if (element && element.contentDescription) {
-            const fs = require('fs');
-            fs.writeFileSync('/tmp/vauchi_qr_data.txt', element.contentDescription);
-          }

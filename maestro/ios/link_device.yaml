@@ -5,7 +5,7 @@
 # iOS Maestro Flow: Device Linking
 # Generates a device link QR code for a new device to join
 
-appId: com.vauchi.app
+appId: app.vauchi.ios
 
 ---
 

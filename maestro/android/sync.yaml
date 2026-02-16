@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: app.vauchi.mobile
+appId: com.vauchi
 name: Sync with Relay (Android)
 ---
 # Trigger a sync with the relay server

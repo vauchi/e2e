@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: app.vauchi.mobile
+appId: com.vauchi
 name: Add Card Field (Android)
 ---
 # Add a field to the user's contact card

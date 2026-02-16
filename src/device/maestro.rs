@@ -41,7 +41,7 @@
 //!
 //! ```yaml
 //! # create_identity.yaml
-//! appId: app.vauchi.mobile
+//! appId: com.vauchi  # Android: com.vauchi, iOS: app.vauchi.ios
 //! ---
 //! - launchApp
 //! - tapOn: "Create Identity"
@@ -135,7 +135,7 @@ impl MaestroDevice {
             name,
             MaestroPlatform::Ios,
             simulator_name,
-            "app.vauchi.mobile",
+            "app.vauchi.ios",
             relay_url,
         )
     }
@@ -150,7 +150,7 @@ impl MaestroDevice {
             name,
             MaestroPlatform::Android,
             emulator_name,
-            "app.vauchi.mobile",
+            "com.vauchi",
             relay_url,
         )
     }
