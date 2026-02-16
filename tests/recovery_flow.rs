@@ -105,10 +105,7 @@ async fn integration_contact_verification() {
             .await
             .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 1, "Alice should have 1 contact");
-        let contact_id = contacts[0]
-            .id
-            .as_ref()
-            .expect("Contact should have ID");
+        let contact_id = contacts[0].id.as_ref().expect("Contact should have ID");
         let device = alice.device(0).expect("No device");
         let device = device.read().await;
         device

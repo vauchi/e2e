@@ -58,9 +58,15 @@ async fn integration_offline_catchup() {
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
         bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         let qr_b = bob.generate_qr().await.expect("Failed to generate QR");
-        alice.complete_exchange(&qr_b).await.expect("Exchange failed");
+        alice
+            .complete_exchange(&qr_b)
+            .await
+            .expect("Exchange failed");
         bob.sync_all().await.expect("Failed to sync Bob");
-        alice.sync_device(0).await.expect("Failed to sync Alice device 0");
+        alice
+            .sync_device(0)
+            .await
+            .expect("Failed to sync Alice device 0");
     }
 
     {
@@ -68,11 +74,20 @@ async fn integration_offline_catchup() {
         let carol = carol.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
-        carol.complete_exchange(&qr_a).await.expect("Exchange failed");
+        carol
+            .complete_exchange(&qr_a)
+            .await
+            .expect("Exchange failed");
         let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
-        alice.complete_exchange(&qr_c).await.expect("Exchange failed");
+        alice
+            .complete_exchange(&qr_c)
+            .await
+            .expect("Exchange failed");
         carol.sync_all().await.expect("Failed to sync Carol");
-        alice.sync_device(0).await.expect("Failed to sync Alice device 0");
+        alice
+            .sync_device(0)
+            .await
+            .expect("Failed to sync Alice device 0");
     }
 
     {
@@ -80,11 +95,19 @@ async fn integration_offline_catchup() {
         let dave = dave.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
-        dave.complete_exchange(&qr_a).await.expect("Exchange failed");
+        dave.complete_exchange(&qr_a)
+            .await
+            .expect("Exchange failed");
         let qr_d = dave.generate_qr().await.expect("Failed to generate QR");
-        alice.complete_exchange(&qr_d).await.expect("Exchange failed");
+        alice
+            .complete_exchange(&qr_d)
+            .await
+            .expect("Exchange failed");
         dave.sync_all().await.expect("Failed to sync Dave");
-        alice.sync_device(0).await.expect("Failed to sync Alice device 0");
+        alice
+            .sync_device(0)
+            .await
+            .expect("Failed to sync Alice device 0");
     }
 
     // Verify device 0 (primary) has 3 contacts.
@@ -98,7 +121,11 @@ async fn integration_offline_catchup() {
             .await
             .expect("Failed to list contacts");
 
-        assert_eq!(contacts_0.len(), 3, "Device A1 (primary) should have 3 contacts");
+        assert_eq!(
+            contacts_0.len(),
+            3,
+            "Device A1 (primary) should have 3 contacts"
+        );
     }
 
     // Step 4: Device A3 comes online (syncs)
@@ -204,7 +231,10 @@ async fn integration_extended_offline() {
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
         bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         let qr_b = bob.generate_qr().await.expect("Failed to generate QR");
-        alice.complete_exchange(&qr_b).await.expect("Exchange failed");
+        alice
+            .complete_exchange(&qr_b)
+            .await
+            .expect("Exchange failed");
         bob.sync_all().await.expect("Failed to sync Bob");
         alice.sync_device(0).await.expect("Failed to sync");
     }
@@ -217,9 +247,15 @@ async fn integration_extended_offline() {
         let carol = carol.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
-        carol.complete_exchange(&qr_a).await.expect("Exchange failed");
+        carol
+            .complete_exchange(&qr_a)
+            .await
+            .expect("Exchange failed");
         let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
-        alice.complete_exchange(&qr_c).await.expect("Exchange failed");
+        alice
+            .complete_exchange(&qr_c)
+            .await
+            .expect("Exchange failed");
         carol.sync_all().await.expect("Failed to sync Carol");
         alice.sync_device(0).await.expect("Failed to sync");
     }

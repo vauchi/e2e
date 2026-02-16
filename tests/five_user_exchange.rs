@@ -107,7 +107,13 @@ async fn integration_sequential_exchange() {
 
     // Verify contact counts on primary devices only.
     // Device sync to secondary devices is a known limitation (#38).
-    for (name, expected) in [("Alice", 1), ("Bob", 2), ("Carol", 2), ("Dave", 2), ("Eve", 1)] {
+    for (name, expected) in [
+        ("Alice", 1),
+        ("Bob", 2),
+        ("Carol", 2),
+        ("Dave", 2),
+        ("Eve", 1),
+    ] {
         let user = orch.user(name).unwrap();
         let user = user.read().await;
         let contacts = user
