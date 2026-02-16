@@ -101,7 +101,10 @@ async fn integration_contact_verification() {
     // issue that prevents verification by name or ID prefix.
     {
         let alice = alice.read().await;
-        let contacts = alice.list_contacts().await.expect("Failed to list contacts");
+        let contacts = alice
+            .list_contacts()
+            .await
+            .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 1, "Alice should have 1 contact");
         let contact_name = &contacts[0].name;
         let device = alice.device(0).expect("No device");
@@ -115,7 +118,10 @@ async fn integration_contact_verification() {
     // Verify the contact shows as verified
     {
         let alice = alice.read().await;
-        let contacts = alice.list_contacts().await.expect("Failed to list contacts");
+        let contacts = alice
+            .list_contacts()
+            .await
+            .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 1, "Alice should have 1 contact");
     }
 

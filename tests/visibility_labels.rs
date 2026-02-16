@@ -62,14 +62,8 @@ async fn smoke_create_labels_and_assign() {
         assert_eq!(contacts.len(), 2, "Alice should have 2 contacts");
 
         // Use contact ID prefixes since both are named "New Contact"
-        let id1 = contacts[0]
-            .id
-            .clone()
-            .expect("Contact should have ID");
-        let id2 = contacts[1]
-            .id
-            .clone()
-            .expect("Contact should have ID");
+        let id1 = contacts[0].id.clone().expect("Contact should have ID");
+        let id2 = contacts[1].id.clone().expect("Contact should have ID");
         (id1, id2)
     };
 
