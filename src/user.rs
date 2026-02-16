@@ -205,6 +205,11 @@ impl User {
             debug!("Syncing device {} for user '{}'", i, self.name);
             let device = device.read().await;
             device.sync().await?;
+            // Small delay between devices so the relay can store messages
+            // from device N before device N+1 connects to receive them.
+            if i + 1 < self.devices.len() {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
         }
         Ok(())
     }

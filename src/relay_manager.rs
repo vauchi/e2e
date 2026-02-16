@@ -239,6 +239,12 @@ impl RelayManager {
             "RELAY_RATE_LIMIT".to_string(),
             self.config.rate_limit.to_string(),
         );
+        // Disable Noise encryption requirement for E2E tests.
+        // The CLI doesn't support Noise NK — it uses plaintext v1 connections.
+        env_vars.insert(
+            "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
+            "false".to_string(),
+        );
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
@@ -384,6 +390,10 @@ impl RelayManager {
         env_vars.insert(
             "RELAY_RATE_LIMIT".to_string(),
             self.config.rate_limit.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
+            "false".to_string(),
         );
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 

@@ -122,6 +122,11 @@ async fn integration_mixed_devices() {
         .await
         .expect("Carol-Alice exchange failed");
 
+    // Final sync round: ensure all device sync messages are delivered.
+    // Each exchange syncs both users, but secondary devices may need one
+    // more round to receive contacts added in other exchanges.
+    orch.sync_all().await.expect("Final sync failed");
+
     // Verify all users have 2 contacts each
     orch.verify_contact_count("Alice", 2)
         .await
