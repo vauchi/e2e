@@ -262,6 +262,17 @@ pub trait Device: Send + Sync {
         ))
     }
 
+    // === Identity Info ===
+
+    /// Get the public identity ID (hex-encoded signing public key).
+    ///
+    /// Available after `create_identity` is called. Used for recovery claims.
+    async fn get_public_id(&self) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Public ID not available on this device type".to_string(),
+        ))
+    }
+
     // === Contact Verification ===
 
     /// Mark a contact's fingerprint as verified.

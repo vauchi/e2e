@@ -95,10 +95,9 @@ async fn integration_contact_verification() {
         alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
-    // Alice verifies Bob's fingerprint
-    // Note: After QR exchange, contacts are named "New Contact" (not "Bob")
-    // until card updates sync. The `contacts verify` command also has a lookup
-    // issue that prevents verification by name or ID prefix.
+    // Alice verifies Bob's fingerprint.
+    // Note: After QR exchange, contacts appear as "New Contact" (not "Bob")
+    // until card updates sync. Use the contact's ID prefix for lookup.
     {
         let alice = alice.read().await;
         let contacts = alice
@@ -106,11 +105,14 @@ async fn integration_contact_verification() {
             .await
             .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 1, "Alice should have 1 contact");
-        let contact_name = &contacts[0].name;
+        let contact_id = contacts[0]
+            .id
+            .as_ref()
+            .expect("Contact should have ID");
         let device = alice.device(0).expect("No device");
         let device = device.read().await;
         device
-            .verify_contact(contact_name)
+            .verify_contact(contact_id)
             .await
             .expect("Failed to verify contact");
     }
@@ -160,21 +162,15 @@ async fn integration_recovery_happy_path() {
     let carol = orch.user("Carol").unwrap();
     let dave = orch.user("Dave").unwrap();
 
-    // Get Alice's old public key before "losing" device
+    // Get Alice's old public key (hex) before "losing" device.
+    // This is the signing public key, needed for recovery claims.
     let alice_old_pk: String;
     {
         let alice = alice.read().await;
-        let device = alice.device(0).expect("No device");
-        let device = device.read().await;
-        // Export identity to get the public key (via CLI command)
-        alice_old_pk = device
-            .generate_qr()
+        alice_old_pk = alice
+            .get_public_id()
             .await
-            .expect("Failed to generate QR")
-            .split(':')
-            .next()
-            .unwrap_or("")
-            .to_string();
+            .expect("Failed to get Alice's public ID");
     }
 
     // Exchange Alice with all three vouchers
@@ -337,20 +333,14 @@ async fn integration_recovery_insufficient_vouchers() {
     let bob = orch.user("Bob").unwrap();
     let carol = orch.user("Carol").unwrap();
 
-    // Get Alice's public key
+    // Get Alice's old public key (hex) before "losing" device.
     let alice_old_pk: String;
     {
         let alice = alice.read().await;
-        let device = alice.device(0).expect("No device");
-        let device = device.read().await;
-        alice_old_pk = device
-            .generate_qr()
+        alice_old_pk = alice
+            .get_public_id()
             .await
-            .expect("Failed to generate QR")
-            .split(':')
-            .next()
-            .unwrap_or("")
-            .to_string();
+            .expect("Failed to get Alice's public ID");
     }
 
     // Exchange with only Bob and Carol (need 3 for threshold)

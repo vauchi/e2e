@@ -8,6 +8,7 @@
 
 use std::path::PathBuf;
 use std::process::Output;
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use tempfile::TempDir;
@@ -27,6 +28,8 @@ pub struct CliDevice {
     relay_url: String,
     /// Path to the CLI binary.
     cli_path: PathBuf,
+    /// Public ID captured from init output.
+    public_id: Mutex<Option<String>>,
 }
 
 impl CliDevice {
@@ -42,6 +45,7 @@ impl CliDevice {
             data_dir,
             relay_url: relay_url.into(),
             cli_path,
+            public_id: Mutex::new(None),
         })
     }
 
@@ -58,6 +62,7 @@ impl CliDevice {
             data_dir,
             relay_url: relay_url.into(),
             cli_path,
+            public_id: Mutex::new(None),
         })
     }
 
@@ -411,8 +416,23 @@ impl Device for CliDevice {
     // === Identity Management ===
 
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
-        self.run_command_success(&["init", name]).await?;
+        let output = self.run_command_success(&["init", name]).await?;
+        // Capture public ID from init output ("  Public ID: <hex>")
+        for line in output.lines() {
+            if let Some(pk) = line.trim().strip_prefix("Public ID: ") {
+                *self.public_id.lock().unwrap() = Some(pk.trim().to_string());
+                break;
+            }
+        }
         Ok(())
+    }
+
+    async fn get_public_id(&self) -> E2eResult<String> {
+        self.public_id
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| E2eError::device("Public ID not available — call create_identity first"))
     }
 
     async fn has_identity(&self) -> bool {
@@ -678,7 +698,7 @@ impl Device for CliDevice {
 
     async fn vouch_for_recovery(&self, claim_data: &str) -> E2eResult<String> {
         let output = self
-            .run_command_success(&["recovery", "vouch", claim_data])
+            .run_command_success(&["recovery", "vouch", claim_data, "--yes"])
             .await?;
         Self::extract_qr_data(&output)
     }

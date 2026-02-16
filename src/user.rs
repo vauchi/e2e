@@ -288,6 +288,16 @@ impl User {
         device.list_contacts().await
     }
 
+    /// Get the public identity ID from the primary device.
+    pub async fn get_public_id(&self) -> E2eResult<String> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.get_public_id().await
+    }
+
     /// Get the contact card from the primary device.
     pub async fn get_card(&self) -> E2eResult<ContactCard> {
         let primary = self
