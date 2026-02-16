@@ -211,9 +211,8 @@ impl MaestroDevice {
         Ok(flows_dir)
     }
 
-    /// Run a Maestro flow.
-    #[allow(dead_code)]
-    async fn run_flow(&self, flow_name: &str) -> E2eResult<String> {
+    /// Run a Maestro flow with optional extra environment variables.
+    async fn run_flow(&self, flow_name: &str, env_vars: &[(&str, &str)]) -> E2eResult<String> {
         let flow_path = self.flows_dir.join(format!("{}.yaml", flow_name));
 
         if !flow_path.exists() {
@@ -227,19 +226,15 @@ impl MaestroDevice {
         let mut cmd = Command::new("maestro");
         cmd.arg("test")
             .arg(&flow_path)
+            .arg("--device")
+            .arg(&self.device_name)
             .env("MAESTRO_APP_ID", &self.app_id)
             .env("VAUCHI_RELAY_URL", &self.relay_url)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        // Add device-specific arguments
-        match self.platform {
-            MaestroPlatform::Ios => {
-                cmd.arg("--device").arg(&self.device_name);
-            }
-            MaestroPlatform::Android => {
-                cmd.arg("--device").arg(&self.device_name);
-            }
+        for (key, value) in env_vars {
+            cmd.env(key, value);
         }
 
         let output = cmd
@@ -258,27 +253,89 @@ impl MaestroDevice {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    /// Parse QR data from flow output.
-    ///
-    /// The flow should output QR data in a specific format that we can parse.
-    #[allow(dead_code)]
-    fn parse_qr_from_output(&self, _output: &str) -> E2eResult<String> {
-        // In a real implementation, we'd either:
-        // 1. Have the flow output QR data to a file
-        // 2. Take a screenshot and use QR detection
-        // 3. Have the flow copy QR data to clipboard
-        Err(E2eError::DeviceNotSupported(
-            "QR extraction from Maestro flows not yet implemented".into(),
-        ))
+    /// Read QR data written by the generate_qr flow.
+    fn read_qr_data(&self) -> E2eResult<String> {
+        std::fs::read_to_string("/tmp/vauchi_qr_data.txt")
+            .map(|s| s.trim().to_string())
+            .map_err(|e| {
+                E2eError::device(format!(
+                    "Failed to read QR data from /tmp/vauchi_qr_data.txt: {}",
+                    e
+                ))
+            })
     }
 
-    /// Parse contacts from flow output.
-    #[allow(dead_code)]
-    fn parse_contacts_from_output(&self, _output: &str) -> E2eResult<Vec<Contact>> {
-        // In a real implementation, we'd parse structured output from the flow
-        Err(E2eError::DeviceNotSupported(
-            "Contact parsing from Maestro flows not yet implemented".into(),
-        ))
+    /// Read contacts list written by the list_contacts flow.
+    fn read_contacts_file(&self) -> E2eResult<Vec<Contact>> {
+        let content = std::fs::read_to_string("/tmp/vauchi_contacts.txt").map_err(|e| {
+            E2eError::device(format!(
+                "Failed to read contacts from /tmp/vauchi_contacts.txt: {}",
+                e
+            ))
+        })?;
+
+        Ok(content
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|name| Contact {
+                name: name.trim().to_string(),
+                id: None,
+                verified: false,
+            })
+            .collect())
+    }
+
+    /// Read card data written by the get_card flow.
+    fn read_card_file(&self) -> E2eResult<ContactCard> {
+        let content = std::fs::read_to_string("/tmp/vauchi_card.json").map_err(|e| {
+            E2eError::device(format!(
+                "Failed to read card from /tmp/vauchi_card.json: {}",
+                e
+            ))
+        })?;
+
+        serde_json::from_str(&content)
+            .map_err(|e| E2eError::device(format!("Failed to parse card JSON: {}", e)))
+    }
+
+    /// Run a platform-specific app lifecycle command.
+    async fn run_app_command(&self, action: &str) -> E2eResult<()> {
+        let output = match self.platform {
+            MaestroPlatform::Ios => {
+                let args = match action {
+                    "launch" => vec!["simctl", "launch", "booted", &self.app_id],
+                    "terminate" => vec!["simctl", "terminate", "booted", &self.app_id],
+                    _ => return Err(E2eError::device(format!("Unknown action: {}", action))),
+                };
+                Command::new("xcrun")
+                    .args(&args)
+                    .output()
+                    .await
+                    .map_err(|e| E2eError::device(format!("xcrun failed: {}", e)))?
+            }
+            MaestroPlatform::Android => {
+                let activity = format!("{}/{}.MainActivity", self.app_id, self.app_id);
+                let args: Vec<&str> = match action {
+                    "launch" => vec!["shell", "am", "start", "-n", &activity],
+                    "terminate" => vec!["shell", "am", "force-stop", &self.app_id],
+                    _ => return Err(E2eError::device(format!("Unknown action: {}", action))),
+                };
+                Command::new("adb")
+                    .args(&args)
+                    .output()
+                    .await
+                    .map_err(|e| E2eError::device(format!("adb failed: {}", e)))?
+            }
+        };
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(E2eError::device(format!(
+                "App {} failed: {}",
+                action, stderr
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -301,153 +358,148 @@ impl Device for MaestroDevice {
 
     // === Identity Management ===
 
-    async fn create_identity(&self, _name: &str) -> E2eResult<()> {
-        // Would run: self.run_flow("create_identity").await
-        Err(E2eError::DeviceNotSupported(format!(
-            "Maestro {} device automation not yet implemented. \
-             Create flow at: {}/create_identity.yaml",
-            self.platform,
-            self.flows_dir.display()
-        )))
+    async fn create_identity(&self, name: &str) -> E2eResult<()> {
+        self.run_flow("create_identity", &[("NAME", name)]).await?;
+        Ok(())
     }
 
     async fn has_identity(&self) -> bool {
-        // Would need to run a flow that checks identity status
-        false
+        // Try getting the card — if it works, identity exists
+        self.run_flow("get_card", &[("CONTACT_NAME", "Your Card")])
+            .await
+            .is_ok()
     }
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: export_identity not implemented".into(),
+            "Maestro device: export_identity not supported (mobile uses cloud backup)".into(),
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: import_identity not implemented".into(),
+            "Maestro device: import_identity not supported (mobile uses cloud backup)".into(),
         ))
     }
 
     // === Exchange ===
 
     async fn generate_qr(&self) -> E2eResult<String> {
-        // Would run: self.run_flow("generate_qr").await
-        // Then parse QR data from output or screenshot
-        Err(E2eError::DeviceNotSupported(format!(
-            "Maestro {} device: generate_qr not implemented. \
-             Create flow at: {}/generate_qr.yaml",
-            self.platform,
-            self.flows_dir.display()
-        )))
+        self.run_flow("generate_qr", &[]).await?;
+        self.read_qr_data()
     }
 
-    async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
-        // Would run: self.run_flow("complete_exchange").await
-        // Passing QR data as environment variable
-        Err(E2eError::DeviceNotSupported(format!(
-            "Maestro {} device: complete_exchange not implemented",
-            self.platform
-        )))
+    async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
+        self.run_flow("complete_exchange", &[("QR_DATA", qr_data)])
+            .await?;
+        Ok(())
     }
 
     // === Device Linking ===
 
     async fn start_device_link(&self) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: start_device_link not implemented".into(),
-        ))
+        self.run_flow("link_device", &[]).await?;
+        // Link data is written by the flow; read it from the temp file
+        std::fs::read_to_string("/tmp/vauchi_link_data.txt")
+            .map(|s| s.trim().to_string())
+            .map_err(|e| E2eError::device(format!("Failed to read link data: {}", e)))
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: join_identity not implemented".into(),
+            "Maestro device: join_identity requires device-specific flow".into(),
         ))
     }
 
     async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: complete_device_link not implemented".into(),
+            "Maestro device: complete_device_link requires device-specific flow".into(),
         ))
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: finish_device_join not implemented".into(),
+            "Maestro device: finish_device_join requires device-specific flow".into(),
         ))
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: list_devices not implemented".into(),
+            "Maestro device: list_devices requires device-specific flow".into(),
         ))
     }
 
     // === Sync ===
 
     async fn sync(&self) -> E2eResult<()> {
-        // Would run: self.run_flow("sync").await
-        Err(E2eError::DeviceNotSupported(format!(
-            "Maestro {} device: sync not implemented",
-            self.platform
-        )))
+        self.run_flow("sync", &[]).await?;
+        Ok(())
     }
 
     // === Contacts ===
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
-        // Would run: self.run_flow("list_contacts").await
-        // Then parse contacts from output
-        Err(E2eError::DeviceNotSupported(format!(
-            "Maestro {} device: list_contacts not implemented",
-            self.platform
-        )))
+        self.run_flow("list_contacts", &[]).await?;
+        self.read_contacts_file()
     }
 
-    async fn get_contact(&self, _name_or_id: &str) -> E2eResult<Option<Contact>> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: get_contact not implemented".into(),
-        ))
+    async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>> {
+        self.run_flow("get_card", &[("CONTACT_NAME", name_or_id)])
+            .await?;
+        let card = self.read_card_file()?;
+        if card.name.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(Contact {
+                name: card.name,
+                id: None,
+                verified: false,
+            }))
+        }
     }
 
     // === Card Management ===
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: get_card not implemented".into(),
-        ))
+        self.run_flow("get_card", &[("CONTACT_NAME", "Your Card")])
+            .await?;
+        self.read_card_file()
     }
 
-    async fn add_field(&self, _field_type: &str, _label: &str, _value: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: add_field not implemented".into(),
-        ))
+    async fn add_field(&self, field_type: &str, label: &str, value: &str) -> E2eResult<()> {
+        self.run_flow(
+            "add_field",
+            &[
+                ("FIELD_TYPE", field_type),
+                ("FIELD_LABEL", label),
+                ("FIELD_VALUE", value),
+            ],
+        )
+        .await?;
+        Ok(())
     }
 
     async fn edit_field(&self, _label: &str, _value: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_field not implemented".into(),
+            "Maestro device: edit_field requires dedicated flow".into(),
         ))
     }
 
     async fn remove_field(&self, _label: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: remove_field not implemented".into(),
+            "Maestro device: remove_field requires dedicated flow".into(),
         ))
     }
 
     async fn edit_name(&self, _name: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_name not implemented".into(),
+            "Maestro device: edit_name requires dedicated flow".into(),
         ))
     }
 
     // === Network Simulation ===
 
     async fn set_network(&self, config: NetworkConfig) -> E2eResult<()> {
-        // Mobile devices can simulate network conditions via:
-        // - iOS: Network Link Conditioner
-        // - Android: adb emu network delay/speed
-        // For now, just store the config
         let _ = config;
         Ok(())
     }
@@ -459,63 +511,64 @@ impl Device for MaestroDevice {
     // === App Lifecycle ===
 
     async fn background_app(&self) -> E2eResult<()> {
-        // iOS: xcrun simctl terminate + launch with background state
-        // Android: adb shell input keyevent KEYCODE_HOME
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: background_app not implemented".into(),
-        ))
+        match self.platform {
+            MaestroPlatform::Ios => {
+                Command::new("xcrun")
+                    .args(["simctl", "ui", "booted", "home"])
+                    .output()
+                    .await
+                    .map_err(|e| E2eError::device(format!("Failed to background app: {}", e)))?;
+                Ok(())
+            }
+            MaestroPlatform::Android => {
+                Command::new("adb")
+                    .args(["shell", "input", "keyevent", "KEYCODE_HOME"])
+                    .output()
+                    .await
+                    .map_err(|e| E2eError::device(format!("Failed to background app: {}", e)))?;
+                Ok(())
+            }
+        }
     }
 
     async fn foreground_app(&self) -> E2eResult<()> {
-        // Would relaunch the app
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: foreground_app not implemented".into(),
-        ))
+        self.run_app_command("launch").await
     }
 
     async fn kill_app(&self) -> E2eResult<()> {
-        // iOS: xcrun simctl terminate booted <app_id>
-        // Android: adb shell am force-stop <package>
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: kill_app not implemented".into(),
-        ))
+        self.run_app_command("terminate").await
     }
 
     async fn launch_app(&self) -> E2eResult<()> {
-        // iOS: xcrun simctl launch booted <app_id>
-        // Android: adb shell am start -n <package>/<activity>
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: launch_app not implemented".into(),
-        ))
+        self.run_app_command("launch").await
     }
 
     // === Proximity Verification ===
 
     async fn start_proximity_verification(&self) -> E2eResult<String> {
-        // Mobile devices support proximity verification via audio
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not implemented".into(),
+            "Maestro device: proximity verification not automatable in simulator".into(),
         ))
     }
 
     async fn verify_proximity(&self, _challenge: &str) -> E2eResult<bool> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not implemented".into(),
+            "Maestro device: proximity verification not automatable in simulator".into(),
         ))
     }
 
     // === Capabilities ===
 
     fn supports_network_simulation(&self) -> bool {
-        true // Mobile devices support network simulation
+        false // Network simulation requires manual setup
     }
 
     fn supports_lifecycle_control(&self) -> bool {
-        true // Mobile devices support app lifecycle control
+        true
     }
 
     fn supports_proximity_verification(&self) -> bool {
-        true // Mobile devices support proximity verification
+        false // Not automatable in simulator
     }
 }
 
