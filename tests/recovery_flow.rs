@@ -122,6 +122,10 @@ async fn integration_contact_verification() {
             .await
             .expect("Failed to list contacts");
         assert_eq!(contacts.len(), 1, "Alice should have 1 contact");
+        assert!(
+            contacts[0].verified,
+            "Contact should be marked as verified after fingerprint verification"
+        );
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");

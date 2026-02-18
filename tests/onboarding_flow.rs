@@ -274,23 +274,24 @@ async fn test_demo_contact_visible_on_start() {
         let user = solo_user.read().await;
         let contacts = user.list_contacts().await.expect("Failed to list contacts");
 
-        // The demo contact should be present for new users with no real contacts
-        // In production, this is automatically created during onboarding
-        // For E2E purposes, we verify the contact list is accessible
+        // The demo contact MUST be present for new users with no real contacts.
+        // If this fails, the onboarding flow is not creating the demo contact.
+        assert!(
+            !contacts.is_empty(),
+            "New user should have at least a demo contact after onboarding, got empty contact list"
+        );
 
-        // Demo contact (if present) should be named "Vauchi Tips" and marked as demo
-        let demo_contact = contacts.iter().find(|c| c.name.contains("Vauchi Tips"));
+        let demo_contact = contacts
+            .iter()
+            .find(|c| c.name.contains("Vauchi Tips") || c.name.contains("Demo"))
+            .expect("Demo contact named 'Vauchi Tips' or 'Demo' must be present for new solo users");
 
-        if let Some(demo) = demo_contact {
-            // Demo contact should be identifiable
-            assert!(
-                demo.name.contains("Vauchi Tips") || demo.name.contains("Demo"),
-                "Demo contact should be clearly labeled"
-            );
-        }
-
-        // Even if demo contact is not present (CLI limitation),
-        // the user should be able to function without contacts
+        // Demo contact should be clearly labeled
+        assert!(
+            demo_contact.name.contains("Vauchi Tips") || demo_contact.name.contains("Demo"),
+            "Demo contact should be clearly labeled, got: {}",
+            demo_contact.name
+        );
     }
 
     // Verify user can still generate QR for exchange even with no/demo contacts

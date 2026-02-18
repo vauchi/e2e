@@ -83,6 +83,17 @@ async fn smoke_card_update() {
         bob.sync_all().await.expect("Failed to sync Bob");
     }
 
+    // Verify Bob received Alice's contact and has her as a contact
+    // TODO: Add get_contact_card() to Device trait to assert field-level values (alice@example.com)
+    {
+        let bob = bob.read().await;
+        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        assert!(
+            !contacts.is_empty(),
+            "Bob should have Alice as a contact after sync"
+        );
+    }
+
     // Step 4: Bob updates his card
     {
         let bob = bob.read().await;
@@ -104,6 +115,17 @@ async fn smoke_card_update() {
     {
         let alice = alice.read().await;
         alice.sync_all().await.expect("Failed to sync Alice");
+    }
+
+    // Verify Alice received Bob's contact after cross-sync
+    // TODO: Add get_contact_card() to Device trait to assert field-level values (+1-555-0123)
+    {
+        let alice = alice.read().await;
+        let contacts = alice.list_contacts().await.expect("Failed to list Alice's contacts");
+        assert!(
+            !contacts.is_empty(),
+            "Alice should have Bob as a contact after sync"
+        );
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -206,11 +228,26 @@ async fn integration_concurrent_updates() {
         alice.sync_all().await.expect("Failed to sync");
     }
 
-    // Verify card exists without errors
+    // Verify all concurrent field updates converged correctly
     {
         let alice = alice.read().await;
         let card = alice.get_card().await.expect("Failed to get card");
         assert!(!card.name.is_empty(), "Card should have a name");
+        // All three concurrent updates should be present after sync
+        for i in 0..3 {
+            let expected_value = format!("value{}", i);
+            assert!(
+                card.fields.iter().any(|f| f.value == expected_value),
+                "Card should contain concurrent field 'value{}' after sync, got fields: {:?}",
+                i,
+                card.fields.iter().map(|f| &f.value).collect::<Vec<_>>()
+            );
+        }
+        assert!(
+            card.fields.len() >= 3,
+            "All 3 concurrent fields should be present, got {}",
+            card.fields.len()
+        );
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");

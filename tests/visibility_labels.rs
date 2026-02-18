@@ -181,7 +181,7 @@ async fn integration_label_visibility_sync() {
         bob.sync_all().await.expect("Failed to sync Bob");
     }
 
-    // Verify Alice's card is intact
+    // Verify Alice's card is intact (owner always sees all their own fields)
     {
         let alice = alice.read().await;
         let card = alice.get_card().await.expect("Failed to get card");
@@ -192,6 +192,18 @@ async fn integration_label_visibility_sync() {
         assert!(
             card.fields.iter().any(|f| f.value == "+15550101"),
             "Alice should have personal phone"
+        );
+    }
+
+    // Verify Bob has Alice as a contact after sync
+    // TODO: Add get_contact_card() to Device trait to assert Bob sees work email
+    //       but NOT personal phone (visibility filtering at field level)
+    {
+        let bob = bob.read().await;
+        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        assert!(
+            !contacts.is_empty(),
+            "Bob should have Alice as a contact after exchange and sync"
         );
     }
 
@@ -251,7 +263,38 @@ async fn smoke_per_contact_visibility() {
     // Sync
     {
         let alice = alice.read().await;
-        alice.sync_all().await.expect("Failed to sync");
+        alice.sync_all().await.expect("Failed to sync Alice");
+    }
+
+    {
+        let bob = bob.read().await;
+        bob.sync_all().await.expect("Failed to sync Bob");
+    }
+
+    // Verify Alice's own card still has both fields (visibility is per-contact, not deletion)
+    {
+        let alice = alice.read().await;
+        let card = alice.get_card().await.expect("Failed to get Alice's card");
+        assert!(
+            card.fields.iter().any(|f| f.value == "alice@public.com"),
+            "Alice's own card should still contain Public Email"
+        );
+        assert!(
+            card.fields.iter().any(|f| f.value == "+15550199"),
+            "Alice's own card should still contain Private Phone (visibility is per-contact, not deletion)"
+        );
+    }
+
+    // Verify Bob has Alice as a contact
+    // TODO: Add get_contact_card() to Device trait to assert Bob sees Public Email
+    //       but NOT Private Phone (per-contact visibility filtering)
+    {
+        let bob = bob.read().await;
+        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        assert!(
+            !contacts.is_empty(),
+            "Bob should have Alice as a contact after exchange and sync"
+        );
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
