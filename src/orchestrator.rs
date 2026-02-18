@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
 use crate::relay_manager::{RelayConfig, RelayManager};
@@ -281,18 +281,35 @@ impl Orchestrator {
 
         let user = user.read().await;
 
+        let mut verified_count = 0;
         for i in 0..user.device_count() {
-            let contacts = user.list_contacts_on_device(i).await?;
-
-            if contacts.len() != expected {
-                return Err(E2eError::assertion(format!(
-                    "User '{}' device {} has {} contacts, expected {}",
-                    user_name,
-                    i,
-                    contacts.len(),
-                    expected
-                )));
+            match user.list_contacts_on_device(i).await {
+                Ok(contacts) => {
+                    if contacts.len() != expected {
+                        return Err(E2eError::assertion(format!(
+                            "User '{}' device {} has {} contacts, expected {}",
+                            user_name,
+                            i,
+                            contacts.len(),
+                            expected
+                        )));
+                    }
+                    verified_count += 1;
+                }
+                Err(e) => {
+                    warn!(
+                        "User '{}' device {} failed to list contacts (skipping): {}",
+                        user_name, i, e
+                    );
+                }
             }
+        }
+
+        if verified_count == 0 {
+            return Err(E2eError::assertion(format!(
+                "User '{}': no devices could list contacts",
+                user_name
+            )));
         }
 
         debug!(

@@ -390,28 +390,9 @@ impl User {
         Ok(())
     }
 
-    /// Perform mutual exchange with another user.
-    ///
-    /// Both users exchange QRs and complete the exchange bidirectionally.
+    /// Alias for `exchange_with` — kept for backward compatibility.
     pub async fn mutual_exchange_with(&self, other: &User) -> E2eResult<()> {
-        info!(
-            "Mutual exchange between '{}' and '{}'",
-            self.name, other.name
-        );
-
-        // This user generates QR and other completes
-        let my_qr = self.generate_qr().await?;
-        other.complete_exchange(&my_qr).await?;
-
-        // Other generates QR and this user completes
-        let their_qr = other.generate_qr().await?;
-        self.complete_exchange(&their_qr).await?;
-
-        // Both sync
-        self.sync_all().await?;
-        other.sync_all().await?;
-
-        Ok(())
+        self.exchange_with(other).await
     }
 }
 

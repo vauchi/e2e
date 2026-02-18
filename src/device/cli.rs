@@ -253,53 +253,9 @@ impl CliDevice {
                 continue;
             }
 
-            // Look for field lines with icons (column-aligned format)
-            // Format: "  mail   Work Email   alice@work.com"
-            //         "  phone  Personal Phone +15550101"
-            // Icon is first word; label and value follow but column gaps vary.
-            if !in_header && !line.starts_with('─') {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 3 {
-                    let icon = parts[0];
-
-                    // Determine field type from icon
-                    let field_type = match icon {
-                        "mail" | "📧" => "email",
-                        "phone" | "📱" => "phone",
-                        "web" | "🌐" => "website",
-                        "home" | "🏠" => "address",
-                        "social" | "👤" => "social",
-                        _ => "custom",
-                    };
-
-                    // After the icon, find where the rest of the text starts
-                    let after_icon = line
-                        .trim_start()
-                        .strip_prefix(icon)
-                        .unwrap_or(line)
-                        .trim_start();
-
-                    // The value is the last whitespace-separated token(s) that
-                    // look like a value (email, phone, URL). The label is everything
-                    // before it. Use the last token as value for simple cases.
-                    let last_part = parts.last().unwrap();
-                    let label = after_icon
-                        .strip_suffix(last_part)
-                        .unwrap_or(after_icon)
-                        .trim();
-
-                    if !label.is_empty() {
-                        fields.push(CardField {
-                            field_type: field_type.to_string(),
-                            label: label.to_string(),
-                            value: last_part.to_string(),
-                        });
-                    }
-                }
-            }
-
-            // Also handle table format (│-separated) for compatibility
+            // Parse field lines — three formats, mutually exclusive to avoid duplicates.
             if line.contains('│') || line.contains('|') {
+                // Table format (│-separated)
                 let parts: Vec<&str> = line
                     .split(['│', '|'])
                     .map(|s| s.trim())
@@ -320,11 +276,49 @@ impl CliDevice {
                         });
                     }
                 }
-            }
+            } else if !in_header {
+                // Try icon-based column format first
+                // Format: "  mail   Work Email   alice@work.com"
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                let is_icon_format = parts.len() >= 3
+                    && matches!(
+                        parts[0],
+                        "mail" | "📧" | "phone" | "📱" | "web" | "🌐" | "home" | "🏠"
+                            | "social" | "👤"
+                    );
 
-            // Also handle colon-separated format (Label: Value)
-            if let Some(colon_pos) = line.find(':') {
-                if !line.contains('│') && !line.contains('|') {
+                if is_icon_format {
+                    let icon = parts[0];
+                    let field_type = match icon {
+                        "mail" | "📧" => "email",
+                        "phone" | "📱" => "phone",
+                        "web" | "🌐" => "website",
+                        "home" | "🏠" => "address",
+                        "social" | "👤" => "social",
+                        _ => "custom",
+                    };
+
+                    let after_icon = line
+                        .trim_start()
+                        .strip_prefix(icon)
+                        .unwrap_or(line)
+                        .trim_start();
+
+                    let last_part = parts.last().unwrap();
+                    let label = after_icon
+                        .strip_suffix(last_part)
+                        .unwrap_or(after_icon)
+                        .trim();
+
+                    if !label.is_empty() {
+                        fields.push(CardField {
+                            field_type: field_type.to_string(),
+                            label: label.to_string(),
+                            value: last_part.to_string(),
+                        });
+                    }
+                } else if let Some(colon_pos) = line.find(':') {
+                    // Colon-separated format (Label: Value)
                     let label = line[..colon_pos]
                         .trim_start_matches(|c: char| !c.is_alphanumeric())
                         .trim();
@@ -436,9 +430,8 @@ impl Device for CliDevice {
     }
 
     async fn has_identity(&self) -> bool {
-        // Check if identity file exists
-        let identity_path = self.data_dir.path().join("identity.json");
-        identity_path.exists()
+        // Use CLI status command instead of probing filesystem
+        self.run_command(&["card", "show"]).await.map_or(false, |o| o.status.success())
     }
 
     async fn export_identity(&self, path: &str) -> E2eResult<()> {
@@ -541,9 +534,16 @@ impl Device for CliDevice {
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            // Parse the contact details
+            // Parse the actual name from the first non-empty, non-separator line
+            let parsed_name = stdout
+                .lines()
+                .map(|l| l.trim())
+                .find(|l| !l.is_empty() && !l.starts_with('─') && !l.starts_with('='))
+                .unwrap_or(name_or_id)
+                .to_string();
+
             Ok(Some(Contact {
-                name: name_or_id.to_string(),
+                name: parsed_name,
                 id: None,
                 verified: stdout.contains("✓") || stdout.contains("verified"),
             }))

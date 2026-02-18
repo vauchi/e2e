@@ -30,14 +30,19 @@ use vauchi_e2e_tests::prelude::*;
 ///
 /// Scenario:
 /// 1. Alice generates an exchange QR code
-/// 2. Wait for 5+ minutes (simulated via test clock or manipulated timestamp)
+/// 2. Wait for 5+ minutes (real-time wait — see note below)
 /// 3. Bob attempts to scan the expired QR code
 /// 4. Exchange should fail with "QrExpired" error
 ///
-/// Note: This test uses time simulation. In production, the relay validates
-/// timestamps and rejects QRs older than 5 minutes.
+/// **WARNING: This test takes ~5 minutes due to QR_EXPIRY_SECONDS being a
+/// hardcoded constant (300s) in `core/vauchi-core/src/exchange/qr.rs:23`.**
+/// The expiry is validated client-side, so neither relay config nor env vars
+/// can shorten it.
+///
+/// TODO: Make `QR_EXPIRY_SECONDS` configurable via env var or builder param
+/// in vauchi-core so E2E tests can use a short TTL (e.g. 5s).
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
+#[ignore = "requires binaries + takes 5min (QR_EXPIRY_SECONDS hardcoded in core)"]
 async fn test_exchange_expired_qr() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -61,13 +66,10 @@ async fn test_exchange_expired_qr() {
             .expect("Failed to generate QR")
     };
 
-    // Simulate waiting for 5+ minutes
-    // In a real scenario, the relay would check the timestamp in the QR payload
-    // and reject it if too old. For now, we wait to let the QR expire.
-    //
-    // Note: In CI, this can be made faster by using a test relay with
-    // configurable expiration times or by manipulating the system clock.
-    orch.wait(Duration::from_secs(5 * 60 + 10)).await;
+    // Wait for QR to expire. QR_EXPIRY_SECONDS = 300s is hardcoded in
+    // core/vauchi-core/src/exchange/qr.rs — client-side validation.
+    // TODO: When QR_EXPIRY_SECONDS becomes configurable, reduce to 5s + buffer.
+    orch.wait(Duration::from_secs(300 + 5)).await;
 
     // Bob attempts to complete exchange with expired QR
     let bob = orch.user("Bob").unwrap();
