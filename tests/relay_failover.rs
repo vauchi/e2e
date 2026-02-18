@@ -148,6 +148,29 @@ async fn integration_updates_during_outage() {
         bob.sync_all().await.expect("Failed to sync Bob");
     }
 
+    // Verify Bob still has Alice as a contact after relay outage + recovery
+    {
+        let bob = bob.read().await;
+        let alice_contact = bob
+            .get_contact("Alice")
+            .await
+            .expect("Failed to get Alice on Bob");
+        assert!(
+            alice_contact.is_some(),
+            "Bob must still have Alice as a contact after relay outage recovery"
+        );
+    }
+
+    // Verify contacts survived the outage
+    orch.verify_contact_count("Alice", 1)
+        .await
+        .expect("Alice should have 1 contact after outage recovery");
+    orch.verify_contact_count("Bob", 1)
+        .await
+        .expect("Bob should have 1 contact after outage recovery");
+    // TODO: Once Device trait gains get_contact_card(), verify Bob received
+    // Alice's email field update queued during the relay outage.
+
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 

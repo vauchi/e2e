@@ -134,8 +134,36 @@ async fn integration_offline_catchup() {
         alice.sync_device(2).await.expect("Failed to sync device 2");
     }
 
-    // Step 5: Verify A3 catches up — currently limited by device sync bug (#38).
-    // Once fixed, this should verify contacts_2.len() == 3.
+    // Step 5: Verify A3 catches up.
+    // Known limitation: device sync bug (#38) may prevent secondary devices
+    // from receiving contacts. We assert on device 0 which is known to work,
+    // and add a soft check on device 2.
+    {
+        let alice = alice.read().await;
+        let contacts_2 = alice
+            .list_contacts_on_device(2)
+            .await
+            .expect("Failed to list contacts on device 2");
+
+        // Device 2 should ideally have all 3 contacts after catchup.
+        // If this fails, device sync (#38) is not yet working.
+        if contacts_2.len() != 3 {
+            eprintln!(
+                "WARNING: Device A3 has {} contacts instead of 3 — device sync bug #38 not yet fixed",
+                contacts_2.len()
+            );
+        }
+        // At minimum, primary device must still have its contacts
+        let contacts_0 = alice
+            .list_contacts_on_device(0)
+            .await
+            .expect("Failed to list contacts on device 0");
+        assert_eq!(
+            contacts_0.len(),
+            3,
+            "Primary device must retain all 3 contacts after offline device sync"
+        );
+    }
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
@@ -190,8 +218,34 @@ async fn integration_card_catchup() {
         alice.sync_device(1).await.expect("Failed to sync device 1");
     }
 
-    // Both devices should now have Bob's updated card
-    // (Verification would require checking Bob's contact card on both devices)
+    // Verify device 0 has Bob as a contact (exchange + card update received)
+    {
+        let alice = alice.read().await;
+        let contacts_0 = alice
+            .list_contacts_on_device(0)
+            .await
+            .expect("Failed to list contacts on device 0");
+        assert!(
+            contacts_0.iter().any(|c| c.name == "Bob"),
+            "Device 0 should have Bob as a contact after sync"
+        );
+    }
+
+    // Verify device 1 (was offline) has contacts after catchup
+    {
+        let alice = alice.read().await;
+        let contacts_1 = alice
+            .list_contacts_on_device(1)
+            .await
+            .expect("Failed to list contacts on device 1");
+        if !contacts_1.iter().any(|c| c.name == "Bob") {
+            eprintln!(
+                "WARNING: Device A2 missing Bob contact — device sync bug #38"
+            );
+        }
+    }
+    // TODO: Once Device trait gains get_contact_card(), verify Bob's
+    // email field update reached both devices.
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
@@ -297,8 +351,32 @@ async fn integration_extended_offline() {
         alice.sync_device(1).await.expect("Failed to sync device 1");
     }
 
-    // A2 catchup verification is limited by device sync bug (#38).
-    // Once fixed, this should verify contacts on device 1 == 2.
+    // Verify device 1 (was offline) after extended catchup
+    {
+        let alice = alice.read().await;
+        let contacts_1 = alice
+            .list_contacts_on_device(1)
+            .await
+            .expect("Failed to list contacts on device 1");
+
+        if contacts_1.len() != 2 {
+            eprintln!(
+                "WARNING: Device A2 has {} contacts instead of 2 — device sync bug #38",
+                contacts_1.len()
+            );
+        }
+
+        // Primary device must always have its contacts
+        let contacts_0 = alice
+            .list_contacts_on_device(0)
+            .await
+            .expect("Failed to list contacts on device 0");
+        assert_eq!(
+            contacts_0.len(),
+            2,
+            "Primary device must retain 2 contacts after offline device catchup"
+        );
+    }
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
