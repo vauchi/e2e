@@ -58,7 +58,6 @@ lint:format:
   stage: lint
   needs: []
   script:
-    - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
@@ -66,7 +65,6 @@ lint:clippy:
   stage: lint
   needs: []
   script:
-    - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
 
 # ============================================================
@@ -83,7 +81,6 @@ security:audit:
     - job: lint:clippy
       optional: true
   script:
-    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
 # Full cargo-deny check: advisories, licenses, bans, sources
@@ -99,7 +96,6 @@ security:deny:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check
 
 # ============================================================
