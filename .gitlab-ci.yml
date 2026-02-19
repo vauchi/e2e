@@ -34,7 +34,7 @@ include:
 
 stages:
   - lint
-  - test      # Required by SAST template (no jobs in this stage)
+  - test
   - security
 
 variables:
@@ -104,6 +104,62 @@ security:deny:
   script:
     - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check
+
+# ============================================================
+# Test Stage — Smoke Suite (PI-05)
+# ============================================================
+# Runs smoke tests (prefixed smoke_*) that cover 5 critical paths:
+#   1. Identity creation + card field management
+#   2. CLI exchange between two users
+#   3. Card update → sync to contact
+#   4. Backup + restore
+#   5. Device linking
+#
+# Requires relay and CLI binaries. Currently manual-only; will become
+# automatic on merge to main once multi-project artifact pipeline
+# is set up (needs relay:build and cli:build job artifacts).
+#
+# Target: < 5 minutes total.
+
+test:smoke:
+  extends: [.rust-job, .timeout-standard]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  allow_failure: true
+  variables:
+    CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  script:
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+    - |
+      echo "Building relay binary..."
+      git clone --depth=1 --branch main https://gitlab.com/vauchi/relay.git /tmp/relay
+      cargo build --release --manifest-path /tmp/relay/Cargo.toml
+      export RELAY_BIN=/tmp/relay/target/release/vauchi-relay
+
+      echo "Building CLI binary..."
+      git clone --depth=1 --branch main https://gitlab.com/vauchi/cli.git /tmp/cli
+      cargo build --release --manifest-path /tmp/cli/Cargo.toml
+      export CLI_BIN=/tmp/cli/target/release/vauchi-cli
+
+      echo "Running smoke tests..."
+      cargo test -- smoke_ --include-ignored --test-threads=1 2>&1 | tee smoke-results.txt
+
+      echo "Smoke suite complete"
+  artifacts:
+    when: always
+    paths:
+      - smoke-results.txt
+    expire_in: 1 week
+  timeout: 10 minutes
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules
