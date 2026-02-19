@@ -283,8 +283,16 @@ impl CliDevice {
                 let is_icon_format = parts.len() >= 3
                     && matches!(
                         parts[0],
-                        "mail" | "📧" | "phone" | "📱" | "web" | "🌐" | "home" | "🏠"
-                            | "social" | "👤"
+                        "mail"
+                            | "📧"
+                            | "phone"
+                            | "📱"
+                            | "web"
+                            | "🌐"
+                            | "home"
+                            | "🏠"
+                            | "social"
+                            | "👤"
                     );
 
                 if is_icon_format {
@@ -431,7 +439,9 @@ impl Device for CliDevice {
 
     async fn has_identity(&self) -> bool {
         // Use CLI status command instead of probing filesystem
-        self.run_command(&["card", "show"]).await.map_or(false, |o| o.status.success())
+        self.run_command(&["card", "show"])
+            .await
+            .is_ok_and(|o| o.status.success())
     }
 
     async fn export_identity(&self, path: &str) -> E2eResult<()> {
