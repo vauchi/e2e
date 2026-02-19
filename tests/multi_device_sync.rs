@@ -87,7 +87,10 @@ async fn smoke_card_update() {
     // TODO: Add get_contact_card() to Device trait to assert field-level values (alice@example.com)
     {
         let bob = bob.read().await;
-        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        let contacts = bob
+            .list_contacts()
+            .await
+            .expect("Failed to list Bob's contacts");
         assert!(
             !contacts.is_empty(),
             "Bob should have Alice as a contact after sync"
@@ -121,7 +124,10 @@ async fn smoke_card_update() {
     // TODO: Add get_contact_card() to Device trait to assert field-level values (+1-555-0123)
     {
         let alice = alice.read().await;
-        let contacts = alice.list_contacts().await.expect("Failed to list Alice's contacts");
+        let contacts = alice
+            .list_contacts()
+            .await
+            .expect("Failed to list Alice's contacts");
         assert!(
             !contacts.is_empty(),
             "Alice should have Bob as a contact after sync"

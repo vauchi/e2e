@@ -461,8 +461,8 @@ mod tests {
         // Ports should be different (increments by 2)
         assert_ne!(port1, port2);
         // Ports should be in range
-        assert!(port1 >= PORT_RANGE_START && port1 < PORT_RANGE_END);
-        assert!(port2 >= PORT_RANGE_START && port2 < PORT_RANGE_END);
+        assert!((PORT_RANGE_START..PORT_RANGE_END).contains(&port1));
+        assert!((PORT_RANGE_START..PORT_RANGE_END).contains(&port2));
     }
 
     #[test]

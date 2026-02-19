@@ -239,9 +239,7 @@ async fn integration_card_catchup() {
             .await
             .expect("Failed to list contacts on device 1");
         if !contacts_1.iter().any(|c| c.name == "Bob") {
-            eprintln!(
-                "WARNING: Device A2 missing Bob contact — device sync bug #38"
-            );
+            eprintln!("WARNING: Device A2 missing Bob contact — device sync bug #38");
         }
     }
     // TODO: Once Device trait gains get_contact_card(), verify Bob's

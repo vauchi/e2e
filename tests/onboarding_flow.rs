@@ -284,7 +284,9 @@ async fn test_demo_contact_visible_on_start() {
         let demo_contact = contacts
             .iter()
             .find(|c| c.name.contains("Vauchi Tips") || c.name.contains("Demo"))
-            .expect("Demo contact named 'Vauchi Tips' or 'Demo' must be present for new solo users");
+            .expect(
+                "Demo contact named 'Vauchi Tips' or 'Demo' must be present for new solo users",
+            );
 
         // Demo contact should be clearly labeled
         assert!(

@@ -200,7 +200,10 @@ async fn integration_label_visibility_sync() {
     //       but NOT personal phone (visibility filtering at field level)
     {
         let bob = bob.read().await;
-        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        let contacts = bob
+            .list_contacts()
+            .await
+            .expect("Failed to list Bob's contacts");
         assert!(
             !contacts.is_empty(),
             "Bob should have Alice as a contact after exchange and sync"
@@ -290,7 +293,10 @@ async fn smoke_per_contact_visibility() {
     //       but NOT Private Phone (per-contact visibility filtering)
     {
         let bob = bob.read().await;
-        let contacts = bob.list_contacts().await.expect("Failed to list Bob's contacts");
+        let contacts = bob
+            .list_contacts()
+            .await
+            .expect("Failed to list Bob's contacts");
         assert!(
             !contacts.is_empty(),
             "Bob should have Alice as a contact after exchange and sync"
