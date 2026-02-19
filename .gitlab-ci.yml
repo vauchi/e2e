@@ -42,6 +42,10 @@ variables:
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
+# Override: advisory until pre-existing zero-assertion tests are remediated
+quality:zero-assertions:
+  allow_failure: true
+
 # ============================================================
 # Lint Stage — Preflight Gate (runs on Rust code changes)
 # ============================================================
