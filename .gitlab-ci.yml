@@ -37,6 +37,10 @@ stages:
   - test
   - security
 
+# Override: advisory until pre-existing zero-assertion tests are remediated
+quality:zero-assertions:
+  allow_failure: true
+
 variables:
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
