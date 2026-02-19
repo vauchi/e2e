@@ -7,6 +7,7 @@
 # End-to-end testing infrastructure
 #
 # Performance optimizations:
+#   - Self-hosted runners: sccache, persistent caches, load-balanced
 #   - Change-based rules: Jobs run only when relevant files change
 #   - Timeouts: Prevent runaway jobs from blocking runners
 #   - Read-only cache for lint jobs
@@ -46,10 +47,6 @@ variables:
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
-# Override: advisory until pre-existing zero-assertion tests are remediated
-quality:zero-assertions:
-  allow_failure: true
-
 # ============================================================
 # Lint Stage — Preflight Gate (runs on Rust code changes)
 # ============================================================
@@ -57,21 +54,17 @@ quality:zero-assertions:
 # to pass before starting (PI-13 fail-fast DAG).
 
 lint:format:
-  extends: [.rust-job, .validation-rust, .timeout-quick]
+  extends: [.rust-runner-nocache, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
-  cache:
-    policy: pull  # Read-only cache for lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.rust-job, .validation-rust, .timeout-quick]
+  extends: [.rust-runner-readonly, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
-  cache:
-    policy: pull  # Read-only cache for lint
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
@@ -82,30 +75,26 @@ lint:clippy:
 
 # Rust security audit (runs on dependency changes)
 security:audit:
-  extends: [.rust-job, .validation-deps, .timeout-quick]
+  extends: [.rust-runner-readonly, .validation-deps, .timeout-quick]
   stage: security
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
-  cache:
-    policy: pull  # Read-only cache
   script:
-    - cargo install cargo-audit || true
+    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
 # Full cargo-deny check: advisories, licenses, bans, sources
 security:deny:
-  extends: [.rust-job, .timeout-quick]
+  extends: [.rust-runner-readonly, .timeout-quick]
   stage: security
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
-  cache:
-    policy: pull
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -130,7 +119,7 @@ security:deny:
 # Target: < 5 minutes total.
 
 test:smoke:
-  extends: [.rust-job, .timeout-standard]
+  extends: [.rust-runner, .timeout-standard]
   stage: test
   needs:
     - job: lint:format
@@ -143,25 +132,27 @@ test:smoke:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
   allow_failure: true
-  variables:
-    CARGO_NET_GIT_FETCH_WITH_CLI: "true"
   script:
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
     - |
+      TMPDIR=$(mktemp -d)
+
       echo "Building relay binary..."
-      git clone --depth=1 --branch main https://gitlab.com/vauchi/relay.git /tmp/relay
-      cargo build --release --manifest-path /tmp/relay/Cargo.toml
-      export RELAY_BIN=/tmp/relay/target/release/vauchi-relay
+      git clone --depth=1 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$TMPDIR/relay"
+      cargo build --release --manifest-path "$TMPDIR/relay/Cargo.toml"
+      export RELAY_BIN="$TMPDIR/relay/target/release/vauchi-relay"
 
       echo "Building CLI binary..."
-      git clone --depth=1 --branch main https://gitlab.com/vauchi/cli.git /tmp/cli
-      cargo build --release --manifest-path /tmp/cli/Cargo.toml
-      export CLI_BIN=/tmp/cli/target/release/vauchi-cli
+      git clone --depth=1 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$TMPDIR/cli"
+      cargo build --release --manifest-path "$TMPDIR/cli/Cargo.toml"
+      export CLI_BIN="$TMPDIR/cli/target/release/vauchi-cli"
 
       echo "Running smoke tests..."
       cargo test -- smoke_ --include-ignored --test-threads=1 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
+      rm -rf "$TMPDIR"
   artifacts:
     when: always
     paths:
