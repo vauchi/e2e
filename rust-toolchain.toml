@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Pin Rust toolchain for reproducible CI builds.
+# Update this version intentionally — do not rely on rust:latest.
+[toolchain]
+channel = "1.93.1"
+components = ["rustfmt", "clippy"]
