@@ -42,8 +42,10 @@ variables:
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
 
 # ============================================================
-# Lint Stage (runs on Rust code changes)
+# Lint Stage — Preflight Gate (runs on Rust code changes)
 # ============================================================
+# Cheapest checks run first. Security jobs wait for these
+# to pass before starting (PI-13 fail-fast DAG).
 
 lint:format:
   extends: [.rust-job, .validation-rust, .timeout-quick]
@@ -66,15 +68,18 @@ lint:clippy:
     - cargo clippy --all-targets -- -D warnings
 
 # ============================================================
-# Security Stage (change-based)
+# Security Stage (change-based, gated by lint)
 # ============================================================
 
-# Rust security audit (runs on dependency changes)
 # Rust security audit (runs on dependency changes)
 security:audit:
   extends: [.rust-job, .validation-deps, .timeout-quick]
   stage: security
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   cache:
     policy: pull  # Read-only cache
   script:
@@ -85,7 +90,11 @@ security:audit:
 security:deny:
   extends: [.rust-job, .timeout-quick]
   stage: security
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   cache:
     policy: pull
   rules:
@@ -100,7 +109,11 @@ security:deny:
 
 semgrep-sast:
   tags: [docker]
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -112,7 +125,11 @@ semgrep-sast:
 
 secret_detection:
   tags: [docker]
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
