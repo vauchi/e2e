@@ -167,13 +167,8 @@ semgrep-sast:
     - job: lint:clippy
       optional: true
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        compare_to: refs/heads/main
-        paths:
-          - "**/*.rs"
-          - ".gitlab-ci.yml"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
 
 secret_detection:
   tags: [docker]
