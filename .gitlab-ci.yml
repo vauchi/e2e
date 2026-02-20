@@ -145,7 +145,7 @@ test:smoke:
       export CLI_BIN="$TMPDIR/cli/target/release/vauchi-cli"
 
       echo "Running smoke tests..."
-      cargo test -- smoke_ --include-ignored --test-threads=1 2>&1 | tee smoke-results.txt
+      cargo nextest run --run-ignored all -j 1 -- smoke_ 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
       rm -rf "$TMPDIR"
