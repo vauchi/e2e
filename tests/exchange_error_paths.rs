@@ -23,6 +23,7 @@
 use std::time::Duration;
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: contact_exchange:QR code expiration
 /// Integration test: QR code older than 5 minutes is rejected.
 ///
 /// Tags: integration, exchange, error-path, expired-qr
@@ -102,6 +103,7 @@ async fn test_exchange_expired_qr() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Cannot exchange with yourself
 /// Smoke test: Cannot exchange with yourself (self-exchange prevention).
 ///
 /// Tags: smoke, exchange, error-path, self-exchange
@@ -161,6 +163,7 @@ async fn test_exchange_self_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Exchange with existing contact
 /// Integration test: Duplicate contact warning on re-exchange.
 ///
 /// Tags: integration, exchange, error-path, duplicate
@@ -255,6 +258,7 @@ async fn test_exchange_already_contact() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Handle malformed QR code
 /// Smoke test: Invalid/malformed QR data is rejected.
 ///
 /// Tags: smoke, exchange, error-path, malformed
@@ -340,6 +344,7 @@ async fn test_exchange_malformed_qr() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Handle non-Vauchi QR code
 /// Integration test: Non-Vauchi QR code is rejected.
 ///
 /// Tags: integration, exchange, error-path, non-vauchi
@@ -416,6 +421,7 @@ async fn test_exchange_non_vauchi_qr() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Network failure during key exchange
 /// Integration test: Exchange fails gracefully on network timeout.
 ///
 /// Tags: integration, exchange, error-path, network

@@ -19,6 +19,7 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Integration test: Full mesh exchange between five users.
 /// Tags: integration, exchange, multi-user
 /// Feature: contact_exchange.feature
@@ -69,7 +70,8 @@ async fn integration_five_user_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-/// Integration test: Sequential chain exchange (A→B→C→D→E).
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
+/// Integration test: Sequential chain exchange (A->B->C->D->E).
 /// Tags: integration, exchange, sequential
 /// Feature: contact_exchange.feature
 #[tokio::test]
@@ -133,6 +135,7 @@ async fn integration_sequential_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: sync_updates:Contact updates propagate to all devices
 /// Integration test: Contact sync across all linked devices.
 /// Tags: integration, sync, multi-device
 /// Feature: sync_updates.feature

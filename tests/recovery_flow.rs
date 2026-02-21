@@ -12,6 +12,7 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: contact_recovery:User initiates social recovery
 /// Smoke test: Recovery claim creation.
 /// Tags: smoke, recovery
 /// Feature: contact_recovery.feature
@@ -69,6 +70,7 @@ async fn smoke_recovery_setup() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Fingerprint verification after exchange
 /// Integration test: Contact verification.
 /// Tags: integration, verification
 /// Feature: contact_exchange.feature
@@ -131,6 +133,7 @@ async fn integration_contact_verification() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
 /// Integration test: Complete recovery happy path.
 /// Tags: integration, recovery
 /// Traces: contact_recovery.feature:97-106 "Recovery succeeds with trusted vouchers only"
@@ -313,6 +316,7 @@ async fn integration_recovery_happy_path() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_recovery:Insufficient trusted vouchers
 /// Integration test: Insufficient vouchers.
 /// Tags: integration, recovery
 /// Traces: contact_recovery.feature:109-117 "Insufficient trusted vouchers"

@@ -21,6 +21,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: relay_network:Relay failover to backup server
 /// Integration test: Relay failover and recovery.
 /// Tags: integration, relay, failover
 /// Feature: relay_network.feature
@@ -83,6 +84,7 @@ async fn integration_relay_failover() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: relay_network:Updates queued during outage delivered after recovery
 /// Integration test: Updates during relay outage sync after recovery.
 /// Tags: integration, relay, offline
 /// Feature: relay_network.feature
@@ -174,6 +176,7 @@ async fn integration_updates_during_outage() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: relay_network:Graceful degradation when all relays unavailable
 /// Integration test: Graceful degradation when all relays unavailable.
 /// Tags: integration, relay, edge-case
 /// Feature: relay_network.feature

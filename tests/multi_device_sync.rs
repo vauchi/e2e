@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: sync_updates:Card update received from contact
 /// Smoke test: Card update propagation across devices.
 /// Tags: smoke, sync
 /// Feature: sync_updates.feature
@@ -137,6 +138,7 @@ async fn smoke_card_update() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: device_management:User links a new device
 /// Integration test: Device linking propagates existing contacts.
 /// Tags: integration, device-linking, sync
 /// Feature: device_management.feature
@@ -187,6 +189,7 @@ async fn integration_device_receives_contacts() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: sync_updates:Concurrent card edits from multiple devices
 /// Integration test: Concurrent updates from multiple devices.
 /// Tags: integration, sync, concurrent
 /// Feature: sync_updates.feature

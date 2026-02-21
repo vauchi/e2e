@@ -15,6 +15,7 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: visibility_labels:Create and assign visibility labels
 /// Smoke test: Create labels and assign contacts.
 /// Tags: smoke, visibility, labels
 /// Feature: visibility_labels.feature
@@ -105,6 +106,7 @@ async fn smoke_create_labels_and_assign() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: visibility_labels:Label controls field visibility
 /// Integration test: Field visibility controlled by labels.
 /// Tags: integration, visibility, labels, sync
 /// Feature: visibility_labels.feature
@@ -213,6 +215,7 @@ async fn integration_label_visibility_sync() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: visibility_control:Hide specific fields from individual contacts
 /// Smoke test: Per-contact visibility hiding.
 /// Tags: smoke, visibility, contacts
 /// Feature: visibility_control.feature

@@ -19,6 +19,7 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Smoke test: Basic CLI exchange between two users.
 /// Tags: smoke, exchange
 /// Feature: contact_exchange.feature
@@ -49,6 +50,7 @@ async fn smoke_cli_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: device_management:User links a new device
 /// Integration test: Device linking across CLI instances.
 /// Tags: integration, device-linking
 /// Feature: device_management.feature
@@ -87,6 +89,7 @@ async fn integration_device_linking() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Integration test: Exchange between users with different device counts.
 /// Tags: integration, exchange, multi-device
 /// Feature: contact_exchange.feature
@@ -141,6 +144,7 @@ async fn integration_mixed_devices() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Placeholder for future iOS simulator testing (Phase 2).
 ///
 /// Requirements:
@@ -173,6 +177,7 @@ async fn test_ios_simulator_exchange() {
     }
 }
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Placeholder for future Android emulator testing (Phase 2).
 ///
 /// Requirements:
@@ -206,6 +211,7 @@ async fn test_android_emulator_exchange() {
     }
 }
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Desktop (Tauri) testing via HTTP test server.
 ///
 /// Requirements:
@@ -261,6 +267,7 @@ async fn test_desktop_exchange() {
     device.kill_app().await.expect("Failed to kill desktop app");
 }
 
+// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// TUI testing via PTY automation.
 ///
 /// Requirements:

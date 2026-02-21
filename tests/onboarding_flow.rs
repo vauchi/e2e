@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: onboarding:Welcome screen on first launch
 /// Smoke test: Welcome screen shows value proposition and skip option.
 /// Tags: smoke, onboarding, first-launch
 /// Traces: onboarding.feature:16-21 "Welcome screen on first launch"
@@ -74,6 +75,7 @@ async fn test_welcome_screen_value_proposition() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:Guided card creation wizard
 /// Integration test: Card creation wizard completes all 4 steps.
 /// Tags: integration, onboarding, card-creation
 /// Traces: onboarding.feature:55-61 "Guided card creation wizard"
@@ -168,6 +170,7 @@ async fn test_card_creation_wizard_steps() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:First exchange tutorial
 /// Integration test: First exchange shows tutorial overlay.
 /// Tags: integration, onboarding, first-exchange
 /// Traces: onboarding.feature:143-148 "First exchange tutorial"
@@ -242,6 +245,7 @@ async fn test_first_exchange_tutorial_overlay() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:Demo contact for solo users
 /// Integration test: Demo contact visible on first start.
 /// Tags: integration, onboarding, demo
 /// Traces: onboarding.feature:170-176 "Demo contact for solo users"
@@ -309,6 +313,7 @@ async fn test_demo_contact_visible_on_start() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:Complete onboarding in under 2 minutes
 /// Performance test: Full onboarding completes in under 2 minutes.
 /// Tags: integration, onboarding, ttv, performance
 /// Traces: onboarding.feature:270-275 "Complete onboarding in under 2 minutes"
@@ -418,6 +423,7 @@ async fn test_time_to_value_under_2_minutes() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:Skip to restore for existing users
 /// Smoke test: Onboarding can be skipped for restore.
 /// Tags: smoke, onboarding, restore
 /// Traces: onboarding.feature:34-39 "Skip to restore for existing users"
@@ -475,6 +481,7 @@ async fn smoke_skip_onboarding_for_restore() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: onboarding:Link to existing device
 /// Integration test: Multi-device onboarding via device linking.
 /// Tags: integration, onboarding, device-linking
 /// Traces: onboarding.feature:42-48 "Link to existing device"

@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
+// @scenario: sync_updates:Offline device catches up on reconnect
 /// Integration test: Offline device catches up on reconnect.
 /// Tags: integration, offline, sync
 /// Feature: sync_updates.feature
@@ -168,6 +169,7 @@ async fn integration_offline_catchup() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: sync_updates:Card update received from contact
 /// Integration test: Card updates received by offline device on catchup.
 /// Tags: integration, offline, card
 /// Feature: sync_updates.feature
@@ -248,6 +250,7 @@ async fn integration_card_catchup() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: sync_updates:Offline device catches up on reconnect
 /// Integration test: Extended offline period with multiple changes.
 /// Tags: integration, offline, edge-case
 /// Feature: sync_updates.feature
