@@ -17,4 +17,5 @@ Thumbs.db
 
 # Test artifacts
 test-*-data/
+data/
 *.log
