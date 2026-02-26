@@ -18,3 +18,6 @@ Thumbs.db
 test-*-data/
 data/
 *.log
+
+# CI local testing
+.gitlab-ci-local/
