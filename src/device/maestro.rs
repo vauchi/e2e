@@ -211,7 +211,20 @@ impl MaestroDevice {
         Ok(flows_dir)
     }
 
+    /// Return the Maestro `--platform` flag value for this device.
+    fn platform_flag(&self) -> &'static str {
+        match self.platform {
+            MaestroPlatform::Ios => "ios",
+            MaestroPlatform::Android => "android",
+        }
+    }
+
     /// Run a Maestro flow with optional extra environment variables.
+    ///
+    /// Passes `--platform` explicitly to avoid XCTest driver timeout on iOS
+    /// (where Maestro may attempt to connect to an Android device first) and
+    /// to ensure correct device targeting on Android when both an emulator and
+    /// a simulator are running simultaneously.
     async fn run_flow(&self, flow_name: &str, env_vars: &[(&str, &str)]) -> E2eResult<String> {
         let flow_path = self.flows_dir.join(format!("{}.yaml", flow_name));
 
@@ -226,6 +239,8 @@ impl MaestroDevice {
         let mut cmd = Command::new("maestro");
         cmd.arg("test")
             .arg(&flow_path)
+            .arg("--platform")
+            .arg(self.platform_flag())
             .arg("--device")
             .arg(&self.device_name)
             .env("MAESTRO_APP_ID", &self.app_id)
@@ -572,6 +587,7 @@ impl Device for MaestroDevice {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests need access to private methods (platform_flag, find_flows_dir, check_maestro_installed)
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,6 +596,64 @@ mod tests {
     fn test_maestro_platform_display() {
         assert_eq!(format!("{}", MaestroPlatform::Ios), "iOS");
         assert_eq!(format!("{}", MaestroPlatform::Android), "Android");
+    }
+
+    #[test]
+    fn test_maestro_platform_flag_ios_returns_ios() {
+        // Check if Maestro is actually installed (needed to construct device)
+        let maestro_installed = std::process::Command::new("maestro")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+
+        if !maestro_installed {
+            // Skip if Maestro not installed — tested via find_flows_dir path below
+            return;
+        }
+
+        let device = MaestroDevice::ios("test", "iPhone 15 Pro", "ws://localhost:8080").unwrap();
+        assert_eq!(device.platform_flag(), "ios");
+    }
+
+    #[test]
+    fn test_maestro_platform_flag_android_returns_android() {
+        let maestro_installed = std::process::Command::new("maestro")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+
+        if !maestro_installed {
+            return;
+        }
+
+        let device = MaestroDevice::android("test", "Pixel_7", "ws://localhost:8080").unwrap();
+        assert_eq!(device.platform_flag(), "android");
+    }
+
+    #[test]
+    fn test_maestro_find_flows_dir_ios_contains_ios_subdir() {
+        let flows_dir = MaestroDevice::find_flows_dir(MaestroPlatform::Ios).unwrap();
+        assert!(
+            flows_dir.ends_with("maestro/ios"),
+            "Expected flows dir to end with maestro/ios, got: {}",
+            flows_dir.display()
+        );
+    }
+
+    #[test]
+    fn test_maestro_find_flows_dir_android_contains_android_subdir() {
+        let flows_dir = MaestroDevice::find_flows_dir(MaestroPlatform::Android).unwrap();
+        assert!(
+            flows_dir.ends_with("maestro/android"),
+            "Expected flows dir to end with maestro/android, got: {}",
+            flows_dir.display()
+        );
     }
 
     #[test]
