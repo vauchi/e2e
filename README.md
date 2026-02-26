@@ -35,14 +35,19 @@ just e2e-run test_cli_to_cli_exchange
 | Maestro CLI | `maestro --version` | `curl -Ls "https://get.maestro.mobile.dev" \| bash` |
 | Android SDK | `echo $ANDROID_HOME` | [Android Studio](https://developer.android.com/studio) |
 | Android emulator | `emulator -list-avds` | Android Studio AVD Manager |
-| macOS remote (iOS) | `macos-remote.sh status` | SSH to macOS machine |
-| Xcode (iOS) | Remote: `xcodebuild -version` | Mac App Store |
+| Xcode (iOS, macOS only) | `xcodebuild -version` | Mac App Store |
+| iOS Simulator (macOS only) | `xcrun simctl list` | Xcode |
+
+> **Quick check:** Run `just maestro-setup` to verify your entire Maestro
+> environment in one step. It checks the CLI, iOS tooling, Android tooling,
+> and available flow files.
 
 **Android Setup:**
 ```bash
 # Verify environment
 export ANDROID_HOME=/path/to/Android/Sdk
 export ANDROID_SDK_ROOT=$ANDROID_HOME
+export PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools
 
 # List available emulators
 $ANDROID_HOME/emulator/emulator -list-avds
@@ -50,8 +55,22 @@ $ANDROID_HOME/emulator/emulator -list-avds
 # Start emulator
 $ANDROID_HOME/emulator/emulator -avd Pixel_7 &
 
-# Verify Maestro can see device
-maestro --device list
+# Verify Maestro can see device (explicit platform)
+maestro test --platform android e2e/maestro/android/create_identity.yaml
+```
+
+**iOS Setup (local macOS):**
+```bash
+# Boot a simulator
+xcrun simctl boot "iPhone 15 Pro"
+
+# Install the app (from ios/ repo)
+cd ios && xcodebuild -scheme Vauchi \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -configuration Debug build
+
+# Verify Maestro can see simulator (explicit platform)
+maestro test --platform ios e2e/maestro/ios/create_identity.yaml
 ```
 
 **iOS Setup (via macOS remote):**
@@ -63,7 +82,7 @@ dev-tools/scripts/macos-remote.sh status
 dev-tools/scripts/macos-remote.sh simulator-list
 
 # Boot simulator
-dev-tools/scripts/macos-remote.sh simulator-boot "iPhone 15"
+dev-tools/scripts/macos-remote.sh simulator-boot "iPhone 15 Pro"
 
 # Sync project to macOS
 dev-tools/scripts/macos-remote.sh sync
@@ -107,6 +126,8 @@ export PROJECT_PATH=/Volumes/Workspace/vauchi
 
 ## Running Tests
 
+### CLI E2E (Rust harness)
+
 ```bash
 # List all E2E tests
 just e2e
@@ -119,7 +140,39 @@ just e2e-run test_multi_device_cli_linking
 just e2e-run all
 
 # Run with verbose output
-RUST_LOG=debug cargo test -p vauchi-e2e-tests -- --ignored --nocapture
+RUST_LOG=debug just e2e-run all
+```
+
+### Mobile E2E (Maestro)
+
+```bash
+# Check environment first
+just maestro-setup
+
+# Run a single iOS flow
+just e2e-ios create_identity
+just e2e-ios generate_qr
+
+# Run a single Android flow
+just e2e-android create_identity
+just e2e-android complete_exchange
+
+# Run all flows on both platforms
+just e2e-maestro
+
+# Run all flows on one platform
+just e2e-maestro ios
+just e2e-maestro android
+
+# Run Rust-orchestrated mobile tests (requires booted devices)
+just e2e-mobile
+```
+
+### All Platforms
+
+```bash
+# Full suite (CLI + Desktop + Mobile)
+just e2e-all
 ```
 
 ## Test Status
@@ -162,7 +215,78 @@ RUST_LOG=debug cargo test -p vauchi-e2e-tests -- --ignored --nocapture
 
 ## Troubleshooting
 
+### iOS XCTest driver timeout
+
+**Symptom:** Maestro hangs for 30-60 seconds then fails with
+`XCTest driver connection timed out` or `Failed to connect to XCTestRunner`.
+
+**Cause:** When both an iOS simulator and Android emulator are running,
+Maestro's auto-detection may attempt to connect to the Android device first
+using the XCTest driver, which will never succeed.
+
+**Fix:** Always pass `--platform ios` when targeting iOS. The `just` recipes
+and the Rust `MaestroDevice` do this automatically:
+
+```bash
+# WRONG (may try Android driver first)
+maestro test e2e/maestro/ios/create_identity.yaml
+
+# CORRECT (explicit platform selection)
+maestro test --platform ios e2e/maestro/ios/create_identity.yaml
+
+# Best: use just recipes (--platform is automatic)
+just e2e-ios create_identity
+```
+
+If the problem persists after using `--platform`:
+
+```bash
+# Verify a simulator is booted
+xcrun simctl list devices booted
+
+# Boot one if none are running
+xcrun simctl boot "iPhone 15 Pro"
+
+# Check Maestro can see it
+maestro --platform ios hierarchy
+```
+
+### Android emulator not targeted correctly
+
+**Symptom:** Maestro runs the flow on the iOS simulator instead of the
+Android emulator, or fails with `No Android devices found`.
+
+**Cause:** Without `--platform android`, Maestro may prefer the iOS
+simulator when both are running.
+
+**Fix:** Always pass `--platform android` when targeting Android:
+
+```bash
+# WRONG (may target iOS simulator)
+maestro test e2e/maestro/android/create_identity.yaml
+
+# CORRECT (explicit platform selection)
+maestro test --platform android e2e/maestro/android/create_identity.yaml
+
+# Best: use just recipes (--platform is automatic)
+just e2e-android create_identity
+```
+
+If the problem persists:
+
+```bash
+# Verify ADB sees the emulator
+adb devices
+
+# Restart ADB if needed
+adb kill-server && adb start-server
+
+# Check ANDROID_HOME is set
+echo $ANDROID_HOME
+```
+
 ### Relay not starting
+
 ```bash
 # Check if port is in use
 lsof -i :18080
@@ -171,16 +295,21 @@ lsof -i :18080
 pkill -f vauchi-relay
 ```
 
-### Android emulator not detected
+### Android emulator not detected by ADB
+
 ```bash
 # Verify ADB sees device
 adb devices
 
 # Restart ADB server
 adb kill-server && adb start-server
+
+# Check emulator is running
+emulator -list-avds
 ```
 
-### iOS Simulator not connecting
+### iOS Simulator not connecting (remote macOS)
+
 ```bash
 # Check macOS connectivity
 dev-tools/scripts/macos-remote.sh status
@@ -190,12 +319,28 @@ dev-tools/scripts/macos-remote.sh run "xcrun simctl list devices booted"
 ```
 
 ### Maestro not finding app
-```bash
-# Ensure app is installed
-maestro --device list
 
-# Check app bundle ID
-maestro studio  # Visual debugger
+```bash
+# Ensure app is installed on the correct platform
+maestro --platform ios hierarchy    # iOS
+maestro --platform android hierarchy  # Android
+
+# Check app bundle IDs
+# iOS: app.vauchi.ios
+# Android: com.vauchi
+
+# Use Maestro Studio for visual debugging
+maestro studio
+```
+
+### Environment check fails
+
+```bash
+# Run the full environment diagnostic
+just maestro-setup
+
+# This checks: Maestro CLI, Xcode tools, Android SDK, ADB,
+# booted simulators/emulators, and available flow files.
 ```
 
 ## Adding New Tests

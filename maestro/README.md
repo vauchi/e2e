@@ -71,15 +71,25 @@ appId: app.vauchi.mobile
 
 ## Running Flows
 
+> **Important:** Always pass `--platform` to avoid XCTest driver timeouts
+> on iOS and incorrect device targeting on Android. The `just` recipes
+> handle this automatically.
+
 ```bash
-# Run a single flow
-maestro test ios/create_identity.yaml
+# Preferred: use just recipes (handles --platform automatically)
+just e2e-ios create_identity
+just e2e-android create_identity
+just e2e-maestro              # Run all flows on both platforms
+
+# Manual invocation (always include --platform)
+maestro test --platform ios ios/create_identity.yaml
+maestro test --platform android android/create_identity.yaml
 
 # Run with variables
-NAME=Alice maestro test ios/create_identity.yaml
+NAME=Alice maestro test --platform ios ios/create_identity.yaml
 
 # Run on specific device
-maestro test --device "iPhone 15 Pro" ios/create_identity.yaml
+maestro test --platform ios --device "iPhone 15 Pro" ios/create_identity.yaml
 ```
 
 ## Integration with E2E Tests
