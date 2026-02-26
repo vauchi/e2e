@@ -16,9 +16,10 @@ End-to-end testing infrastructure for Vauchi.
 ## Commands
 
 ```bash
-cargo test                                  # Run all e2e tests
+just test e2e                               # Run all e2e tests
 cargo test five_user_exchange              # Run specific test
 cargo test --release                        # Run tests in release mode
+just check e2e                              # Format + lint + test
 ```
 
 ## Test Scenarios
