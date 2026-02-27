@@ -706,7 +706,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1599,7 +1599,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2092,7 +2092,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2510,7 +2510,7 @@ dependencies = [
  "getrandom 0.4.1",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2898,8 +2898,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-core"
-version = "0.1.15"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#0111ccb36efc04969f626ee2c351ab184833b853"
+version = "0.2.1"
 dependencies = [
  "argon2",
  "async-trait",
@@ -2955,8 +2954,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.1.15"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#0111ccb36efc04969f626ee2c351ab184833b853"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2965,7 +2963,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "1.1.0"
-source = "git+https://gitlab.com/vauchi/relay.git?branch=main#04a73604351c2918645e68ae0dab059d57774f2d"
+source = "git+https://gitlab.com/vauchi/relay.git?branch=main#e59a6090b5b7a11f84c0117372ad2c9d43a24eb4"
 dependencies = [
  "axum",
  "base64",
@@ -2979,6 +2977,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snow",
+ "subtle",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
