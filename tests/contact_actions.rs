@@ -79,6 +79,7 @@ fn e2e_phone_field_generates_tel_uri_after_exchange() {
 }
 
 /// @scenario: contact_actions:Long press phone number shows action menu
+// @scenario: contact_actions.feature:Long press phone number shows action menu
 #[test]
 fn e2e_phone_secondary_actions_include_call_sms_copy() {
     let bob_fields = vec![ContactField::new(
@@ -104,6 +105,7 @@ fn e2e_phone_secondary_actions_include_call_sms_copy() {
 // ============================================================
 
 /// @scenario: contact_actions:Get directions to address
+// @scenario: contact_actions.feature:Get directions to address
 #[test]
 fn e2e_address_field_generates_directions_uri() {
     let bob_fields = vec![ContactField::new(
@@ -177,6 +179,7 @@ fn e2e_file_uri_blocked_after_exchange() {
 }
 
 /// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions.feature:Allowed URI schemes whitelist
 #[test]
 fn e2e_allowed_schemes_work_after_exchange() {
     let bob_fields = vec![
