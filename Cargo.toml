@@ -97,3 +97,7 @@ path = "tests/recovery_flow.rs"
 [[test]]
 name = "contact_actions"
 path = "tests/contact_actions.rs"
+
+[[test]]
+name = "resistance_features"
+path = "tests/resistance_features.rs"
