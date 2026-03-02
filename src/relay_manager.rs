@@ -442,6 +442,7 @@ impl Drop for RelayManager {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests exercise private functions (is_port_available, find_available_port)
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,9 +468,13 @@ mod tests {
 
     #[test]
     fn test_is_port_available() {
-        // Port 0 should always be "available" (OS allocates)
-        // But we test that we can bind to a random high port
-        let port = find_available_port().expect("Should find port");
-        assert!(is_port_available(port));
+        // Negative case: a bound port must not be available
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
+        let port = listener.local_addr().expect("local addr").port();
+        assert!(
+            !is_port_available(port),
+            "port should be unavailable while bound"
+        );
+        // Positive case is exercised by test_find_available_port (calls is_port_available internally)
     }
 }
