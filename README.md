@@ -364,6 +364,6 @@ async fn test_android_exchange() {
 
 ## See Also
 
-- [Planning doc](../docs/planning/todo/09-e2e-testing-infrastructure.md)
+- [Planning doc](../_private/docs/problems/2026-02-17-maestro-e2e-environment-blockers/README.md)
 - [Maestro docs](https://maestro.mobile.dev)
 - [Tauri testing](https://v2.tauri.app/develop/tests/webdriver/)
