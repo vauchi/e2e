@@ -28,6 +28,7 @@ include:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'
       - '/ci-templates/mr-rules.yml'
+      - '/ci-templates/downstream.yml'
       - '/ci-templates/reuse.yml'
       - '/ci-templates/test-quality.yml'
   - template: Security/SAST.gitlab-ci.yml
@@ -37,6 +38,7 @@ stages:
   - lint
   - test
   - security
+  - verify
 
 
 variables:
@@ -177,3 +179,27 @@ secret_detection:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ============================================================
+# Verify Stage — Upstream Compatibility
+# ============================================================
+
+# Runs when core merges to main and triggers this repo
+verify:upstream:
+  extends: [.rust-runner, .verify-on-upstream, .timeout-standard]
+  stage: verify
+  needs: []
+  script:
+    - cargo clippy --all-targets -- -D warnings
+    - cargo nextest run --all-targets
+
+# Runs when core creates a dev/RC tag and triggers this repo
+verify:upstream-prerelease:
+  extends: [.rust-runner, .timeout-standard]
+  stage: verify
+  needs: []
+  script:
+    - cargo clippy --all-targets -- -D warnings
+    - cargo nextest run --all-targets
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == "pipeline" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api") && $UPSTREAM_CORE_VERSION
