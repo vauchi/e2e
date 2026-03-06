@@ -144,12 +144,14 @@ test:smoke:
       export CLI_BIN="$TMPDIR/cli/target/release/vauchi-cli"
 
       echo "Running smoke tests..."
-      cargo nextest run --run-ignored all -j 1 -- smoke_ 2>&1 | tee smoke-results.txt
+      cargo nextest run --profile ci --run-ignored all -j 1 -- smoke_ 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
       rm -rf "$TMPDIR"
   artifacts:
     when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
     paths:
       - smoke-results.txt
     expire_in: 1 week
@@ -191,7 +193,11 @@ verify:upstream:
   needs: []
   script:
     - cargo clippy --all-targets -- -D warnings
-    - cargo nextest run --all-targets
+    - cargo nextest run --profile ci --all-targets
+  artifacts:
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
 
 # Runs when core creates a dev/RC tag and triggers this repo
 verify:upstream-prerelease:
@@ -200,6 +206,10 @@ verify:upstream-prerelease:
   needs: []
   script:
     - cargo clippy --all-targets -- -D warnings
-    - cargo nextest run --all-targets
+    - cargo nextest run --profile ci --all-targets
+  artifacts:
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
   rules:
     - if: ($CI_PIPELINE_SOURCE == "pipeline" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api") && $UPSTREAM_CORE_VERSION
