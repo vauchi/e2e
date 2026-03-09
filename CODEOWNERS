@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# GitLab CODEOWNERS for vauchi-e2e
+# https://docs.gitlab.com/ee/user/project/codeowners/
+
+# Default owner
+* @megloff1
+
+# Security-sensitive configuration
+/.gitlab-ci.yml @megloff1
