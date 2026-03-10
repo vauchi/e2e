@@ -31,6 +31,7 @@ include:
       - '/ci-templates/downstream.yml'
       - '/ci-templates/reuse.yml'
       - '/ci-templates/test-quality.yml'
+      - '/ci-templates/perf.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
@@ -49,6 +50,10 @@ variables:
 # ============================================================
 # Lint Stage — Preflight Gate (runs on Rust code changes)
 # ============================================================
+
+# Duplicate dependency check (advisory)
+lint:duplicates:
+  extends: [.rust-runner-nocache, .lint-duplicates-job, .timeout-quick]
 # Cheapest checks run first. Security jobs wait for these
 # to pass before starting (PI-13 fail-fast DAG).
 
