@@ -54,6 +54,11 @@ variables:
 # Duplicate dependency check (advisory)
 lint:duplicates:
   extends: [.rust-runner-nocache, .lint-duplicates-job, .timeout-quick]
+
+# Unused dependency check (advisory)
+lint:machete:
+  extends: [.rust-runner-nocache, .lint-machete-job, .timeout-quick]
+
 # Cheapest checks run first. Security jobs wait for these
 # to pass before starting (PI-13 fail-fast DAG).
 
