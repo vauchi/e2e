@@ -14,8 +14,8 @@ license = "AGPL-3.0-or-later"
 junit = []
 
 [dependencies]
-# Core library - use git dependency for CI, patched to local path via .cargo/config.toml
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", branch = "main" }
+# Core library - use path dependency for local dev; CI uses git dependency
+vauchi-core = { path = "../core/vauchi-core" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
@@ -62,9 +62,16 @@ reqwest = { version = "0.12", features = ["json"] }
 # Random number generation
 rand = "0.8"
 
+# Fake data generation for seeding contacts
+fake = { version = "3", features = ["derive"] }
+
 [dev-dependencies]
 # Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
 vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
+
+[[bin]]
+name = "seed-contacts"
+path = "src/bin/seed_contacts.rs"
 
 [[test]]
 name = "five_user_exchange"
@@ -101,3 +108,7 @@ path = "tests/contact_actions.rs"
 [[test]]
 name = "resistance_features"
 path = "tests/resistance_features.rs"
+
+[[test]]
+name = "seeded_contacts"
+path = "tests/seeded_contacts.rs"
