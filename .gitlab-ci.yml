@@ -137,27 +137,56 @@ test:smoke:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
   allow_failure: true
+  cache:
+    key: smoke-binaries-${CI_DEFAULT_BRANCH}
+    paths:
+      - .smoke-bin/
+    policy: pull-push
   script:
     - |
+      mkdir -p .smoke-bin
+
+      # Reuse cached binaries if relay/cli haven't changed on main
+      RELAY_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" main | cut -f1)
+      CLI_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" main | cut -f1)
+
+      REBUILD_RELAY=1
+      REBUILD_CLI=1
+      [ -f .smoke-bin/relay.sha ] && [ "$(cat .smoke-bin/relay.sha)" = "$RELAY_HEAD" ] && [ -x .smoke-bin/vauchi-relay ] && REBUILD_RELAY=0
+      [ -f .smoke-bin/cli.sha ] && [ "$(cat .smoke-bin/cli.sha)" = "$CLI_HEAD" ] && [ -x .smoke-bin/vauchi-cli ] && REBUILD_CLI=0
+
       TMPDIR=$(mktemp -d)
 
-      echo "Building relay binary..."
-      git clone --depth=1 --branch main \
-        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$TMPDIR/relay"
-      cargo build --release --manifest-path "$TMPDIR/relay/Cargo.toml"
-      export RELAY_BIN="$TMPDIR/relay/target/release/vauchi-relay"
+      if [ "$REBUILD_RELAY" -eq 1 ]; then
+        echo "Building relay binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$TMPDIR/relay"
+        cargo build --release --manifest-path "$TMPDIR/relay/Cargo.toml"
+        cp "$TMPDIR/relay/target/release/vauchi-relay" .smoke-bin/
+        echo "$RELAY_HEAD" > .smoke-bin/relay.sha
+      else
+        echo "Relay binary cached (${RELAY_HEAD:0:8})"
+      fi
 
-      echo "Building CLI binary..."
-      git clone --depth=1 --branch main \
-        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$TMPDIR/cli"
-      cargo build --release --manifest-path "$TMPDIR/cli/Cargo.toml"
-      export CLI_BIN="$TMPDIR/cli/target/release/vauchi-cli"
+      if [ "$REBUILD_CLI" -eq 1 ]; then
+        echo "Building CLI binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$TMPDIR/cli"
+        cargo build --release --manifest-path "$TMPDIR/cli/Cargo.toml"
+        cp "$TMPDIR/cli/target/release/vauchi-cli" .smoke-bin/
+        echo "$CLI_HEAD" > .smoke-bin/cli.sha
+      else
+        echo "CLI binary cached (${CLI_HEAD:0:8})"
+      fi
+
+      export RELAY_BIN="$(pwd)/.smoke-bin/vauchi-relay"
+      export CLI_BIN="$(pwd)/.smoke-bin/vauchi-cli"
+      rm -rf "$TMPDIR"
 
       echo "Running smoke tests..."
       cargo nextest run --profile ci --run-ignored all -j 1 -- smoke_ 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
-      rm -rf "$TMPDIR"
   artifacts:
     when: always
     reports:
