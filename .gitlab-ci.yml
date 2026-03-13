@@ -32,6 +32,7 @@ include:
       - '/ci-templates/reuse.yml'
       - '/ci-templates/test-quality.yml'
       - '/ci-templates/perf.yml'
+      - '/ci-templates/badges.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
@@ -40,6 +41,7 @@ stages:
   - test
   - security
   - verify
+  - deploy
 
 
 variables:
@@ -242,3 +244,10 @@ verify:upstream-prerelease:
   script:
     - cargo clippy --all-targets -- -D warnings
     - cargo nextest run --profile ci --all-targets
+
+# ============================================================
+# Deploy Stage — Badge Pages
+# ============================================================
+
+pages:
+  extends: .badges-pages

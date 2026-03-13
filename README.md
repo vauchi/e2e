@@ -1,6 +1,8 @@
 <!-- SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
+[![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/e2e)](https://api.reuse.software/info/gitlab.com/vauchi/e2e)
+
 > [!WARNING]
 > **Pre-Alpha Software** - This project is under heavy development and not ready for production use.
 > APIs may change without notice. Use at your own risk.
