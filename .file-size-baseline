@@ -1,0 +1,3 @@
+# Generated 2026-03-15. Files above error threshold, grandfathered.
+# These files must not grow beyond their baseline. Reduce over time.
+src/yaml/executor.rs 1353
