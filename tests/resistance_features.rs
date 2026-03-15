@@ -9,10 +9,7 @@
 //!
 //! Feature: resistance_features.feature @duress @emergency @hidden @panic
 
-use vauchi_core::{
-    api::DuressSettings, network::MockTransport, AuthMode, Contact, ContactCard, SymmetricKey,
-    Vauchi,
-};
+use vauchi_core::{api::DuressSettings, AuthMode, Contact, ContactCard, SymmetricKey, Vauchi};
 
 // Helper to create a test contact with a unique PK
 fn make_contact(pk_byte: u8, name: &str) -> Contact {
@@ -30,7 +27,7 @@ fn make_contact(pk_byte: u8, name: &str) -> Contact {
 /// @scenario: Setup duress PIN with app password
 #[test]
 fn test_duress_pin_requires_app_password_first() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Setup duress without app password should fail
@@ -44,7 +41,7 @@ fn test_duress_pin_requires_app_password_first() {
 /// @scenario: Setup duress PIN after app password
 #[test]
 fn test_duress_pin_setup_after_app_password() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Setup app password first
@@ -59,7 +56,7 @@ fn test_duress_pin_setup_after_app_password() {
 /// @scenario: Authenticate with normal password switches to Normal mode
 #[test]
 fn test_authenticate_with_normal_password_enters_normal_mode() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
     vauchi.setup_duress_password("6789").unwrap();
@@ -71,7 +68,7 @@ fn test_authenticate_with_normal_password_enters_normal_mode() {
 /// @scenario: Authenticate with duress PIN switches to Duress mode
 #[test]
 fn test_authenticate_with_duress_pin_enters_duress_mode() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
     vauchi.setup_duress_password("6789").unwrap();
@@ -83,7 +80,7 @@ fn test_authenticate_with_duress_pin_enters_duress_mode() {
 /// @scenario: Invalid password fails authentication
 #[test]
 fn test_authenticate_with_invalid_password_fails() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
 
@@ -99,7 +96,7 @@ fn test_authenticate_with_invalid_password_fails() {
 /// @scenario: Duress alert is queued when duress PIN is entered
 #[test]
 fn test_duress_alert_queued_on_duress_auth() {
-    let mut alice = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
     alice.setup_app_password("1234").unwrap();
     alice.setup_duress_password("6789").unwrap();
@@ -128,7 +125,7 @@ fn test_duress_alert_queued_on_duress_auth() {
 /// @scenario: Duress settings can be configured and retrieved
 #[test]
 fn test_duress_settings_save_and_load() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     let settings = DuressSettings {
@@ -151,7 +148,7 @@ fn test_duress_settings_save_and_load() {
 /// @scenario: Duress mode can be disabled
 #[test]
 fn test_disable_duress() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
     vauchi.setup_duress_password("6789").unwrap();
@@ -170,7 +167,7 @@ fn test_disable_duress() {
 /// @scenario: Contacts can be hidden
 #[test]
 fn test_hide_contact() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     let bob = make_contact(1, "Bob");
@@ -191,7 +188,7 @@ fn test_hide_contact() {
 /// @scenario: Hidden contacts do not appear in list_contacts
 #[test]
 fn test_hidden_contacts_excluded_from_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     let bob = make_contact(1, "Bob");
@@ -214,7 +211,7 @@ fn test_hidden_contacts_excluded_from_list() {
 /// @scenario: Hidden contacts can be retrieved via list_hidden_contacts
 #[test]
 fn test_list_hidden_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     let bob = make_contact(1, "Bob");
@@ -245,7 +242,7 @@ fn test_list_hidden_contacts() {
 /// @scenario: Hidden contacts can be unhidden
 #[test]
 fn test_unhide_contact() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     let bob = make_contact(1, "Bob");
@@ -273,7 +270,7 @@ fn test_unhide_contact() {
 /// @scenario: Duress mode shows only decoy contacts
 #[test]
 fn test_duress_mode_shows_decoy_contacts_only() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Create a real contact
@@ -317,7 +314,7 @@ fn test_duress_mode_shows_decoy_contacts_only() {
 /// @scenario: Configure emergency broadcast with trusted contacts
 #[test]
 fn test_configure_emergency_broadcast() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Create trusted contacts
@@ -351,7 +348,7 @@ fn test_configure_emergency_broadcast() {
 /// @scenario: Emergency broadcast respects max 10 trusted contacts
 #[test]
 fn test_emergency_broadcast_max_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Create 11 contacts (exceeds max of 10)
@@ -373,7 +370,7 @@ fn test_emergency_broadcast_max_contacts() {
 /// @scenario: Send emergency broadcast requires established ratchet (queues for delivery)
 #[test]
 fn test_send_emergency_broadcast_queues_for_delivery() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Create trusted contact (without ratchet, so can't send directly)
@@ -402,7 +399,7 @@ fn test_send_emergency_broadcast_queues_for_delivery() {
 /// @scenario: Emergency broadcast configuration respects blocked contacts
 #[test]
 fn test_emergency_broadcast_honors_blocked_status() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Create two trusted contacts
@@ -442,7 +439,7 @@ fn test_emergency_broadcast_honors_blocked_status() {
 /// @scenario: Full duress flow: real contacts hidden, decoys shown, alert queued
 #[test]
 fn test_duress_full_workflow() {
-    let mut alice = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
     // Create real trusted contacts (hidden for duress)

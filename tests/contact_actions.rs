@@ -13,14 +13,13 @@
 //! Feature: contact_actions.feature
 
 use vauchi_core::contact_card::ContactAction;
-use vauchi_core::network::MockTransport;
 use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Helper: create two users, exchange cards, return both instances.
 fn exchange_with_fields(
     alice_fields: Vec<ContactField>,
     bob_fields: Vec<ContactField>,
-) -> (Vauchi<MockTransport>, Vauchi<MockTransport>) {
+) -> (Vauchi, Vauchi) {
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
     for field in alice_fields {

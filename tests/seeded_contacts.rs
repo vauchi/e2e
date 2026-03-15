@@ -13,13 +13,12 @@
 //! Feature: contacts_management.feature @contacts @search @filter @groups
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Seed N fake contacts with groups into a Vauchi instance.
 /// Returns group IDs as (family, friends, work).
-fn seed_contacts(vauchi: &Vauchi<MockTransport>, count: usize) -> (String, String, String) {
+fn seed_contacts(vauchi: &Vauchi, count: usize) -> (String, String, String) {
     let family = vauchi.create_group("Family").expect("create group");
     let friends = vauchi.create_group("Friends").expect("create group");
     let work = vauchi.create_group("Work").expect("create group");
@@ -110,8 +109,8 @@ fn seed_contacts(vauchi: &Vauchi<MockTransport>, count: usize) -> (String, Strin
 }
 
 /// Create AppEngine with identity and N seeded contacts.
-fn create_seeded_engine(count: usize) -> AppEngine<MockTransport> {
-    let mut vauchi: Vauchi<MockTransport> = Vauchi::in_memory().expect("vauchi");
+fn create_seeded_engine(count: usize) -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().expect("vauchi");
     vauchi
         .create_identity("Test User")
         .expect("create identity");

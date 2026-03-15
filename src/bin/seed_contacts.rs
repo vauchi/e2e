@@ -20,7 +20,6 @@ use rand::SeedableRng;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::network::MockTransport;
 use vauchi_core::Vauchi;
 
 fn main() {
@@ -30,7 +29,7 @@ fn main() {
 
     println!("Seeding {} fake contacts (seed={})", count, seed);
 
-    let mut vauchi: Vauchi<MockTransport> = Vauchi::in_memory().expect("Failed to create Vauchi");
+    let mut vauchi = Vauchi::in_memory().expect("Failed to create Vauchi");
 
     // Create own identity
     vauchi
