@@ -3722,3 +3722,7 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
+
+[[patch.unused]]
+name = "vauchi-protocol"
+version = "0.3.0"
