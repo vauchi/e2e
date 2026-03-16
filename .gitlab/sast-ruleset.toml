@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Custom Semgrep SAST configuration
+# Adds Rust community rules (GitLab ships no Rust rules by default).
+# See: https://semgrep.dev/p/rust
+
+[semgrep]
+  description = "Semgrep with Rust community rules"
+
+  [[semgrep.passthrough]]
+    type = "url"
+    value = "https://semgrep.dev/c/p/rust"
+    target = "semgrep-rust-community.yml"
+
