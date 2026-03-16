@@ -3,14 +3,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Custom Semgrep SAST configuration
-# Adds Rust community rules (GitLab ships no Rust rules by default).
-# See: https://semgrep.dev/p/rust
+# Security rules only — quality rules (CC-03, CC-06) excluded from dashboard.
+# Quality rules for local use: semgrep --config scripts/semgrep-rules/vauchi-quality.yml .
 
 [semgrep]
-  description = "Semgrep with Rust community rules"
+  description = "Semgrep with Rust community + vauchi security rules"
 
   [[semgrep.passthrough]]
     type = "url"
     value = "https://semgrep.dev/c/p/rust"
     target = "semgrep-rust-community.yml"
+
+  [[semgrep.passthrough]]
+    type = "url"
+    value = "https://gitlab.com/vauchi/scripts/-/raw/main/semgrep-rules/vauchi-security.yml"
+    target = "semgrep-vauchi-security.yml"
 
