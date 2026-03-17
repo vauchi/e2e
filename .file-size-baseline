@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Generated 2026-03-15. Files above error threshold, grandfathered.
-# These files must not grow beyond their baseline. Reduce over time.
+# Generated 2026-03-15. Updated 2026-03-16 with exemptions from PRB-2026-032.
+# Files must not grow beyond baseline. SPLIT per PRB-2026-032 Phase 4.
+
+# SPLIT — Phase 4: per-command-category handlers
 src/yaml/executor.rs 1353
