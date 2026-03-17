@@ -136,10 +136,25 @@ fn e2e_address_field_generates_directions_uri() {
 // ============================================================
 
 /// @scenario: contact_actions:URLs are validated before opening (#45)
+///
+/// Defense-in-depth: javascript: URIs are blocked at two layers:
+/// 1. Input validation: `add_own_field` rejects javascript: for Website fields
+/// 2. Output blocking: `to_uri()` blocks dangerous schemes even for Custom fields
 #[test]
 fn e2e_javascript_uri_blocked_after_exchange() {
+    // Layer 1: Website field type rejects javascript: at input
+    let mut bob = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+    let field = ContactField::new(FieldType::Website, "Malicious", "javascript:alert(1)");
+    let result = bob.add_own_field(field);
+    assert!(
+        result.is_err(),
+        "javascript: URI must be rejected at input for Website fields"
+    );
+
+    // Layer 2: Even if a javascript: URI sneaks in via Custom type, to_uri() blocks it
     let bob_fields = vec![ContactField::new(
-        FieldType::Website,
+        FieldType::Custom,
         "Malicious",
         "javascript:alert(1)",
     )];
@@ -151,7 +166,7 @@ fn e2e_javascript_uri_blocked_after_exchange() {
 
     assert!(
         uri.is_none(),
-        "javascript: scheme must be blocked — got {:?}",
+        "javascript: scheme must be blocked at output — got {:?}",
         uri
     );
 }
