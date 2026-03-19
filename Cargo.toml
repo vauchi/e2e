@@ -26,10 +26,6 @@ async-trait = "0.1"
 # Temp directories for isolated test data
 tempfile = "3"
 
-# CLI subprocess testing
-assert_cmd = "2"
-predicates = "3"
-
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -39,19 +35,12 @@ serde_yaml = "0.9"
 humantime = "2"
 humantime-serde = "1"
 
-# Regex for pattern matching in scenarios
-regex = "1"
-
 # Error handling
 thiserror = "2"
 anyhow = "1"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Async utilities
-futures = "0.3"
 
 # PTY automation for TUI testing
 expectrl = "0.7"
