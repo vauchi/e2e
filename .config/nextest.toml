@@ -3,4 +3,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [profile.ci.junit]
-path = "target/nextest/ci/junit.xml"
+# Path is relative to nextest's output dir (target/nextest/ci/), not project root.
+path = "junit.xml"
