@@ -112,3 +112,13 @@ path = "tests/resistance_features.rs"
 [[test]]
 name = "seeded_contacts"
 path = "tests/seeded_contacts.rs"
+
+# Development profile: fast builds, backtraces work (matches core)
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+# Test profile: skip full debug info, reduce binary size ~60%
+[profile.test]
+debug = "line-tables-only"
+split-debuginfo = "off"
