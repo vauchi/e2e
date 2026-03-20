@@ -3671,7 +3671,3 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
-
-[[patch.unused]]
-name = "vauchi-relay"
-version = "0.3.0"

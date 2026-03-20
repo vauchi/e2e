@@ -102,6 +102,22 @@ path = "tests/resistance_features.rs"
 name = "seeded_contacts"
 path = "tests/seeded_contacts.rs"
 
+[[test]]
+name = "delivery_pipeline"
+path = "tests/delivery_pipeline.rs"
+
+[[test]]
+name = "onboarding_flow"
+path = "tests/onboarding_flow.rs"
+
+[[test]]
+name = "exchange_error_paths"
+path = "tests/exchange_error_paths.rs"
+
+[[test]]
+name = "yaml_scenarios"
+path = "tests/yaml_scenarios.rs"
+
 # Development profile: fast builds, backtraces work (matches core)
 [profile.dev]
 debug = "line-tables-only"
