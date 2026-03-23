@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[advisories]
+ignore = [
+    # aws-lc-sys CVEs — TLS-only usage via rustls, no direct crypto exposure.
+    # Fix: cargo update -p aws-lc-sys when patched version is released.
+    "RUSTSEC-2026-0044",
+    "RUSTSEC-2026-0045",
+    "RUSTSEC-2026-0046",
+    "RUSTSEC-2026-0047",
+    "RUSTSEC-2026-0048",
+]

@@ -2,7 +2,8 @@
 /target/
 
 # Local cargo config (path overrides for local dev, not for CI)
-.cargo/
+.cargo/*
+!.cargo/audit.toml
 
 # IDE
 .idea/
