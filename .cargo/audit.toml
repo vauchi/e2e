@@ -4,11 +4,16 @@
 
 [advisories]
 ignore = [
+    # rustls-pemfile is unmaintained — transitive via tungstenite/rustls-native-certs.
+    "RUSTSEC-2025-0134",
+    # atomic-polyfill is unmaintained — transitive via postcard. Waiting for postcard v2.
+    "RUSTSEC-2023-0089",
     # aws-lc-sys CVEs — TLS-only usage via rustls, no direct crypto exposure.
-    # Fix: cargo update -p aws-lc-sys when patched version is released.
     "RUSTSEC-2026-0044",
     "RUSTSEC-2026-0045",
     "RUSTSEC-2026-0046",
     "RUSTSEC-2026-0047",
     "RUSTSEC-2026-0048",
+    # rustls-webpki CRL matching logic — limited impact (requires compromised CA).
+    "RUSTSEC-2026-0049",
 ]
