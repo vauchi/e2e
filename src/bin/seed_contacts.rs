@@ -11,16 +11,16 @@
 //! phone numbers, emails, and addresses using the fake-rs crate.
 //! Useful for testing backup load, scrolling, search, group filter, etc.
 
+use fake::Fake;
 use fake::faker::address::en::*;
 use fake::faker::internet::en::*;
 use fake::faker::name::en::*;
-use fake::Fake;
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
+use vauchi_core::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::Vauchi;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
