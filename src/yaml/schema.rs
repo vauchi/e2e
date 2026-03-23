@@ -330,10 +330,10 @@ impl ActorRef {
             if device == "primary" {
                 return (user, None);
             }
-            if let Some(idx_str) = device.strip_prefix("device") {
-                if let Ok(idx) = idx_str.parse() {
-                    return (user, Some(idx));
-                }
+            if let Some(idx_str) = device.strip_prefix("device")
+                && let Ok(idx) = idx_str.parse()
+            {
+                return (user, Some(idx));
             }
         }
         (actor, None)
@@ -467,6 +467,7 @@ pub struct StepResult {
     pub output: Option<String>,
 }
 
+// INLINE_TEST_REQUIRED: tests access private YAML schema validation and step deserialization
 #[cfg(test)]
 mod tests {
     use super::*;

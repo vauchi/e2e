@@ -356,11 +356,11 @@ impl RelayManager {
         };
 
         // Stop if running
-        if let Some(relay) = self.relays.get_mut(index) {
-            if let Some(mut process) = relay.process.take() {
-                info!("Stopping relay {} for restart", index);
-                let _ = process.kill().await;
-            }
+        if let Some(relay) = self.relays.get_mut(index)
+            && let Some(mut process) = relay.process.take()
+        {
+            info!("Stopping relay {} for restart", index);
+            let _ = process.kill().await;
         }
 
         // Small delay before restart

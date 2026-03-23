@@ -480,10 +480,10 @@ impl Device for TuiDevice {
         // Look for "Link code:" in status
         if screen.contains("Link code:") {
             for line in screen.lines() {
-                if line.contains("Link code:") {
-                    if let Some(code_start) = line.find(':') {
-                        return Ok(line[code_start + 1..].trim().to_string());
-                    }
+                if line.contains("Link code:")
+                    && let Some(code_start) = line.find(':')
+                {
+                    return Ok(line[code_start + 1..].trim().to_string());
                 }
             }
         }
@@ -601,10 +601,10 @@ impl Device for TuiDevice {
 
         for line in screen.lines() {
             let trimmed = line.trim();
-            if trimmed.contains("📇") || trimmed.contains("Card:") {
-                if let Some(card_name) = trimmed.split(':').nth(1) {
-                    name = card_name.trim().to_string();
-                }
+            if (trimmed.contains("📇") || trimmed.contains("Card:"))
+                && let Some(card_name) = trimmed.split(':').nth(1)
+            {
+                name = card_name.trim().to_string();
             }
             if trimmed.contains(':') && !trimmed.starts_with("Card") {
                 let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
@@ -749,6 +749,7 @@ impl Device for TuiDevice {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private TuiDevice terminal parsing and screen detection
 #[cfg(test)]
 mod tests {
     use super::*;

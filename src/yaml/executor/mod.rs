@@ -101,10 +101,10 @@ impl ScenarioExecutor {
         step_results.extend(steps);
 
         // Cleanup
-        if let Err(e) = self.cleanup().await {
-            if self.verbose {
-                eprintln!("Cleanup error: {}", e);
-            }
+        if let Err(e) = self.cleanup().await
+            && self.verbose
+        {
+            eprintln!("Cleanup error: {}", e);
         }
 
         Ok(ScenarioResult {
@@ -271,10 +271,10 @@ impl ScenarioExecutor {
             match timeout(step_timeout, self.do_action(step)).await {
                 Ok(Ok(output)) => {
                     // Store output if specified
-                    if let Some(output_var) = &step.output {
-                        if let Some(value) = output {
-                            self.outputs.insert(output_var.clone(), value.clone());
-                        }
+                    if let Some(output_var) = &step.output
+                        && let Some(value) = output
+                    {
+                        self.outputs.insert(output_var.clone(), value.clone());
                     }
 
                     return Ok(StepResult {
@@ -290,16 +290,16 @@ impl ScenarioExecutor {
                 }
                 Ok(Err(e)) => {
                     // Check if this error was expected
-                    if let Some(expected) = &step.expect_error {
-                        if e.to_string().contains(expected) {
-                            return Ok(StepResult {
-                                description,
-                                passed: true,
-                                duration: start.elapsed(),
-                                error: None,
-                                output: None,
-                            });
-                        }
+                    if let Some(expected) = &step.expect_error
+                        && e.to_string().contains(expected)
+                    {
+                        return Ok(StepResult {
+                            description,
+                            passed: true,
+                            duration: start.elapsed(),
+                            error: None,
+                            output: None,
+                        });
                     }
                     last_error = Some(e);
                 }

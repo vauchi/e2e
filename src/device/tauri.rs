@@ -189,10 +189,10 @@ impl TauriDevice {
         for _ in 0..30 {
             tokio::time::sleep(Duration::from_millis(200)).await;
 
-            if let Ok(response) = reqwest::get(&url).await {
-                if response.status().is_success() {
-                    return Ok(());
-                }
+            if let Ok(response) = reqwest::get(&url).await
+                && response.status().is_success()
+            {
+                return Ok(());
             }
         }
 
@@ -301,10 +301,10 @@ impl Device for TauriDevice {
     async fn sync(&self) -> E2eResult<()> {
         let response = self.post("/sync", serde_json::json!({})).await?;
 
-        if let Some(error) = response.get("error") {
-            if !error.is_null() {
-                return Err(E2eError::device(format!("Sync failed: {}", error)));
-            }
+        if let Some(error) = response.get("error")
+            && !error.is_null()
+        {
+            return Err(E2eError::device(format!("Sync failed: {}", error)));
         }
 
         Ok(())
@@ -464,14 +464,15 @@ impl Drop for TauriDevice {
     fn drop(&mut self) {
         // Kill the app process if still running
         // We can't use async here, so use blocking approach
-        if let Ok(mut guard) = self.process.try_lock() {
-            if let Some(mut process) = guard.take() {
-                let _ = process.start_kill();
-            }
+        if let Ok(mut guard) = self.process.try_lock()
+            && let Some(mut process) = guard.take()
+        {
+            let _ = process.start_kill();
         }
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private TauriDevice command parsing and state transitions
 #[cfg(test)]
 mod tests {
     use super::*;
