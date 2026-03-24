@@ -12,8 +12,8 @@
 //!
 //! Feature: contacts_management.feature @contacts @search @filter @groups
 
+use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Seed N fake contacts with groups into a Vauchi instance.

@@ -16,6 +16,7 @@ junit = []
 [dependencies]
 # Core library - use path dependency for local dev; CI uses git dependency
 vauchi-core = { path = "../core/vauchi-core" }
+vauchi-app = { path = "../core/vauchi-app", features = ["network-native-tls"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
