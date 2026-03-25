@@ -66,49 +66,35 @@ lint:machete:
 # to pass before starting (PI-13 fail-fast DAG).
 
 lint:format:
-  extends: [.rust-runner-nocache, .validation-rust, .timeout-quick]
-  stage: lint
-  needs: []
-  script:
-    - cargo fmt --all -- --check
+  extends: [.rust-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
 
 lint:clippy:
-  extends: [.rust-runner-readonly, .validation-rust, .timeout-quick]
-  stage: lint
-  needs: []
-  script:
-    - cargo clippy --all-targets -- -D warnings
+  extends: [.rust-runner-readonly, .lint-clippy, .validation-rust, .timeout-quick]
 
 # ============================================================
 # Security Stage (change-based, gated by lint)
 # ============================================================
 
 # Rust security audit (runs on dependency changes)
+# Extends shared template for auto-install of cargo-audit
 security:audit:
-  extends: [.rust-runner-readonly, .validation-deps, .timeout-quick]
-  stage: security
+  extends: [.rust-runner-readonly, .security-audit-job]
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
-  script:
-    - cargo audit
 
 # Full cargo-deny check: advisories, licenses, bans, sources
+# Extends shared template for auto-install of cargo-deny
 security:deny:
-  extends: [.rust-runner-readonly, .timeout-quick]
+  extends: [.rust-runner-readonly, .security-deny-job]
   stage: security
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  script:
-    - cargo deny check
 
 # ============================================================
 # Test Stage — Smoke Suite (PI-05)
