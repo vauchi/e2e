@@ -68,6 +68,14 @@ impl CliDevice {
 
     /// Find the CLI binary in the workspace.
     fn find_cli_binary() -> E2eResult<PathBuf> {
+        // Try E2E_BIN_DIR first (SHA-cached binaries from build-binaries.sh)
+        if let Ok(dir) = std::env::var("E2E_BIN_DIR") {
+            let path = PathBuf::from(&dir).join("vauchi");
+            if path.exists() {
+                return Ok(path);
+            }
+        }
+
         // Try release binary first
         let release_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
@@ -749,6 +757,7 @@ impl Device for CliDevice {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests depend on private find_cli_binary() function
 #[cfg(test)]
 mod tests {
     use super::*;
