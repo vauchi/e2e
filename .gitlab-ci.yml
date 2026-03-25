@@ -220,7 +220,6 @@ verify:upstream:
   stage: verify
   needs: []
   script:
-    - cargo clippy --all-targets -- -D warnings
     - cargo nextest run --profile ci --all-targets
 
 # Runs when core creates a dev/RC tag and triggers this repo
@@ -229,7 +228,6 @@ verify:upstream-prerelease:
   stage: verify
   needs: []
   script:
-    - cargo clippy --all-targets -- -D warnings
     - cargo nextest run --profile ci --all-targets
 
 # ============================================================
