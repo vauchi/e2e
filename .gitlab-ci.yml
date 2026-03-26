@@ -34,6 +34,7 @@ include:
       - '/ci-templates/file-size.yml'
       - '/ci-templates/perf.yml'
       - '/ci-templates/badges.yml'
+      - '/ci-templates/github-mirror.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
@@ -236,3 +237,6 @@ verify:upstream-prerelease:
 
 pages:
   extends: .badges-pages
+
+github-mirror:
+  extends: .github-mirror
