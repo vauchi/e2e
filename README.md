@@ -1,6 +1,8 @@
 <!-- SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
+> **Mirror:** This repo is a read-only mirror of [gitlab.com/vauchi/e2e](https://gitlab.com/vauchi/e2e). Please open issues and merge requests there.
+
 [![Pipeline](https://vauchi.gitlab.io/e2e/badges/pipeline.svg)](https://gitlab.com/vauchi/e2e/-/pipelines)
 [![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/e2e)](https://api.reuse.software/info/gitlab.com/vauchi/e2e)
 
