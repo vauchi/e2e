@@ -216,7 +216,7 @@ secret_detection:
 # ============================================================
 
 # Runs when core merges to main and triggers this repo
-verify:upstream:
+verify:upstream-compat:
   extends: [.rust-runner, .verify-on-upstream, .verify-nextest-artifacts, .timeout-standard]
   stage: verify
   needs: []
