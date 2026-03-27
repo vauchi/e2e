@@ -9,7 +9,7 @@
 //!
 //! Feature: resistance_features.feature @duress @emergency @hidden @panic
 
-use vauchi_core::{AuthMode, Contact, ContactCard, SymmetricKey, Vauchi, api::DuressSettings};
+use vauchi_core::{AuthMode, Contact, ContactCard, DuressSettings, SymmetricKey, Vauchi};
 
 // Helper to create a test contact with a unique PK
 fn make_contact(pk_byte: u8, name: &str) -> Contact {
