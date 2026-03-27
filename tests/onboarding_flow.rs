@@ -249,6 +249,7 @@ async fn test_first_exchange_tutorial_overlay() {
 /// Traces: demo_contact.feature:21-26 "Demo contact appears for users with no contacts"
 /// Traces: demo_contact.feature:34-39 "Demo contact is visually distinct"
 #[tokio::test]
+#[ignore = "demo contact is a UI-layer virtual contact, not in contacts DB — needs Maestro/mobile test"]
 async fn test_demo_contact_visible_on_start() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

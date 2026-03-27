@@ -81,7 +81,7 @@ steps:
 
   # Device 0: Change phone to value A
   - type: action
-    action: update_field
+    action: edit_field
     actor: alice.device0
     params:
       field_type: "phone"
@@ -91,7 +91,7 @@ steps:
 
   # Device 1: Change same phone to value B (later timestamp)
   - type: action
-    action: update_field
+    action: edit_field
     actor: alice.device1
     params:
       field_type: "phone"
@@ -101,7 +101,7 @@ steps:
 
   # Device 2: Change same phone to value C (latest timestamp)
   - type: action
-    action: update_field
+    action: edit_field
     actor: alice.device2
     params:
       field_type: "phone"
@@ -134,7 +134,7 @@ steps:
 
   # Verify all devices converged to latest value (device2's edit)
   - type: assertion
-    assertion: field_value
+    assertion: card_field_equals
     actor: alice
     params:
       field_type: "phone"
@@ -170,7 +170,7 @@ steps:
 
   # Device 2: Update display name
   - type: action
-    action: update_field
+    action: edit_field
     actor: alice.device2
     params:
       field_type: "name"
@@ -199,7 +199,7 @@ steps:
 
   # Verify all fields were merged (non-conflicting edits)
   - type: assertion
-    assertion: has_field
+    assertion: card_has_field
     actor: alice
     params:
       field_type: "email"
@@ -207,7 +207,7 @@ steps:
       all_devices: true
 
   - type: assertion
-    assertion: has_field
+    assertion: card_has_field
     actor: alice
     params:
       field_type: "website"
@@ -215,7 +215,7 @@ steps:
       all_devices: true
 
   - type: assertion
-    assertion: field_value
+    assertion: card_field_equals
     actor: alice
     params:
       field_type: "name"
@@ -232,7 +232,7 @@ steps:
 
   # Device 0: Delete the email field
   - type: action
-    action: delete_field
+    action: remove_field
     actor: alice.device0
     params:
       field_type: "email"
@@ -241,7 +241,7 @@ steps:
 
   # Device 1: Edit the same email field (later timestamp)
   - type: action
-    action: update_field
+    action: edit_field
     actor: alice.device1
     params:
       field_type: "email"
@@ -270,7 +270,7 @@ steps:
 
   # Last-write-wins: edit should win over delete
   - type: assertion
-    assertion: has_field
+    assertion: card_has_field
     actor: alice
     params:
       field_type: "email"
@@ -278,7 +278,7 @@ steps:
       all_devices: true
 
   - type: assertion
-    assertion: field_value
+    assertion: card_field_equals
     actor: alice
     params:
       field_type: "email"
@@ -302,7 +302,7 @@ steps:
 
   # Verify Bob sees Alice's final converged card
   - type: assertion
-    assertion: contact_field_value
+    assertion: card_field_equals
     actor: bob
     params:
       contact_name: "Alice Anderson"
