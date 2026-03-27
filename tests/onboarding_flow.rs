@@ -26,7 +26,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Traces: onboarding.feature:24-31 "Value proposition is clear"
 /// Traces: onboarding.feature:34-39 "Skip to restore for existing users"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn test_welcome_screen_value_proposition() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -89,7 +88,6 @@ async fn test_welcome_screen_value_proposition() {
 /// 3. Email (optional)
 /// 4. Preview and confirm
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn test_card_creation_wizard_steps() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -177,7 +175,6 @@ async fn test_card_creation_wizard_steps() {
 /// Traces: onboarding.feature:135-140 "Prompt for first exchange"
 /// Traces: onboarding.feature:151-155 "Exchange success celebration"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn test_first_exchange_tutorial_overlay() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -252,7 +249,6 @@ async fn test_first_exchange_tutorial_overlay() {
 /// Traces: demo_contact.feature:21-26 "Demo contact appears for users with no contacts"
 /// Traces: demo_contact.feature:34-39 "Demo contact is visually distinct"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn test_demo_contact_visible_on_start() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -322,7 +318,6 @@ async fn test_demo_contact_visible_on_start() {
 /// Time-to-value (TTV) is critical for user retention.
 /// This test ensures the minimal path to a functional card is fast.
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn test_time_to_value_under_2_minutes() {
     let start = Instant::now();
     let two_minutes = Duration::from_secs(120);
@@ -429,7 +424,6 @@ async fn test_time_to_value_under_2_minutes() {
 /// Traces: onboarding.feature:34-39 "Skip to restore for existing users"
 /// Traces: onboarding.feature:42-48 "Link to existing device"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_skip_onboarding_for_restore() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -486,7 +480,6 @@ async fn smoke_skip_onboarding_for_restore() {
 /// Tags: integration, onboarding, device-linking
 /// Traces: onboarding.feature:42-48 "Link to existing device"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_link_to_existing_device() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

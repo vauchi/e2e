@@ -20,7 +20,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: integration, delivery, relay
 /// Feature: message_delivery.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_card_update_delivered_via_relay() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -75,7 +74,6 @@ async fn integration_card_update_delivered_via_relay() {
 /// Tags: integration, delivery, persistence
 /// Feature: message_delivery.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_delivery_survives_relay_restart() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -137,7 +135,6 @@ async fn integration_delivery_survives_relay_restart() {
 /// Tags: integration, delivery, multi-device
 /// Feature: message_delivery.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_multi_device_delivery() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -198,7 +195,6 @@ async fn integration_multi_device_delivery() {
 /// Tags: integration, delivery, multi-device, offline
 /// Feature: message_delivery.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_partial_multi_device_delivery() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

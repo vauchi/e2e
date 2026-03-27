@@ -24,7 +24,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: smoke, exchange
 /// Feature: contact_exchange.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_cli_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -55,7 +54,6 @@ async fn smoke_cli_exchange() {
 /// Tags: integration, device-linking
 /// Feature: device_management.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_device_linking() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -94,7 +92,6 @@ async fn integration_device_linking() {
 /// Tags: integration, exchange, multi-device
 /// Feature: contact_exchange.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_mixed_devices() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

@@ -20,7 +20,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: smoke, visibility, labels
 /// Feature: visibility_labels.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_create_labels_and_assign() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -111,7 +110,6 @@ async fn smoke_create_labels_and_assign() {
 /// Tags: integration, visibility, labels, sync
 /// Feature: visibility_labels.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_label_visibility_sync() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -220,7 +218,6 @@ async fn integration_label_visibility_sync() {
 /// Tags: smoke, visibility, contacts
 /// Feature: visibility_control.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_per_contact_visibility() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

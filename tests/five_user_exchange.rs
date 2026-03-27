@@ -24,7 +24,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: integration, exchange, multi-user
 /// Feature: contact_exchange.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_five_user_exchange() {
     // Setup orchestrator
     let mut orch = Orchestrator::new();
@@ -75,7 +74,6 @@ async fn integration_five_user_exchange() {
 /// Tags: integration, exchange, sequential
 /// Feature: contact_exchange.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_sequential_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -140,7 +138,6 @@ async fn integration_sequential_exchange() {
 /// Tags: integration, sync, multi-device
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_contact_sync() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

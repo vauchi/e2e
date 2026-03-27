@@ -23,7 +23,6 @@ use vauchi_e2e_tests::prelude::*;
 
 /// Run all smoke-tier YAML scenarios.
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn yaml_smoke_scenarios() {
     let mut loader = ScenarioLoader::new_default();
     let scenarios = loader
@@ -50,7 +49,6 @@ async fn yaml_smoke_scenarios() {
 
 /// Run all integration-tier YAML scenarios.
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn yaml_integration_scenarios() {
     let mut loader = ScenarioLoader::new_default();
     let scenarios = loader
@@ -77,7 +75,6 @@ async fn yaml_integration_scenarios() {
 
 /// Run all edge-case YAML scenarios.
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn yaml_edge_scenarios() {
     let mut loader = ScenarioLoader::new_default();
     let scenarios = loader

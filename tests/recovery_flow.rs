@@ -17,7 +17,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: smoke, recovery
 /// Feature: contact_recovery.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_recovery_setup() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -75,7 +74,6 @@ async fn smoke_recovery_setup() {
 /// Tags: integration, verification
 /// Feature: contact_exchange.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_contact_verification() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -146,7 +144,6 @@ async fn integration_contact_verification() {
 /// 5. Alice collects vouchers and creates proof
 /// 6. Bob verifies the proof
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_recovery_happy_path() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -321,7 +318,6 @@ async fn integration_recovery_happy_path() {
 /// Tags: integration, recovery
 /// Traces: contact_recovery.feature:109-117 "Insufficient trusted vouchers"
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_recovery_insufficient_vouchers() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

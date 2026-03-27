@@ -26,7 +26,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: integration, relay, failover
 /// Feature: relay_network.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_relay_failover() {
     let config = OrchestratorConfig {
         relay_count: 2,
@@ -89,7 +88,6 @@ async fn integration_relay_failover() {
 /// Tags: integration, relay, offline
 /// Feature: relay_network.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_updates_during_outage() {
     let config = OrchestratorConfig {
         relay_count: 2,
@@ -181,7 +179,6 @@ async fn integration_updates_during_outage() {
 /// Tags: integration, relay, edge-case
 /// Feature: relay_network.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_no_relays() {
     let config = OrchestratorConfig {
         relay_count: 2,

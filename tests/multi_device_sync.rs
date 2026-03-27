@@ -25,7 +25,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: smoke, sync
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn smoke_card_update() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -143,7 +142,6 @@ async fn smoke_card_update() {
 /// Tags: integration, device-linking, sync
 /// Feature: device_management.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_device_receives_contacts() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -194,7 +192,6 @@ async fn integration_device_receives_contacts() {
 /// Tags: integration, sync, concurrent
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_concurrent_updates() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");

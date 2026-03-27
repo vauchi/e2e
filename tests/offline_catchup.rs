@@ -25,7 +25,6 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: integration, offline, sync
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_offline_catchup() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -174,7 +173,6 @@ async fn integration_offline_catchup() {
 /// Tags: integration, offline, card
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_card_catchup() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
@@ -255,7 +253,6 @@ async fn integration_card_catchup() {
 /// Tags: integration, offline, edge-case
 /// Feature: sync_updates.feature
 #[tokio::test]
-#[ignore = "requires relay and CLI binaries to be built"]
 async fn integration_extended_offline() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
