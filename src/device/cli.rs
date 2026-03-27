@@ -498,7 +498,7 @@ impl Device for CliDevice {
 
     async fn complete_device_link(&self, request_data: &str) -> E2eResult<String> {
         let output = self
-            .run_command_success(&["device", "complete", request_data])
+            .run_command_success(&["device", "complete", "--yes", request_data])
             .await?;
         Self::extract_qr_data(&output)
     }
