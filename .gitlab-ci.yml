@@ -12,9 +12,9 @@
 #   - Timeouts: Prevent runaway jobs from blocking runners
 #   - Read-only cache for lint jobs
 #
-# Note: E2E tests require relay and CLI binaries, so actual test execution
-# runs from the meta-repo (vauchi/vauchi). This pipeline only validates
-# the test code itself (lint, security).
+# Note: Integration tests require relay and CLI binaries. The verify stage
+# (triggered by core) compiles all targets but only executes unit tests.
+# Full integration tests run via the manual test:smoke job.
 #
 # GitLab Ultimate Features:
 #   - SAST: Static application security testing
@@ -215,13 +215,16 @@ secret_detection:
 # Verify Stage — Upstream Compatibility
 # ============================================================
 
-# Runs when core merges to main and triggers this repo
+# Runs when core merges to main and triggers this repo.
+# Integration tests (tests/) need relay/CLI binaries that aren't available
+# in downstream pipelines — build all targets to catch API breakage, but
+# only execute unit tests from lib/bin targets.
 verify:upstream-compat:
   extends: [.rust-runner, .verify-on-upstream, .verify-nextest-artifacts, .timeout-standard]
   stage: verify
   needs: []
   script:
-    - cargo nextest run --profile ci --all-targets
+    - cargo nextest run --profile ci --all-targets -E 'kind(lib) | kind(bin)'
 
 # Runs when core creates a dev/RC tag and triggers this repo
 verify:upstream-prerelease:
@@ -229,7 +232,7 @@ verify:upstream-prerelease:
   stage: verify
   needs: []
   script:
-    - cargo nextest run --profile ci --all-targets
+    - cargo nextest run --profile ci --all-targets -E 'kind(lib) | kind(bin)'
 
 # ============================================================
 # Deploy Stage — Badge Pages
