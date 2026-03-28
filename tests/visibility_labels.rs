@@ -252,13 +252,13 @@ async fn smoke_per_contact_visibility() {
         alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
-    // Hide private phone from contact (use "New Contact" — only one contact)
+    // Hide private phone from Bob (contact name matches Bob's identity)
     {
         let alice = alice.read().await;
         let device = alice.device(0).expect("No device");
         let device = device.read().await;
         device
-            .hide_field_from_contact("New Contact", "Private Phone")
+            .hide_field_from_contact("Bob", "Private Phone")
             .await
             .expect("Failed to hide field");
     }
