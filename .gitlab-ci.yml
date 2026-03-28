@@ -107,11 +107,11 @@ security:deny:
 #   4. Backup + restore
 #   5. Device linking
 #
-# Requires relay and CLI binaries. Currently manual-only; will become
-# automatic on merge to main once multi-project artifact pipeline
-# is set up (needs relay:build and cli:build job artifacts).
+# Requires relay and CLI binaries (built on-demand with SHA cache).
+# Runs automatically on MRs and main. Binary cache avoids rebuilds
+# when relay/CLI haven't changed.
 #
-# Target: < 5 minutes total.
+# Target: < 5 minutes total (< 1 min if binaries cached).
 
 test:smoke:
   extends: [.rust-runner, .timeout-standard]
@@ -123,10 +123,7 @@ test:smoke:
       optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-  allow_failure: true
   cache:
     key: smoke-binaries-${CI_DEFAULT_BRANCH}
     paths:
