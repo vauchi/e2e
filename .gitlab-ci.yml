@@ -166,8 +166,7 @@ test:smoke:
         echo "CLI binary cached (${CLI_HEAD:0:8})"
       fi
 
-      export RELAY_BIN="$(pwd)/.smoke-bin/vauchi-relay"
-      export CLI_BIN="$(pwd)/.smoke-bin/vauchi"
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
       rm -rf "$TMPDIR"
 
       echo "Running smoke tests..."
