@@ -3063,7 +3063,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "hex",
  "reqwest",
@@ -3079,7 +3079,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -3110,7 +3110,7 @@ dependencies = [
  "unicode-normalization",
  "url",
  "uuid",
- "vauchi-protocol 0.10.6",
+ "vauchi-protocol 0.11.0",
  "webpki-roots 0.26.11",
  "x25519-dalek",
  "zeroize",
@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
