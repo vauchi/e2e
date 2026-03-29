@@ -265,13 +265,13 @@ impl RelayManager {
             .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let child = cmd
+        let mut child = cmd
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
 
-        // Verify the relay is actually listening by doing a health check
+        // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
-        self.wait_for_health(port, index).await?;
+        self.wait_for_health(port, index, &mut child).await?;
 
         let instance = RelayInstance {
             url,
@@ -288,25 +288,48 @@ impl RelayManager {
     }
 
     /// Wait for a relay to become healthy.
-    async fn wait_for_health(&self, port: u16, index: usize) -> E2eResult<()> {
+    ///
+    /// Polls the relay's HTTP `/health` endpoint (on the main port) and checks
+    /// that the process hasn't exited. A raw TCP connect is insufficient — it
+    /// succeeds as soon as the kernel binds the listener, before the relay is
+    /// ready to serve requests.
+    async fn wait_for_health(&self, port: u16, index: usize, child: &mut Child) -> E2eResult<()> {
         let health_url = format!("http://127.0.0.1:{}/health", port);
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .map_err(|e| E2eError::relay(format!("Failed to create HTTP client: {}", e)))?;
 
         let check_health = async {
             for attempt in 0..60 {
-                // Try TCP connection first
-                match tokio::net::TcpStream::connect(format!("127.0.0.1:{}", port)).await {
-                    Ok(_) => {
-                        debug!(
-                            "Relay {} accepting connections (attempt {})",
-                            index,
-                            attempt + 1
-                        );
+                // Check process liveness first — fail fast if relay crashed
+                if let Some(exit_status) = child.try_wait().map_err(|e| {
+                    E2eError::relay(format!("Failed to check relay {} status: {}", index, e))
+                })? {
+                    return Err(E2eError::relay(format!(
+                        "Relay {} exited during startup with status: {}",
+                        index, exit_status
+                    )));
+                }
+
+                // Try actual HTTP health check (not just TCP connect)
+                match client.get(&health_url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        debug!("Relay {} healthy (attempt {})", index, attempt + 1);
                         return Ok(());
                     }
-                    Err(_) => {
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    Ok(resp) => {
+                        debug!(
+                            "Relay {} returned {} (attempt {})",
+                            index,
+                            resp.status(),
+                            attempt + 1
+                        );
                     }
+                    Err(_) => {}
                 }
+
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
             Err(E2eError::timeout(format!(
                 "Relay {} failed to start within timeout (health check at {})",
@@ -412,12 +435,12 @@ impl RelayManager {
             .stderr(Stdio::null())
             .kill_on_drop(true);
 
-        let child = cmd
+        let mut child = cmd
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
 
         // Wait for health
-        self.wait_for_health(port, index).await?;
+        self.wait_for_health(port, index, &mut child).await?;
 
         // Update the instance
         if let Some(relay) = self.relays.get_mut(index) {
