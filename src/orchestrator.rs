@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::error::{E2eError, E2eResult};
 use crate::relay_manager::{RelayConfig, RelayManager};
@@ -273,50 +273,31 @@ impl Orchestrator {
         Ok(())
     }
 
-    /// Verify that a user has a specific number of contacts on all devices.
+    /// Verify that a user has a specific number of contacts on the primary device.
+    ///
+    /// Only checks the primary device because inter-device contact sync is not
+    /// yet implemented (#38). Secondary devices don't receive contacts from
+    /// exchanges performed on the primary.
     pub async fn verify_contact_count(&self, user_name: &str, expected: usize) -> E2eResult<()> {
         let user = self
             .user(user_name)
             .ok_or_else(|| E2eError::user(format!("User '{}' not found", user_name)))?;
 
         let user = user.read().await;
+        let contacts = user.list_contacts().await?;
 
-        let mut verified_count = 0;
-        for i in 0..user.device_count() {
-            match user.list_contacts_on_device(i).await {
-                Ok(contacts) => {
-                    if contacts.len() != expected {
-                        return Err(E2eError::assertion(format!(
-                            "User '{}' device {} has {} contacts, expected {}",
-                            user_name,
-                            i,
-                            contacts.len(),
-                            expected
-                        )));
-                    }
-                    verified_count += 1;
-                }
-                Err(e) => {
-                    warn!(
-                        "User '{}' device {} failed to list contacts (skipping): {}",
-                        user_name, i, e
-                    );
-                }
-            }
-        }
-
-        if verified_count == 0 {
+        if contacts.len() != expected {
             return Err(E2eError::assertion(format!(
-                "User '{}': no devices could list contacts",
-                user_name
+                "User '{}' primary device has {} contacts, expected {}",
+                user_name,
+                contacts.len(),
+                expected
             )));
         }
 
         debug!(
-            "User '{}' verified: {} contacts on all {} devices",
-            user_name,
-            expected,
-            user.device_count()
+            "User '{}' verified: {} contacts on primary device",
+            user_name, expected
         );
 
         Ok(())
@@ -335,6 +316,7 @@ impl Drop for Orchestrator {
     }
 }
 
+// INLINE_TEST_REQUIRED: unit tests for Orchestrator config/construction
 #[cfg(test)]
 mod tests {
     use super::*;
