@@ -210,7 +210,30 @@ impl RelayManager {
     }
 
     /// Spawn a single relay instance at the given index.
+    ///
+    /// Retries with a new port if the relay crashes on startup (SIGABRT from
+    /// port TOCTOU races when nextest runs parallel test binaries).
     async fn spawn_one(&mut self, index: usize) -> E2eResult<()> {
+        let max_retries = 3;
+        for attempt in 0..max_retries {
+            match self.try_spawn_one(index).await {
+                Ok(()) => return Ok(()),
+                Err(e) if attempt + 1 < max_retries => {
+                    info!(
+                        "Relay {} spawn failed (attempt {}), retrying: {}",
+                        index,
+                        attempt + 1,
+                        e
+                    );
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        unreachable!()
+    }
+
+    /// Attempt to spawn a single relay instance.
+    async fn try_spawn_one(&mut self, index: usize) -> E2eResult<()> {
         // Allocate port dynamically if base_port is 0
         let port = if self.config.base_port == 0 {
             find_available_port()?
