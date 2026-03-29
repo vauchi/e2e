@@ -301,6 +301,10 @@ impl CliDevice {
                             | "🏠"
                             | "social"
                             | "👤"
+                            | "note"
+                            | "📝"
+                            | "cake"
+                            | "🎂"
                     );
 
                 if is_icon_format {
@@ -311,6 +315,8 @@ impl CliDevice {
                         "web" | "🌐" => "website",
                         "home" | "🏠" => "address",
                         "social" | "👤" => "social",
+                        "note" | "📝" => "custom",
+                        "cake" | "🎂" => "birthday",
                         _ => "custom",
                     };
 
