@@ -144,7 +144,7 @@ async fn integration_label_visibility_sync() {
         alice.exchange_with(&bob).await.expect("Exchange failed");
     }
 
-    // Create label and assign contact (use "New Contact" — only one contact)
+    // Create label and assign contact
     {
         let alice = alice.read().await;
         let device = alice.device(0).expect("No device");
@@ -155,7 +155,7 @@ async fn integration_label_visibility_sync() {
             .await
             .expect("Failed to create label");
         device
-            .add_contact_to_label("Colleagues", "New Contact")
+            .add_contact_to_label("Colleagues", "Bob")
             .await
             .expect("Failed to add contact to label");
 
