@@ -180,7 +180,43 @@ test:smoke:
     paths:
       - smoke-results.txt
     expire_in: 1 week
-  timeout: 10 minutes
+  timeout: 20 minutes
+
+# Integration tests — full E2E suite on main and schedule.
+# Pulls cached relay+CLI binaries from test:smoke.
+# Advisory (allow_failure) until tests stabilize.
+test:integration:
+  extends: [.rust-runner, .timeout-long]
+  stage: test
+  needs:
+    - job: test:smoke
+      optional: true
+  cache:
+    key: smoke-binaries-${CI_DEFAULT_BRANCH}
+    paths:
+      - .smoke-bin/
+    policy: pull
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
+        echo "ERROR: Cached binaries not found. test:smoke must run first."
+        exit 1
+      fi
+      echo "Running integration tests..."
+      cargo nextest run --profile ci --run-ignored all -- integration_ 2>&1 | tee integration-results.txt
+      echo "Integration suite complete"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - integration-results.txt
+    expire_in: 1 week
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules
