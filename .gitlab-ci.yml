@@ -267,6 +267,57 @@ verify:upstream-prerelease:
     - cargo nextest run --profile ci --all-targets -E 'kind(lib) | kind(bin)'
 
 # ============================================================
+# Test Stage — Maestro Device Tests (manual, requires simulator)
+# ============================================================
+# Runs Maestro flows on iOS simulator. Manual trigger only.
+# Requires: macOS runner with Maestro CLI + booted simulator.
+# Gate: VAUCHI_DEVICE_TESTS=1 CI variable (set on runner or manually).
+
+test:maestro-ios:
+  stage: test
+  tags: [macos, self-hosted]
+  resource_group: ios-simulator
+  rules:
+    - if: $VAUCHI_DEVICE_TESTS == "1"
+      when: manual
+      allow_failure: true
+  needs: []
+  before_script:
+    - |
+      if ! command -v maestro &>/dev/null; then
+        echo "Error: Maestro CLI not found on this runner."
+        echo "Install: curl -Ls 'https://get.maestro.mobile.dev' | bash"
+        exit 1
+      fi
+      echo "Maestro version: $(maestro --version 2>&1 | head -1)"
+      BOOTED=$(xcrun simctl list devices booted 2>/dev/null | grep -c "Booted" || echo 0)
+      echo "Booted simulators: $BOOTED"
+      if [ "$BOOTED" -eq 0 ]; then
+        echo "Error: No booted iOS simulator. Boot one before running."
+        exit 1
+      fi
+  script:
+    - |
+      FAILED=0
+      for flow in maestro/ios/*.yaml; do
+        name=$(basename "$flow" .yaml)
+        echo "→ $name"
+        if maestro test "$flow" --platform ios; then
+          echo "  ✓ $name"
+        else
+          echo "  ✗ FAILED: $name"
+          FAILED=$((FAILED + 1))
+        fi
+      done
+      echo ""
+      if [ "$FAILED" -gt 0 ]; then
+        echo "$FAILED flow(s) failed."
+        exit 1
+      fi
+      echo "All iOS Maestro flows passed."
+  timeout: 15 minutes
+
+# ============================================================
 # Deploy Stage — Badge Pages
 # ============================================================
 
