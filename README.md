@@ -3,16 +3,18 @@
 
 > **Mirror:** This repo is a read-only mirror of [gitlab.com/vauchi/e2e](https://gitlab.com/vauchi/e2e). Please open issues and merge requests there.
 
-[![Pipeline](https://vauchi.gitlab.io/e2e/badges/pipeline.svg)](https://gitlab.com/vauchi/e2e/-/pipelines)
+[![Pipeline](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/e2e/badges/pipeline.json&label=pipeline)](https://gitlab.com/vauchi/e2e/-/pipelines)
 [![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/e2e)](https://api.reuse.software/info/gitlab.com/vauchi/e2e)
 
 > [!WARNING]
-> **Pre-Alpha Software** - This project is under heavy development and not ready for production use.
+> **Pre-Alpha Software** - This project is under heavy
+> development and not ready for production use.
 > APIs may change without notice. Use at your own risk.
 
 # Vauchi E2E Testing Infrastructure
 
-End-to-end testing framework for multi-user, multi-device, cross-platform scenarios.
+End-to-end testing framework for multi-user,
+multi-device, cross-platform scenarios.
 
 ## Prerequisites
 
@@ -48,6 +50,7 @@ just e2e-run test_cli_to_cli_exchange
 > and available flow files.
 
 **Android Setup:**
+
 ```bash
 # Verify environment
 export ANDROID_HOME=/path/to/Android/Sdk
@@ -65,6 +68,7 @@ maestro test --platform android e2e/maestro/android/create_identity.yaml
 ```
 
 **iOS Setup (local macOS):**
+
 ```bash
 # Boot a simulator
 xcrun simctl boot "iPhone 15 Pro"
@@ -79,6 +83,7 @@ maestro test --platform ios e2e/maestro/ios/create_identity.yaml
 ```
 
 **iOS Setup (via macOS remote):**
+
 ```bash
 # Check macOS connectivity
 dev-tools/scripts/macos-remote.sh status
@@ -102,7 +107,8 @@ dev-tools/scripts/macos-remote.sh sync
 | WebdriverIO | `npx wdio --version` | `npm install @wdio/cli` |
 | Desktop build | `cargo tauri build` | Built from source |
 
-**Note:** Tauri WebDriver testing is only supported on Linux/Windows (not macOS).
+**Note:** Tauri WebDriver testing is only supported on
+Linux/Windows (not macOS).
 
 ### Phase 4: TUI Testing (expectrl)
 
@@ -199,7 +205,7 @@ just e2e-all
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     E2E Test Orchestrator (Rust)                    │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -356,6 +362,7 @@ just maestro-setup
 4. Add to test list in this README
 
 Example:
+
 ```rust
 #[tokio::test]
 #[ignore = "requires Maestro and Android emulator"]
@@ -369,6 +376,8 @@ async fn test_android_exchange() {
 
 ## See Also
 
-- [Planning doc](../_private/docs/problems/2026-02-17-maestro-e2e-environment-blockers/README.md)
+- [Planning doc][planning]
 - [Maestro docs](https://maestro.mobile.dev)
 - [Tauri testing](https://v2.tauri.app/develop/tests/webdriver/)
+
+[planning]: ../_private/docs/problems/2026-02-17-maestro-e2e-environment-blockers/README.md
