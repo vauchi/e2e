@@ -134,7 +134,9 @@ pub struct RelayConfig {
     pub blob_ttl_secs: u64,
     /// Idle timeout in seconds (default: 60).
     pub idle_timeout: u64,
-    /// Rate limit per minute (default: 1000 for testing).
+    /// Rate limit per minute.  Set high for e2e tests (5000) because
+    /// multi-device sync tests compress many user-operations into seconds.
+    /// Production relay uses a lower value.
     pub rate_limit: u32,
     /// Enable the HTTP API v2 (required for OHTTP).
     pub http_api_enabled: bool,
@@ -153,7 +155,7 @@ impl Default for RelayConfig {
             storage_backend: "memory".to_string(),
             blob_ttl_secs: 3600,
             idle_timeout: 60,
-            rate_limit: 1000,
+            rate_limit: 5000,
             http_api_enabled: true,
             ohttp_enabled: true,
             ohttp_key_rotation_hours: 24,
