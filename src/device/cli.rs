@@ -106,7 +106,8 @@ impl CliDevice {
             .arg(self.data_dir.path())
             .arg("--relay")
             .arg(&self.relay_url)
-            .args(args);
+            .args(args)
+            .stdin(std::process::Stdio::null());
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",
@@ -116,9 +117,10 @@ impl CliDevice {
             args.join(" ")
         );
 
-        let output = cmd
-            .output()
+        let cmd_desc = format!("vauchi {}", args.join(" "));
+        let output = tokio::time::timeout(std::time::Duration::from_secs(60), cmd.output())
             .await
+            .map_err(|_| E2eError::timeout(format!("CLI command timed out after 60s: {cmd_desc}")))?
             .map_err(|e| E2eError::cli_execution(format!("Failed to run CLI command: {}", e)))?;
 
         trace!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
