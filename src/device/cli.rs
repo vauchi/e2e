@@ -555,7 +555,15 @@ impl Device for CliDevice {
             }
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("Rate limited") && attempt < MAX_RETRIES {
-                let wait_secs = 2u64.pow(attempt + 1);
+                // Parse "retry after Ns" from stderr, fall back to 10s.
+                let retry_after = stderr
+                    .find("retry after ")
+                    .and_then(|pos| {
+                        let rest = &stderr[pos + 12..];
+                        rest.split('s').next()?.trim().parse::<u64>().ok()
+                    })
+                    .unwrap_or(10);
+                let wait_secs = retry_after + (attempt as u64 * 2);
                 debug!(
                     "Sync rate-limited, retrying in {wait_secs}s (attempt {}/{})",
                     attempt + 1,
