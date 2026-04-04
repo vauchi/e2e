@@ -34,6 +34,7 @@ include:
       - '/ci-templates/file-size.yml'
       - '/ci-templates/perf.yml'
       - '/ci-templates/badges.yml'
+      - '/ci-templates/freshness.yml'
       - '/ci-templates/github-mirror.yml'
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
@@ -54,6 +55,10 @@ variables:
 # ============================================================
 # Lint Stage — Preflight Gate (runs on Rust code changes)
 # ============================================================
+
+# Blocks MRs with non-main branch refs in Cargo.toml git dependencies.
+check:branch-refs:
+  extends: .check-git-branch-refs
 
 # Duplicate dependency check (advisory)
 lint:duplicates:
