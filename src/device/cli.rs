@@ -542,8 +542,34 @@ impl Device for CliDevice {
     // === Sync ===
 
     async fn sync(&self) -> E2eResult<()> {
-        self.run_command_success(&["sync"]).await?;
-        Ok(())
+        // Retry on relay rate-limit (429) with exponential backoff.
+        // The test relay enforces per-client token-bucket rate limiting;
+        // multi-device sync tests can exhaust the bucket with rapid sequential
+        // requests.  Retrying here keeps the test resilient without masking
+        // real failures (only "Rate limited" errors are retried).
+        const MAX_RETRIES: u32 = 3;
+        for attempt in 0..=MAX_RETRIES {
+            let output = self.run_command(&["sync"]).await?;
+            if output.status.success() {
+                return Ok(());
+            }
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("Rate limited") && attempt < MAX_RETRIES {
+                let wait_secs = 2u64.pow(attempt + 1);
+                debug!(
+                    "Sync rate-limited, retrying in {wait_secs}s (attempt {}/{})",
+                    attempt + 1,
+                    MAX_RETRIES
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
+                continue;
+            }
+            return Err(E2eError::CliCommand {
+                command: "vauchi sync".to_string(),
+                stderr: stderr.to_string(),
+            });
+        }
+        unreachable!("loop runs MAX_RETRIES+1 times and always returns")
     }
 
     // === Contacts ===
