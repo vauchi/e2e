@@ -102,13 +102,25 @@ impl Orchestrator {
         self.started
     }
 
-    /// Get the primary relay URL.
+    /// Get the primary relay URL (WebSocket).
     pub fn primary_relay_url(&self) -> E2eResult<String> {
         self.relay_manager
             .as_ref()
             .and_then(|rm| rm.relay_url(0))
             .map(|s| s.to_string())
             .ok_or_else(|| E2eError::scenario("No relay available"))
+    }
+
+    /// Get the primary relay HTTP API URL.
+    ///
+    /// The v2 endpoints (OHTTP, exchange, sync) are served on the
+    /// HTTP/metrics port, not the WebSocket port.
+    pub fn primary_relay_http_url(&self) -> E2eResult<String> {
+        self.relay_manager
+            .as_ref()
+            .and_then(|rm| rm.relay_http_url(0))
+            .map(|s| s.to_string())
+            .ok_or_else(|| E2eError::scenario("No relay HTTP API available"))
     }
 
     /// Get all relay URLs.
@@ -135,7 +147,8 @@ impl Orchestrator {
         device_count: usize,
     ) -> E2eResult<Arc<RwLock<User>>> {
         let name = name.into();
-        let relay_url = self.primary_relay_url()?;
+        // CLI uses HTTP transport — pass the HTTP API URL (v2 endpoints, OHTTP)
+        let relay_url = self.primary_relay_http_url()?;
 
         info!("Adding user '{}' with {} device(s)", name, device_count);
 

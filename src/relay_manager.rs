@@ -67,6 +67,8 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 pub struct RelayInstance {
     /// The relay's WebSocket URL.
     pub url: String,
+    /// The relay's HTTP API URL (v2 endpoints, OHTTP, health).
+    pub http_url: String,
     /// The relay's port.
     pub port: u16,
     /// The metrics endpoint port.
@@ -276,6 +278,15 @@ impl RelayManager {
             "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
             "false".to_string(),
         );
+        // Enable HTTP API v2 so /v2/* routes are mounted (required for CLI sync).
+        // Without this the relay only serves WebSocket; the OHTTP key endpoint
+        // returns the WebSocket error page, which OhttpClient::new() then
+        // rejects as "invalid OHTTP key config: the configuration was not
+        // supported".
+        env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        // Enable the OHTTP gateway so GET /v2/ohttp-key returns a valid key config
+        // and POST /v2/ohttp accepts encrypted requests.
+        env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
@@ -294,10 +305,12 @@ impl RelayManager {
 
         // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
+        let http_url = format!("http://127.0.0.1:{}", metrics_port);
         self.wait_for_health(port, index, &mut child).await?;
 
         let instance = RelayInstance {
             url,
+            http_url,
             port,
             metrics_port,
             process: Some(child),
@@ -365,9 +378,17 @@ impl RelayManager {
             .map_err(|_| E2eError::timeout(format!("Relay {} startup timed out", index)))?
     }
 
-    /// Get the URL for a relay by index.
+    /// Get the WebSocket URL for a relay by index.
     pub fn relay_url(&self, index: usize) -> Option<&str> {
         self.relays.get(index).map(|r| r.url.as_str())
+    }
+
+    /// Get the HTTP API URL for a relay by index.
+    ///
+    /// The v2 endpoints (OHTTP, exchange, sync) are served on the
+    /// HTTP/metrics port, not the WebSocket port.
+    pub fn relay_http_url(&self, index: usize) -> Option<&str> {
+        self.relays.get(index).map(|r| r.http_url.as_str())
     }
 
     /// Get a relay instance by index.
@@ -449,6 +470,8 @@ impl RelayManager {
             "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
             "false".to_string(),
         );
+        env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
