@@ -29,8 +29,10 @@ async fn smoke_card_update() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
-    orch.add_user("Alice", 3).expect("Failed to add Alice");
-    orch.add_user("Bob", 2).expect("Failed to add Bob");
+    // Smoke test: 2+1 devices tests multi-device sync without exhausting
+    // relay rate limits. Full 3+2 coverage is in integration tests.
+    orch.add_user("Alice", 2).expect("Failed to add Alice");
+    orch.add_user("Bob", 1).expect("Failed to add Bob");
 
     orch.create_all_identities()
         .await
