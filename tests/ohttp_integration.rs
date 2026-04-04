@@ -133,7 +133,7 @@ async fn test_send_and_fetch_via_ohttp() {
     let blob_id = result.unwrap();
     assert!(!blob_id.is_empty(), "blob_id must not be empty");
 
-    // 5. Fetch via OHTTP — need a fresh transport (OHTTP encapsulation is one-shot)
+    // 5. Fetch via OHTTP (same transport could be reused — OhttpClient is stateless)
     let transport2 = create_ohttp_transport(&ohttp_url, &key_bytes);
     let fetched = transport2.fetch(std::slice::from_ref(&recipient_id));
 
