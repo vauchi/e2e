@@ -138,14 +138,20 @@ test:smoke:
     - |
       mkdir -p .smoke-bin
 
-      # Reuse cached binaries if relay/cli haven't changed on main
+      # Reuse cached binaries if relay/cli/core haven't changed on main.
+      # Core is a shared dependency — both relay (vauchi-protocol) and CLI
+      # (vauchi-core) pull it via git dep, so core changes must invalidate both.
       RELAY_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" main | cut -f1)
       CLI_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" main | cut -f1)
+      CORE_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" main | cut -f1)
+
+      CACHED_CORE=""
+      [ -f .smoke-bin/core.sha ] && CACHED_CORE=$(cat .smoke-bin/core.sha)
 
       REBUILD_RELAY=1
       REBUILD_CLI=1
-      [ -f .smoke-bin/relay.sha ] && [ "$(cat .smoke-bin/relay.sha)" = "$RELAY_HEAD" ] && [ -x .smoke-bin/vauchi-relay ] && REBUILD_RELAY=0
-      [ -f .smoke-bin/cli.sha ] && [ "$(cat .smoke-bin/cli.sha)" = "$CLI_HEAD" ] && [ -x .smoke-bin/vauchi ] && REBUILD_CLI=0
+      [ -f .smoke-bin/relay.sha ] && [ "$(cat .smoke-bin/relay.sha)" = "$RELAY_HEAD" ] && [ "$CACHED_CORE" = "$CORE_HEAD" ] && [ -x .smoke-bin/vauchi-relay ] && REBUILD_RELAY=0
+      [ -f .smoke-bin/cli.sha ] && [ "$(cat .smoke-bin/cli.sha)" = "$CLI_HEAD" ] && [ "$CACHED_CORE" = "$CORE_HEAD" ] && [ -x .smoke-bin/vauchi ] && REBUILD_CLI=0
 
       BUILD_TMPDIR=$(mktemp -d)
 
@@ -170,6 +176,9 @@ test:smoke:
       else
         echo "CLI binary cached (${CLI_HEAD:0:8})"
       fi
+
+      # Record core HEAD so future runs detect core-only changes
+      echo "$CORE_HEAD" > .smoke-bin/core.sha
 
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
       rm -rf "$BUILD_TMPDIR"
