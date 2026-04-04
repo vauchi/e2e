@@ -155,7 +155,7 @@ impl Default for RelayConfig {
             storage_backend: "memory".to_string(),
             blob_ttl_secs: 3600,
             idle_timeout: 60,
-            rate_limit: 5000,
+            rate_limit: 100_000,
             http_api_enabled: true,
             ohttp_enabled: true,
             ohttp_key_rotation_hours: 24,
