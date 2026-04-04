@@ -135,7 +135,7 @@ async fn test_send_and_fetch_via_ohttp() {
 
     // 5. Fetch via OHTTP — need a fresh transport (OHTTP encapsulation is one-shot)
     let transport2 = create_ohttp_transport(&ohttp_url, &key_bytes);
-    let fetched = transport2.fetch(&[recipient_id.clone()]);
+    let fetched = transport2.fetch(std::slice::from_ref(&recipient_id));
 
     assert!(
         fetched.is_ok(),
