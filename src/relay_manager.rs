@@ -291,6 +291,11 @@ impl RelayManager {
             "RELAY_RATE_LIMIT".to_string(),
             self.config.rate_limit.to_string(),
         );
+        // Use the same rate limit for the OHTTP exchange path.
+        env_vars.insert(
+            "RELAY_OHTTP_EXCHANGE_RATE_LIMIT".to_string(),
+            self.config.rate_limit.to_string(),
+        );
         // Disable Noise encryption requirement for E2E tests.
         // The CLI doesn't support Noise NK — it uses plaintext v1 connections.
         env_vars.insert(
@@ -485,6 +490,10 @@ impl RelayManager {
         );
         env_vars.insert(
             "RELAY_RATE_LIMIT".to_string(),
+            self.config.rate_limit.to_string(),
+        );
+        env_vars.insert(
+            "RELAY_OHTTP_EXCHANGE_RATE_LIMIT".to_string(),
             self.config.rate_limit.to_string(),
         );
         env_vars.insert(
