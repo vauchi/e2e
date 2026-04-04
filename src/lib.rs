@@ -60,6 +60,7 @@
 
 pub mod device;
 pub mod error;
+pub mod ohttp_relay_manager;
 pub mod orchestrator;
 pub mod relay_manager;
 pub mod report;
@@ -71,6 +72,7 @@ pub mod prelude {
     //! Re-exports commonly used types for convenience.
     pub use crate::device::{CliDevice, Contact, ContactCard, Device, DeviceType};
     pub use crate::error::{E2eError, E2eResult};
+    pub use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
     pub use crate::orchestrator::{Orchestrator, OrchestratorConfig};
     pub use crate::relay_manager::{RelayConfig, RelayInstance, RelayManager};
     pub use crate::report::{JunitReport, TestSummary};

@@ -32,7 +32,7 @@ static NEXT_PORT: AtomicU16 = AtomicU16::new(PORT_RANGE_START);
 ///
 /// Uses a combination of atomic counter and port availability check to ensure
 /// unique ports even when tests run in parallel.
-fn find_available_port() -> E2eResult<u16> {
+pub fn find_available_port() -> E2eResult<u16> {
     // Try up to 100 ports to find an available one
     for _ in 0..100 {
         // Get the next port atomically
@@ -96,6 +96,14 @@ impl RelayInstance {
         format!("http://127.0.0.1:{}/metrics", self.metrics_port)
     }
 
+    /// Returns the HTTP base URL (for v2 API / OHTTP gateway).
+    ///
+    /// The v2 HTTP API runs on the metrics port (`RELAY_METRICS_ADDR`),
+    /// not the main WebSocket port.
+    pub fn http_url(&self) -> String {
+        format!("http://127.0.0.1:{}", self.metrics_port)
+    }
+
     /// Check if the relay is running.
     pub fn is_running(&self) -> bool {
         self.process.is_some()
@@ -128,6 +136,12 @@ pub struct RelayConfig {
     pub idle_timeout: u64,
     /// Rate limit per minute (default: 1000 for testing).
     pub rate_limit: u32,
+    /// Enable the HTTP API v2 (required for OHTTP).
+    pub http_api_enabled: bool,
+    /// Enable the OHTTP gateway (requires `http_api_enabled`).
+    pub ohttp_enabled: bool,
+    /// OHTTP key rotation interval in hours (default: 24).
+    pub ohttp_key_rotation_hours: u64,
 }
 
 impl Default for RelayConfig {
@@ -140,6 +154,9 @@ impl Default for RelayConfig {
             blob_ttl_secs: 3600,
             idle_timeout: 60,
             rate_limit: 1000,
+            http_api_enabled: true,
+            ohttp_enabled: true,
+            ohttp_key_rotation_hours: 24,
         }
     }
 }
@@ -278,15 +295,17 @@ impl RelayManager {
             "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
             "false".to_string(),
         );
-        // Enable HTTP API v2 so /v2/* routes are mounted (required for CLI sync).
-        // Without this the relay only serves WebSocket; the OHTTP key endpoint
-        // returns the WebSocket error page, which OhttpClient::new() then
-        // rejects as "invalid OHTTP key config: the configuration was not
-        // supported".
-        env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
-        // Enable the OHTTP gateway so GET /v2/ohttp-key returns a valid key config
-        // and POST /v2/ohttp accepts encrypted requests.
-        env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
+        // Enable HTTP API v2 and OHTTP gateway when configured (defaults to true).
+        if self.config.http_api_enabled {
+            env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        }
+        if self.config.ohttp_enabled {
+            env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
+            env_vars.insert(
+                "RELAY_OHTTP_KEY_ROTATION_HOURS".to_string(),
+                self.config.ohttp_key_rotation_hours.to_string(),
+            );
+        }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
@@ -470,8 +489,16 @@ impl RelayManager {
             "RELAY_REQUIRE_NOISE_ENCRYPTION".to_string(),
             "false".to_string(),
         );
-        env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
-        env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
+        if self.config.http_api_enabled {
+            env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        }
+        if self.config.ohttp_enabled {
+            env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
+            env_vars.insert(
+                "RELAY_OHTTP_KEY_ROTATION_HOURS".to_string(),
+                self.config.ohttp_key_rotation_hours.to_string(),
+            );
+        }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 
         let mut cmd = Command::new(&self.binary_path);

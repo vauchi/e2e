@@ -59,6 +59,9 @@ fake = { version = "3", features = ["derive"] }
 # Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
 vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 
+# OHTTP key generation for stale-key error tests
+ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"] }
+
 [[bin]]
 name = "seed-contacts"
 path = "src/bin/seed_contacts.rs"
@@ -118,6 +121,10 @@ path = "tests/exchange_error_paths.rs"
 [[test]]
 name = "yaml_scenarios"
 path = "tests/yaml_scenarios.rs"
+
+[[test]]
+name = "ohttp_integration"
+path = "tests/ohttp_integration.rs"
 
 # Development profile: fast builds, backtraces work (matches core)
 [profile.dev]
