@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Duress Unlock
+# Unlocks the app with the duress PIN and verifies only decoy contacts are shown.
+# Requires: app password set, duress PIN enabled, at least one decoy contact added.
+# Environment variables:
+#   DURESS_PIN - The duress PIN to enter (required)
+#   DECOY_NAME - Expected decoy contact name (required)
+#   REAL_CONTACT_NAME - A real contact name that should NOT appear (required)
+
+appId: com.vauchi
+
+---
+
+# Relaunch app to trigger lock screen
+- launchApp
+
+# Wait for app password / PIN screen
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Enter duress PIN (triggers duress mode)
+- inputText: ${DURESS_PIN}
+- hideKeyboard
+- tapOn: "Unlock"
+
+# Wait for duress mode to load
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Navigate to contacts
+- tapOn: "Contacts"
+
+# Verify decoy contact IS visible
+- assertVisible: ${DECOY_NAME}
+
+# Verify real contact is NOT visible
+- assertNotVisible: ${REAL_CONTACT_NAME}

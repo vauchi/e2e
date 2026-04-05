@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Setup Duress PIN
+# Enables duress PIN (requires app password to be set first).
+# Environment variables:
+#   DURESS_PIN - 6-digit duress PIN (required, must differ from app password)
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+
+# Scroll to Duress PIN section
+- swipe:
+    direction: UP
+    duration: 300
+
+# Verify duress is not yet enabled
+- assertVisible: "Not set"
+
+# Tap to set duress PIN
+- tapOn: "Set Duress PIN"
+
+# Enter duress PIN and confirm
+- assertVisible: "Set Duress PIN"
+- tapOn:
+    id: "duress_pin_field"
+- inputText: ${DURESS_PIN}
+- hideKeyboard
+- tapOn:
+    id: "confirm_duress_pin_field"
+- inputText: ${DURESS_PIN}
+- hideKeyboard
+
+# Save
+- tapOn: "Set"
+
+# Wait for key derivation
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Verify duress is now enabled
+- assertVisible: "Enabled"
+
+# Go back
+- pressKey: back

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Send Emergency Broadcast
+# Sends a configured emergency broadcast and verifies confirmation.
+# Requires emergency broadcast to be configured first.
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+
+# Scroll to Emergency Broadcast section
+- swipe:
+    direction: UP
+    duration: 300
+
+# Verify broadcast is configured
+- assertVisible: "Configured"
+
+# Send emergency broadcast
+- tapOn: "Send Alert"
+
+# Confirm in dialog
+- assertVisible: "Send Emergency Alert"
+- tapOn: "Send"
+
+# Wait for delivery
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Verify sent confirmation
+- assertVisible: "sent"
+
+# Go back
+- pressKey: back

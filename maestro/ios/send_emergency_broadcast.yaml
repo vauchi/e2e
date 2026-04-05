@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Send Emergency Broadcast
+# Sends a configured emergency broadcast and verifies confirmation.
+# Requires emergency broadcast to be configured first.
+
+appId: app.vauchi.ios
+
+---
+
+# Navigate to Settings > Emergency Broadcast
+- tapOn: "Settings"
+- tapOn: "Emergency Broadcast"
+
+# Verify broadcast is configured
+- assertVisible: "Configured"
+
+# Send emergency broadcast
+- tapOn: "Send Alert"
+
+# Confirm in dialog
+- assertVisible: "Send Emergency Alert"
+- tapOn: "Send"
+
+# Wait for delivery
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Verify sent confirmation
+- assertVisible: "sent"
+
+# Go back
+- back

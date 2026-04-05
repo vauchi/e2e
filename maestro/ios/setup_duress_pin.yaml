@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Setup Duress PIN
+# Enables duress PIN (requires app password to be set first).
+# Environment variables:
+#   DURESS_PIN - 6-digit duress PIN (required, must differ from app password)
+
+appId: app.vauchi.ios
+
+---
+
+# Navigate to Settings > Duress PIN
+- tapOn: "Settings"
+- tapOn: "Duress PIN"
+
+# Verify app password is enabled (prerequisite)
+- assertVisible: "Enabled"
+
+# Tap to set duress PIN
+- tapOn: "Set Duress PIN"
+
+# Enter duress PIN and confirm
+- assertVisible: "Set Duress PIN"
+- tapOn:
+    id: "duress_pin_field"
+- inputText: ${DURESS_PIN}
+- tapOn:
+    id: "confirm_duress_pin_field"
+- inputText: ${DURESS_PIN}
+
+# Save
+- tapOn: "Set"
+
+# Wait for key derivation
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Verify duress is now enabled
+- assertVisible: "Duress PIN"
+- assertVisible: "Enabled"
+
+# Go back
+- back

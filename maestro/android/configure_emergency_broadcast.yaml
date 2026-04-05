@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Configure Emergency Broadcast
+# Sets up emergency broadcast with a trusted contact and custom message.
+# Environment variables:
+#   CONTACT_NAME - Trusted contact to receive alerts (required)
+#   ALERT_MESSAGE - Custom emergency message (required)
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+
+# Scroll to Emergency Broadcast section
+- swipe:
+    direction: UP
+    duration: 300
+
+# Verify not yet configured
+- assertVisible: "Not configured"
+
+# Tap Configure
+- tapOn: "Configure"
+- waitForAnimationToEnd
+
+# Select trusted contact
+- tapOn: ${CONTACT_NAME}
+
+# Enter custom message
+- tapOn:
+    id: "emergency_message_field"
+- inputText: ${ALERT_MESSAGE}
+- hideKeyboard
+
+# Save configuration
+- tapOn: "Save"
+- waitForAnimationToEnd
+
+# Verify configured state
+- assertVisible: "Configured"
+
+# Go back
+- pressKey: back

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Hide Contact
+# Hides a contact from the main contact list.
+# Environment variables:
+#   CONTACT_NAME - Name of the contact to hide (required)
+
+appId: app.vauchi.ios
+
+---
+
+# Navigate to contacts
+- tapOn: "Contacts"
+- waitForAnimationToEnd
+
+# Verify contact is visible
+- assertVisible: ${CONTACT_NAME}
+
+# Tap on the contact to open detail
+- tapOn: ${CONTACT_NAME}
+- waitForAnimationToEnd
+
+# Tap Hide Contact button
+- tapOn: "Hide Contact"
+- waitForAnimationToEnd
+
+# Go back to contact list
+- back
+
+# Verify contact is no longer visible in main list
+- assertNotVisible: ${CONTACT_NAME}

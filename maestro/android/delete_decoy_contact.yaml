@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Delete Decoy Contact
+# Removes a decoy contact from the duress profile.
+# Requires a decoy contact to exist.
+# Environment variables:
+#   DECOY_NAME - Name of the decoy contact to delete (required)
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+
+# Scroll to Decoy Contacts section
+- swipe:
+    direction: UP
+    duration: 300
+
+# Verify decoy contact exists
+- assertVisible: ${DECOY_NAME}
+
+# Delete the decoy contact
+- tapOn: "Delete"
+
+# Confirm deletion
+- tapOn: "Delete"
+
+- waitForAnimationToEnd
+
+# Verify decoy contact is gone
+- assertNotVisible: ${DECOY_NAME}
+
+# Go back
+- pressKey: back

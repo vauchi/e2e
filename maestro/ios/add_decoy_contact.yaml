@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Add Decoy Contact
+# Adds a fake contact shown when duress PIN is entered.
+# Requires duress PIN to be enabled first.
+# Environment variables:
+#   DECOY_NAME - Display name for the decoy contact (required)
+
+appId: app.vauchi.ios
+
+---
+
+# Navigate to Settings > Duress PIN
+- tapOn: "Settings"
+- tapOn: "Duress PIN"
+
+# Verify duress is enabled and decoy section visible
+- assertVisible: "Decoy Contacts"
+
+# Add a decoy contact
+- tapOn: "Add Decoy Contact"
+- assertVisible: "Add Decoy Contact"
+- inputText: ${DECOY_NAME}
+- tapOn: "Add"
+
+- waitForAnimationToEnd
+
+# Verify decoy contact appears in list
+- assertVisible: ${DECOY_NAME}
+
+# Go back
+- back

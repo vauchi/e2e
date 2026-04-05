@@ -39,13 +39,21 @@ maestro/
 │   ├── generate_qr.yaml
 │   ├── complete_exchange.yaml
 │   ├── sync.yaml
-│   └── list_contacts.yaml
-├── android/                # Android-specific flows
-│   ├── create_identity.yaml
-│   ├── generate_qr.yaml
-│   ├── complete_exchange.yaml
-│   ├── sync.yaml
-│   └── list_contacts.yaml
+│   ├── list_contacts.yaml
+│   ├── add_field.yaml
+│   ├── get_card.yaml
+│   ├── link_device.yaml
+│   ├── visibility_labels.yaml
+│   ├── setup_app_password.yaml      # Resistance features
+│   ├── setup_duress_pin.yaml
+│   ├── add_decoy_contact.yaml
+│   ├── delete_decoy_contact.yaml
+│   ├── duress_unlock.yaml
+│   ├── hide_contact.yaml
+│   ├── configure_emergency_broadcast.yaml
+│   └── send_emergency_broadcast.yaml
+├── android/                # Android-specific flows (same set)
+│   └── ...
 └── README.md               # This file
 ```
 
@@ -106,6 +114,24 @@ programmatically. Each Device trait method maps to a corresponding flow:
 | `list_contacts()` | `list_contacts.yaml` |
 | `add_field(...)` | `add_field.yaml` |
 | `get_card()` | `get_card.yaml` |
+| `link_device()` | `link_device.yaml` |
+| `visibility_labels()` | `visibility_labels.yaml` |
+
+### Resistance Feature Flows
+
+These flows test security/resistance features and must be run in order
+(1-5 form a chain: password > duress > decoys > unlock):
+
+| # | Flow | Env Vars |
+|---|------|----------|
+| 1 | `setup_app_password.yaml` | `APP_PASSWORD` |
+| 2 | `setup_duress_pin.yaml` | `DURESS_PIN` |
+| 3 | `add_decoy_contact.yaml` | `DECOY_NAME` |
+| 4 | `delete_decoy_contact.yaml` | `DECOY_NAME` |
+| 5 | `duress_unlock.yaml` | `DURESS_PIN`, `DECOY_NAME`, `REAL_CONTACT_NAME` |
+| 6 | `hide_contact.yaml` | `CONTACT_NAME` |
+| 7 | `configure_emergency_broadcast.yaml` | `CONTACT_NAME`, `ALERT_MESSAGE` |
+| 8 | `send_emergency_broadcast.yaml` | — |
 
 ## QR Code Extraction
 
