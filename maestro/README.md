@@ -8,11 +8,13 @@ This directory contains Maestro YAML flows for automated mobile testing.
 ## Setup
 
 1. Install Maestro CLI:
+
    ```bash
    curl -Ls "https://get.maestro.mobile.dev" | bash
    ```
 
 2. For iOS:
+
    ```bash
    # Boot a simulator
    xcrun simctl boot "iPhone 15 Pro"
@@ -22,6 +24,7 @@ This directory contains Maestro YAML flows for automated mobile testing.
    ```
 
 3. For Android:
+
    ```bash
    # Start an emulator
    emulator -avd Pixel_7
@@ -32,7 +35,7 @@ This directory contains Maestro YAML flows for automated mobile testing.
 
 ## Directory Structure
 
-```
+```text
 maestro/
 ├── ios/                    # iOS-specific flows
 │   ├── create_identity.yaml
@@ -60,12 +63,14 @@ maestro/
 ## Flow Template
 
 Each flow should:
+
 1. Navigate to the relevant screen
 2. Perform the action
 3. Verify success
 4. Output any required data (e.g., QR codes)
 
 Example `create_identity.yaml`:
+
 ```yaml
 appId: app.vauchi.mobile
 ---
@@ -136,6 +141,7 @@ These flows test security/resistance features and must be run in order
 ## QR Code Extraction
 
 For `generate_qr`, the flow should either:
+
 1. Take a screenshot and save to a known path
 2. Copy QR data to clipboard
 3. Output QR data to stdout in a parseable format
