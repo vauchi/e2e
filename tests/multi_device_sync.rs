@@ -25,10 +25,9 @@ use vauchi_e2e_tests::prelude::*;
 /// Tags: smoke, sync
 /// Feature: sync_updates.feature
 ///
-/// IGNORED: CLI sync hangs after multi-device link + exchange.
-/// Tracked in problem record `2026-04-04-e2e-multi-device-sync-hang`.
+/// Previously ignored: CLI sync hung due to infinite refetch loop in
+/// HttpTransportAdapter (core bugfix/e2e-sync-hang-infinite-refetch).
 #[tokio::test]
-#[ignore = "CLI sync hangs after device link — core sync investigation needed"]
 async fn smoke_card_update() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
