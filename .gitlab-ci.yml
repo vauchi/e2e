@@ -193,11 +193,12 @@ test:smoke:
       junit: target/nextest/ci/junit.xml
     paths:
       - smoke-results.txt
+      - .smoke-bin/
     expire_in: 1 week
   timeout: 20 minutes
 
 # Integration tests — full E2E suite on main and schedule.
-# Pulls cached relay+CLI binaries from test:smoke.
+# Gets relay+CLI binaries from test:smoke artifacts; cache is fallback for scheduled runs.
 # Advisory (allow_failure) until tests stabilize.
 test:integration:
   extends: [.rust-runner, .timeout-long]
