@@ -26,7 +26,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Feature: sync_updates.feature
 ///
 /// Previously ignored: CLI sync hung due to infinite refetch loop in
-/// HttpTransportAdapter (core bugfix/e2e-sync-hang-infinite-refetch).
+/// HttpTransportAdapter (fixed in core `fba8f32c`).
 #[tokio::test]
 async fn smoke_card_update() {
     let mut orch = Orchestrator::new();

@@ -218,7 +218,6 @@ async fn integration_label_visibility_sync() {
 /// Tags: smoke, visibility, contacts
 /// Feature: visibility_control.feature
 #[tokio::test]
-#[ignore = "CLI sync hangs after exchange — same root cause as smoke_card_update"]
 async fn smoke_per_contact_visibility() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
