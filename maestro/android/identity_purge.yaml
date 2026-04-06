@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Identity Purge (Scheduled Deletion + Cancel)
+# Verifies the full identity purge lifecycle:
+#   1. Navigate to Settings > Privacy & Data
+#   2. Schedule deletion (7-day grace period)
+#   3. Verify scheduled state is shown
+#   4. Cancel deletion
+#   5. Verify identity is active again
+#
+# Precondition: Identity must already exist (run create_identity.yaml first)
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+- assertVisible: "Settings"
+
+# Scroll to Privacy section and tap Delete Identity
+- scrollUntilVisible:
+    element: "Delete Identity"
+    direction: DOWN
+- tapOn: "Delete Identity"
+
+# Confirm scheduling in alert dialog
+- assertVisible: "Schedule Deletion"
+- tapOn: "Schedule"
+
+# Verify scheduled state
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Cancel Deletion"
+    direction: DOWN
+- assertVisible: "Cancel Deletion"
+
+# Cancel the scheduled deletion
+- tapOn: "Cancel Deletion"
+
+# Verify back to active state — Delete Identity button reappears
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Delete Identity"
+    direction: DOWN
+- assertVisible: "Delete Identity"
+
+# Go back to home
+- back

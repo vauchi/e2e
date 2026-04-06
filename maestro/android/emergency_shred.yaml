@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Android Maestro Flow: Emergency Shred (Panic Shred)
+# Verifies the panic shred flow destroys all data:
+#   1. Navigate to Settings > Emergency Shred
+#   2. Confirm destruction
+#   3. Verify data wiped / app resets to onboarding
+#
+# WARNING: This flow destroys the identity. Run last.
+# Precondition: Identity must already exist (run create_identity.yaml first)
+
+appId: com.vauchi
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+- assertVisible: "Settings"
+
+# Scroll to Emergency Shred
+- scrollUntilVisible:
+    element: "Emergency Shred"
+    direction: DOWN
+- tapOn: "Emergency Shred"
+
+# Confirm in dialog
+- assertVisible: "Emergency Shred"
+- tapOn: "Destroy All Data"
+
+# Wait for destruction to complete
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Verify data wiped — app returns to onboarding
+- assertVisible: "Create New Identity"

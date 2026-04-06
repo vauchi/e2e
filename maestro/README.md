@@ -54,7 +54,9 @@ maestro/
 │   ├── duress_unlock.yaml
 │   ├── hide_contact.yaml
 │   ├── configure_emergency_broadcast.yaml
-│   └── send_emergency_broadcast.yaml
+│   ├── send_emergency_broadcast.yaml
+│   ├── identity_purge.yaml            # Identity purge (schedule + cancel)
+│   └── emergency_shred.yaml           # Panic shred (destroys identity)
 ├── android/                # Android-specific flows (same set)
 │   └── ...
 └── README.md               # This file
@@ -137,6 +139,8 @@ These flows test security/resistance features and must be run in order
 | 6 | `hide_contact.yaml` | `CONTACT_NAME` |
 | 7 | `configure_emergency_broadcast.yaml` | `CONTACT_NAME`, `ALERT_MESSAGE` |
 | 8 | `send_emergency_broadcast.yaml` | — |
+| 9 | `identity_purge.yaml` | — |
+| 10 | `emergency_shred.yaml` | — (WARNING: destroys identity, run last) |
 
 ## QR Code Extraction
 

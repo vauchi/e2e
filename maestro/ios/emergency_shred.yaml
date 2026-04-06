@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# iOS Maestro Flow: Emergency Shred (Panic Shred)
+# Verifies the panic shred flow destroys all data:
+#   1. Navigate to Settings > Emergency Shred
+#   2. Tap Emergency Shred and confirm
+#   3. Type DELETE confirmation
+#   4. Verify data wiped / app resets to onboarding
+#
+# WARNING: This flow destroys the identity. Run last.
+# Precondition: Identity must already exist (run create_identity.yaml first)
+
+appId: app.vauchi.ios
+
+---
+
+# Navigate to Settings
+- tapOn: "Settings"
+- assertVisible: "Settings"
+
+# Scroll to Emergency Shred
+- scrollUntilVisible:
+    element: "Emergency Shred"
+    direction: DOWN
+- tapOn: "Emergency Shred"
+
+# Step 1: Warning screen — tap "I Understand"
+- assertVisible: "Emergency Data Wipe"
+- tapOn: "I Understand"
+
+# Step 2: Confirm screen — type DELETE
+- assertVisible: "Type DELETE to confirm"
+- inputText: "DELETE"
+- tapOn: "Wipe All Data"
+
+# Step 3: Wait for wiping to complete
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Step 4: Verify data wiped — app returns to onboarding
+- assertVisible: "Create New Identity"
