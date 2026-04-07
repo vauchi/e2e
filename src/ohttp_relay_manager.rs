@@ -122,6 +122,14 @@ impl OhttpRelayManager {
             return Ok(debug_path);
         }
 
+        // ohttp-relay has its own Cargo workspace (not in the root workspace),
+        // so its binary lands in ohttp-relay/target/ instead of target/.
+        let ohttp_own_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../ohttp-relay/target/debug/vauchi-ohttp-relay");
+        if ohttp_own_path.exists() {
+            return Ok(ohttp_own_path);
+        }
+
         Err(E2eError::relay(
             "vauchi-ohttp-relay binary not found. Please run `just build vauchi-ohttp-relay` first.",
         ))
