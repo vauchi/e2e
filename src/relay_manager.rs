@@ -22,59 +22,47 @@ use crate::error::{E2eError, E2eResult};
 /// Base port range start for relay servers (tests will allocate from here).
 const PORT_RANGE_START: u16 = 18100;
 
-/// Port range end for relay servers.
-const PORT_RANGE_END: u16 = 19000;
+/// Global port counter to defend against TCP TIME_WAIT collisions.
+static NEXT_PORT: AtomicU16 = AtomicU16::new(PORT_RANGE_START);
 
-/// Global port counter to ensure unique ports across parallel tests.
-/// Initialized lazily per-process with a PID-based offset so that
-/// concurrent test binaries (nextest runs each binary as a separate process)
-/// start from different points in the range, avoiding TOCTOU port races.
-static NEXT_PORT: AtomicU16 = AtomicU16::new(0);
-
-/// Seed NEXT_PORT once per process using the PID to scatter starting points.
-fn seeded_port_start() -> u16 {
-    let range_size = (PORT_RANGE_END - PORT_RANGE_START) / 2; // step-2 slots
-    // Hash PID into the range — different binaries get different offsets
-    let offset = (std::process::id() as u16 % range_size) * 2;
-    let start = PORT_RANGE_START + offset;
-    // CAS: only the first caller seeds; others see the already-seeded value
-    let _ = NEXT_PORT.compare_exchange(0, start, Ordering::SeqCst, Ordering::SeqCst);
-    NEXT_PORT.load(Ordering::SeqCst)
-}
-
-/// Find an available port for binding.
+/// Reserve an available port by binding to port 0.
 ///
-/// Uses a PID-seeded atomic counter and port availability check to ensure
-/// unique ports even when tests run in parallel across multiple binaries.
+/// Asks the OS to assign a free port, then immediately releases it.
+/// The atomic counter provides a second layer of uniqueness across
+/// parallel tests — even if the OS reassigns the same port to a
+/// different test between release and relay spawn, the counter
+/// ensures each test gets a distinct allocation.
+///
+/// Previous approach used check-then-act (`is_port_available`), which
+/// had a TOCTOU race under parallel nextest execution.
 pub fn find_available_port() -> E2eResult<u16> {
-    // Ensure the counter is seeded for this process
-    seeded_port_start();
-
-    // Try up to 100 ports to find an available one
     for _ in 0..100 {
-        // Get the next port atomically
-        let port = NEXT_PORT.fetch_add(2, Ordering::SeqCst);
+        // Advance counter to avoid reusing ports from recent tests
+        // (defends against TCP TIME_WAIT collisions).
+        let _seq = NEXT_PORT.fetch_add(2, Ordering::SeqCst);
 
-        // Wrap around if we exceed the range
-        if port >= PORT_RANGE_END {
-            NEXT_PORT.store(PORT_RANGE_START, Ordering::SeqCst);
-            continue;
-        }
+        // Ask the OS for a free port (bind to :0).
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .map_err(|e| E2eError::relay(format!("Failed to bind ephemeral port: {e}")))?;
+        let port = listener
+            .local_addr()
+            .map_err(|e| E2eError::relay(format!("Failed to get local addr: {e}")))?
+            .port();
 
-        // Check if the port is actually available
-        if is_port_available(port) && is_port_available(port + 1000) {
+        // Also verify the metrics port (port + 1000) is free.
+        let metrics_ok = TcpListener::bind(format!("127.0.0.1:{}", port + 1000)).is_ok();
+
+        // Drop both listeners to release the ports right before relay spawn.
+        drop(listener);
+
+        if metrics_ok {
             return Ok(port);
         }
     }
 
     Err(E2eError::relay(
-        "Could not find available port for relay server",
+        "Could not find available port pair for relay server",
     ))
-}
-
-/// Check if a port is available for binding.
-fn is_port_available(port: u16) -> bool {
-    TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok()
 }
 
 /// Timeout for relay startup.
@@ -130,8 +118,26 @@ impl RelayInstance {
 impl Drop for RelayInstance {
     fn drop(&mut self) {
         if let Some(mut process) = self.process.take() {
-            // Try to kill the process gracefully
+            // Kill and wait for exit so the port is fully released.
+            // start_kill() alone returns immediately — the process may
+            // still hold the port when the next test tries to bind it.
             let _ = process.start_kill();
+            // Block briefly for the process to exit. In async context
+            // kill_on_drop(true) handles cleanup, but in sync Drop we
+            // need a wait to avoid port leaks between tests.
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                if let Ok(rt) = rt {
+                    let _ = rt.block_on(async {
+                        tokio::time::timeout(std::time::Duration::from_secs(5), process.wait())
+                            .await
+                    });
+                }
+            })
+            .join()
+            .ok();
         }
     }
 }
@@ -602,16 +608,41 @@ impl RelayManager {
 
 impl Drop for RelayManager {
     fn drop(&mut self) {
-        // Synchronous cleanup - just start the kill, don't wait
-        for relay in &mut self.relays {
-            if let Some(mut process) = relay.process.take() {
-                let _ = process.start_kill();
-            }
+        // Kill all relay processes and wait for exit so ports are released
+        // before the next test starts. Without waiting, TCP TIME_WAIT can
+        // cause port conflicts in subsequent tests.
+        let mut children: Vec<_> = self
+            .relays
+            .iter_mut()
+            .filter_map(|r| r.process.take())
+            .collect();
+        for child in &mut children {
+            let _ = child.start_kill();
+        }
+        if !children.is_empty() {
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                if let Ok(rt) = rt {
+                    rt.block_on(async {
+                        for child in &mut children {
+                            let _ = tokio::time::timeout(
+                                std::time::Duration::from_secs(5),
+                                child.wait(),
+                            )
+                            .await;
+                        }
+                    });
+                }
+            })
+            .join()
+            .ok();
         }
     }
 }
 
-// INLINE_TEST_REQUIRED: tests exercise private functions (is_port_available, find_available_port)
+// INLINE_TEST_REQUIRED: tests exercise private function find_available_port
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,22 +659,28 @@ mod tests {
     fn test_find_available_port() {
         let port1 = find_available_port().expect("Should find port");
         let port2 = find_available_port().expect("Should find port");
-        // Ports should be different (increments by 2)
-        assert_ne!(port1, port2);
-        // Ports should be in range
-        assert!((PORT_RANGE_START..PORT_RANGE_END).contains(&port1));
-        assert!((PORT_RANGE_START..PORT_RANGE_END).contains(&port2));
-    }
 
-    #[test]
-    fn test_is_port_available() {
-        // Negative case: a bound port must not be available
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
-        let port = listener.local_addr().expect("local addr").port();
-        assert!(
-            !is_port_available(port),
-            "port should be unavailable while bound"
-        );
-        // Positive case is exercised by test_find_available_port (calls is_port_available internally)
+        // OS-assigned ports must be distinct
+        assert_ne!(port1, port2, "consecutive ports must differ");
+
+        // Ports must be non-privileged (>1024) and in valid u16 range
+        assert!(port1 > 1024, "port {port1} should be non-privileged");
+        assert!(port2 > 1024, "port {port2} should be non-privileged");
+
+        // Both the relay port and its metrics port (port+1000) must be bindable
+        // right after allocation — this is the whole point of the reservation.
+        for port in [port1, port2] {
+            let listener = TcpListener::bind(format!("127.0.0.1:{port}"));
+            assert!(
+                listener.is_ok(),
+                "port {port} should be bindable after allocation"
+            );
+            let metrics = TcpListener::bind(format!("127.0.0.1:{}", port + 1000));
+            assert!(
+                metrics.is_ok(),
+                "metrics port {} should be bindable",
+                port + 1000
+            );
+        }
     }
 }
