@@ -210,7 +210,7 @@ test:integration:
     key: smoke-binaries-${CI_DEFAULT_BRANCH}
     paths:
       - .smoke-bin/
-    policy: pull
+    policy: pull-push  # Write back rebuilt binaries so next run uses fresh cache
   script:
     - |
       mkdir -p .smoke-bin
