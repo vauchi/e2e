@@ -161,6 +161,12 @@ pub struct RelayConfig {
     pub ohttp_enabled: bool,
     /// OHTTP key rotation interval in hours (default: 24).
     pub ohttp_key_rotation_hours: u64,
+    /// Version policy: minimum required client compat version (0 = no enforcement).
+    pub version_min: Option<u16>,
+    /// Version policy: version at which the relay warns clients to upgrade.
+    pub version_warn: Option<u16>,
+    /// Version policy: grace period days after min_version is raised.
+    pub version_grace_days: Option<u16>,
 }
 
 impl Default for RelayConfig {
@@ -176,6 +182,9 @@ impl Default for RelayConfig {
             http_api_enabled: true,
             ohttp_enabled: true,
             ohttp_key_rotation_hours: 24,
+            version_min: None,
+            version_warn: None,
+            version_grace_days: None,
         }
     }
 }
@@ -331,6 +340,7 @@ impl RelayManager {
             );
         }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
+        self.add_version_policy_env_vars(&mut env_vars);
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
@@ -462,6 +472,19 @@ impl RelayManager {
         self.relays.len()
     }
 
+    /// Add version policy env vars if configured.
+    fn add_version_policy_env_vars(&self, env_vars: &mut HashMap<String, String>) {
+        if let Some(min) = self.config.version_min {
+            env_vars.insert("RELAY_VERSION_MIN".to_string(), min.to_string());
+        }
+        if let Some(warn) = self.config.version_warn {
+            env_vars.insert("RELAY_VERSION_WARN".to_string(), warn.to_string());
+        }
+        if let Some(grace) = self.config.version_grace_days {
+            env_vars.insert("RELAY_VERSION_GRACE_DAYS".to_string(), grace.to_string());
+        }
+    }
+
     /// Stop a specific relay.
     pub async fn stop_relay(&mut self, index: usize) -> E2eResult<()> {
         if let Some(relay) = self.relays.get_mut(index) {
@@ -541,6 +564,7 @@ impl RelayManager {
             );
         }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
+        self.add_version_policy_env_vars(&mut env_vars);
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)

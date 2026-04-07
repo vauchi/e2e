@@ -126,6 +126,10 @@ path = "tests/yaml_scenarios.rs"
 name = "ohttp_integration"
 path = "tests/ohttp_integration.rs"
 
+[[test]]
+name = "version_enforcement"
+path = "tests/version_enforcement_tests.rs"
+
 # Development profile: fast builds, backtraces work (matches core)
 [profile.dev]
 debug = "line-tables-only"
