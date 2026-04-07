@@ -213,11 +213,35 @@ test:integration:
     policy: pull
   script:
     - |
+      mkdir -p .smoke-bin
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+
+      # Build binaries if not cached (fallback — avoids hard dependency on test:smoke)
       if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
-        echo "ERROR: Cached binaries not found. test:smoke must run first."
-        exit 1
+        echo "Cached binaries not found — building from source..."
+        BUILD_TMPDIR=$(mktemp -d)
+
+        if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ]; then
+          echo "Building relay binary..."
+          git clone --depth=1 --branch main \
+            "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$BUILD_TMPDIR/relay"
+          cargo build --release --manifest-path "$BUILD_TMPDIR/relay/Cargo.toml"
+          cp "$BUILD_TMPDIR/relay/target/release/vauchi-relay" "$E2E_BIN_DIR/"
+        fi
+
+        if [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
+          echo "Building CLI binary..."
+          git clone --depth=1 --branch main \
+            "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
+          cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+          cp "$BUILD_TMPDIR/cli/target/release/vauchi" "$E2E_BIN_DIR/"
+        fi
+
+        rm -rf "$BUILD_TMPDIR"
+      else
+        echo "Using cached binaries"
       fi
+
       echo "Running integration tests..."
       cargo nextest run --profile ci --run-ignored default -- integration_ 2>&1 | tee integration-results.txt
       echo "Integration suite complete"
