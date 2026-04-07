@@ -216,30 +216,42 @@ test:integration:
       mkdir -p .smoke-bin
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
 
-      # Build binaries if not cached (fallback — avoids hard dependency on test:smoke)
+      # Verify cached binaries are usable (not just present).
+      # Stale binaries built against older core versions SIGABRT on startup.
+      NEED_REBUILD=0
       if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
-        echo "Cached binaries not found — building from source..."
+        echo "Cached binaries not found"
+        NEED_REBUILD=1
+      else
+        # Health check: relay should respond to --version without crashing
+        if ! "$E2E_BIN_DIR/vauchi-relay" --version >/dev/null 2>&1; then
+          echo "WARNING: Cached relay binary crashes (stale?) — rebuilding"
+          NEED_REBUILD=1
+        elif ! "$E2E_BIN_DIR/vauchi" --version >/dev/null 2>&1; then
+          echo "WARNING: Cached CLI binary crashes (stale?) — rebuilding"
+          NEED_REBUILD=1
+        else
+          echo "Using cached binaries (health check passed)"
+        fi
+      fi
+
+      if [ "$NEED_REBUILD" -eq 1 ]; then
+        echo "Building from source..."
         BUILD_TMPDIR=$(mktemp -d)
 
-        if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ]; then
-          echo "Building relay binary..."
-          git clone --depth=1 --branch main \
-            "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$BUILD_TMPDIR/relay"
-          cargo build --release --manifest-path "$BUILD_TMPDIR/relay/Cargo.toml"
-          cp "$BUILD_TMPDIR/relay/target/release/vauchi-relay" "$E2E_BIN_DIR/"
-        fi
+        echo "Building relay binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$BUILD_TMPDIR/relay"
+        cargo build --release --manifest-path "$BUILD_TMPDIR/relay/Cargo.toml"
+        cp "$BUILD_TMPDIR/relay/target/release/vauchi-relay" "$E2E_BIN_DIR/"
 
-        if [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
-          echo "Building CLI binary..."
-          git clone --depth=1 --branch main \
-            "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
-          cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
-          cp "$BUILD_TMPDIR/cli/target/release/vauchi" "$E2E_BIN_DIR/"
-        fi
+        echo "Building CLI binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
+        cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+        cp "$BUILD_TMPDIR/cli/target/release/vauchi" "$E2E_BIN_DIR/"
 
         rm -rf "$BUILD_TMPDIR"
-      else
-        echo "Using cached binaries"
       fi
 
       echo "Running integration tests..."
