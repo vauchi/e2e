@@ -26,13 +26,30 @@ const PORT_RANGE_START: u16 = 18100;
 const PORT_RANGE_END: u16 = 19000;
 
 /// Global port counter to ensure unique ports across parallel tests.
-static NEXT_PORT: AtomicU16 = AtomicU16::new(PORT_RANGE_START);
+/// Initialized lazily per-process with a PID-based offset so that
+/// concurrent test binaries (nextest runs each binary as a separate process)
+/// start from different points in the range, avoiding TOCTOU port races.
+static NEXT_PORT: AtomicU16 = AtomicU16::new(0);
+
+/// Seed NEXT_PORT once per process using the PID to scatter starting points.
+fn seeded_port_start() -> u16 {
+    let range_size = (PORT_RANGE_END - PORT_RANGE_START) / 2; // step-2 slots
+    // Hash PID into the range — different binaries get different offsets
+    let offset = (std::process::id() as u16 % range_size) * 2;
+    let start = PORT_RANGE_START + offset;
+    // CAS: only the first caller seeds; others see the already-seeded value
+    let _ = NEXT_PORT.compare_exchange(0, start, Ordering::SeqCst, Ordering::SeqCst);
+    NEXT_PORT.load(Ordering::SeqCst)
+}
 
 /// Find an available port for binding.
 ///
-/// Uses a combination of atomic counter and port availability check to ensure
-/// unique ports even when tests run in parallel.
+/// Uses a PID-seeded atomic counter and port availability check to ensure
+/// unique ports even when tests run in parallel across multiple binaries.
 pub fn find_available_port() -> E2eResult<u16> {
+    // Ensure the counter is seeded for this process
+    seeded_port_start();
+
     // Try up to 100 ports to find an available one
     for _ in 0..100 {
         // Get the next port atomically
@@ -351,12 +368,15 @@ impl RelayManager {
 
     /// Wait for a relay to become healthy.
     ///
-    /// Polls the relay's HTTP `/health` endpoint (on the main port) and checks
-    /// that the process hasn't exited. A raw TCP connect is insufficient — it
-    /// succeeds as soon as the kernel binds the listener, before the relay is
-    /// ready to serve requests.
+    /// Polls both the main port (`/health`) and the HTTP API / metrics port.
+    /// Both must respond before the relay is considered ready.  Previously only
+    /// the main port was checked, so a relay whose metrics port failed to bind
+    /// (port conflict) passed the health check while the CLI — which connects
+    /// to the metrics port — got "Connection refused".
     async fn wait_for_health(&self, port: u16, index: usize, child: &mut Child) -> E2eResult<()> {
         let health_url = format!("http://127.0.0.1:{}/health", port);
+        let metrics_port = port + 1000;
+        let metrics_url = format!("http://127.0.0.1:{}/health", metrics_port);
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(2))
             .build()
@@ -374,12 +394,9 @@ impl RelayManager {
                     )));
                 }
 
-                // Try actual HTTP health check (not just TCP connect)
-                match client.get(&health_url).send().await {
-                    Ok(resp) if resp.status().is_success() => {
-                        debug!("Relay {} healthy (attempt {})", index, attempt + 1);
-                        return Ok(());
-                    }
+                // Check main port
+                let main_ok = match client.get(&health_url).send().await {
+                    Ok(resp) if resp.status().is_success() => true,
                     Ok(resp) => {
                         debug!(
                             "Relay {} returned {} (attempt {})",
@@ -387,15 +404,28 @@ impl RelayManager {
                             resp.status(),
                             attempt + 1
                         );
+                        false
                     }
-                    Err(_) => {}
+                    Err(_) => false,
+                };
+
+                // Check metrics / HTTP API port (where the CLI connects)
+                let metrics_ok = main_ok
+                    && matches!(
+                        client.get(&metrics_url).send().await,
+                        Ok(resp) if resp.status().is_success()
+                    );
+
+                if main_ok && metrics_ok {
+                    debug!("Relay {} healthy (attempt {})", index, attempt + 1);
+                    return Ok(());
                 }
 
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
             Err(E2eError::timeout(format!(
-                "Relay {} failed to start within timeout (health check at {})",
-                index, health_url
+                "Relay {} failed to start within timeout (health: {}, metrics: {})",
+                index, health_url, metrics_url
             )))
         };
 
