@@ -53,6 +53,7 @@ fn create_ohttp_transport(ohttp_relay_url: &str, ohttp_key: &[u8]) -> HttpTransp
         timeout_ms: 10_000,
         proxy: ProxyConfig::None,
         allow_direct: false,
+        pinned_certs: vec![],
     };
     let mut transport = HttpTransport::new(config);
 
@@ -235,6 +236,7 @@ async fn test_fail_closed_without_ohttp() {
         timeout_ms: 1_000,
         proxy: ProxyConfig::None,
         allow_direct: false,
+        pinned_certs: vec![],
     };
     let transport = HttpTransport::new(config);
 
