@@ -2,6 +2,20 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# Serialize tests that spawn relay processes to prevent port races.
+# Each ohttp/smoke test spawns relay + ohttp-relay pairs; parallel
+# execution causes TOCTOU port conflicts on CI runners.
+[test-groups.relay-tests]
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = "binary(ohttp_integration) | binary(cross_platform)"
+test-group = "relay-tests"
+
 [profile.ci.junit]
 # Path is relative to nextest's output dir (target/nextest/ci/), not project root.
 path = "junit.xml"
+
+[[profile.ci.overrides]]
+filter = "binary(ohttp_integration) | binary(cross_platform)"
+test-group = "relay-tests"
