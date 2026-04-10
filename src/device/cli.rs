@@ -107,7 +107,8 @@ impl CliDevice {
             .arg("--relay")
             .arg(&self.relay_url)
             .args(args)
-            .stdin(std::process::Stdio::null());
+            .stdin(std::process::Stdio::null())
+            .env("VAUCHI_ALLOW_DIRECT", "1");
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",
