@@ -1656,10 +1656,10 @@ dependencies = [
  "libc",
  "log",
  "openssl",
- "openssl-probe 0.2.1",
+ "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework 3.7.0",
+ "security-framework",
  "security-framework-sys",
  "tempfile",
 ]
@@ -1760,12 +1760,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "openssl-probe"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "openssl-probe"
@@ -2295,19 +2289,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls-native-certs"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5bfb394eeed242e909609f56089eecfe5fda225042e8b171791b9c95f5931e5"
-dependencies = [
- "openssl-probe 0.1.6",
- "rustls-pemfile",
- "rustls-pki-types",
- "schannel",
- "security-framework 2.11.1",
-]
-
-[[package]]
 name = "rustls-pemfile"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2388,19 +2369,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "security-framework"
-version = "2.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "897b2245f0b511c87893af39b033e5ca9cce68824c4d7e7630b5a1d339658d02"
-dependencies = [
- "bitflags 2.11.0",
- "core-foundation 0.9.4",
- "core-foundation-sys",
- "libc",
- "security-framework-sys",
-]
 
 [[package]]
 name = "security-framework"
@@ -3095,11 +3063,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
- "native-tls",
  "rand 0.8.5",
- "rustls",
- "rustls-native-certs",
- "rustls-pki-types",
  "sha1",
  "thiserror 1.0.69",
  "utf-8",
@@ -3235,9 +3199,10 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.18.10"
+version = "0.19.6"
 dependencies = [
  "hex",
+ "log",
  "reqwest",
  "serde",
  "serde_json",
@@ -3251,7 +3216,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.18.10"
+version = "0.19.6"
 dependencies = [
  "argon2",
  "async-trait",
@@ -3265,7 +3230,6 @@ dependencies = [
  "hex",
  "hkdf",
  "hmac",
- "native-tls",
  "ohttp",
  "postcard",
  "qrcode",
@@ -3276,15 +3240,13 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha2",
- "snow",
  "subtle",
  "thiserror 2.0.18",
- "tungstenite",
  "unicode-normalization",
  "ureq",
  "url",
  "uuid",
- "vauchi-protocol 0.18.10",
+ "vauchi-protocol 0.19.6",
  "webpki-roots 0.26.11",
  "x25519-dalek",
  "zeroize",
@@ -3327,7 +3289,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.18.10"
+version = "0.19.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -4086,7 +4048,3 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
-
-[[patch.unused]]
-name = "vauchi-relay"
-version = "0.3.0"
