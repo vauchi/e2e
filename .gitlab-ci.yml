@@ -92,7 +92,8 @@ security:audit:
       optional: true
 
 # Full cargo-deny check: advisories, licenses, bans, sources
-# Extends shared template for auto-install of cargo-deny
+# Extends shared template for auto-install of cargo-deny.
+# Clones core repo first since e2e has path deps pointing to ../core/.
 security:deny:
   extends: [.rust-runner-readonly, .security-deny-job]
   stage: security
@@ -101,6 +102,15 @@ security:deny:
       optional: true
     - job: lint:clippy
       optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - command -v cargo-deny >/dev/null 2>&1 || cargo binstall cargo-deny --no-confirm 2>/dev/null || true
+    - |
+      # Clone core repo for path dependency resolution (e2e depends on ../core/)
+      if [ ! -d "../core" ]; then
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" "../core"
+      fi
 
 # ============================================================
 # Test Stage — Smoke Suite (PI-05)
