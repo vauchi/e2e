@@ -177,6 +177,22 @@ test:smoke:
         echo "CLI binary cached (${CLI_HEAD:0:8})"
       fi
 
+      # Build ohttp-relay (lives in-tree, no git clone needed)
+      OHTTP_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" main | cut -f1)
+      REBUILD_OHTTP=1
+      [ -f .smoke-bin/ohttp.sha ] && [ "$(cat .smoke-bin/ohttp.sha)" = "$OHTTP_HEAD" ] && [ -x .smoke-bin/vauchi-ohttp-relay ] && REBUILD_OHTTP=0
+
+      if [ "$REBUILD_OHTTP" -eq 1 ]; then
+        echo "Building ohttp-relay binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
+        cargo build --release --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" .smoke-bin/
+        echo "$OHTTP_HEAD" > .smoke-bin/ohttp.sha
+      else
+        echo "OHTTP relay binary cached (${OHTTP_HEAD:0:8})"
+      fi
+
       # Record core HEAD so future runs detect core-only changes
       echo "$CORE_HEAD" > .smoke-bin/core.sha
 
@@ -219,8 +235,8 @@ test:integration:
       # Verify cached binaries are usable (not just present).
       # Stale binaries built against older core versions SIGABRT on startup.
       NEED_REBUILD=0
-      if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ]; then
-        echo "Cached binaries not found"
+      if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ] || [ ! -x "$E2E_BIN_DIR/vauchi-ohttp-relay" ]; then
+        echo "Cached binaries not found (need relay, cli, ohttp-relay)"
         NEED_REBUILD=1
       else
         # Health check: relay should respond to --version without crashing
@@ -250,6 +266,12 @@ test:integration:
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
         cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
         cp "$BUILD_TMPDIR/cli/target/release/vauchi" "$E2E_BIN_DIR/"
+
+        echo "Building ohttp-relay binary..."
+        git clone --depth=1 --branch main \
+          "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
+        cargo build --release --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$E2E_BIN_DIR/"
 
         rm -rf "$BUILD_TMPDIR"
       fi
