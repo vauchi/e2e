@@ -68,7 +68,23 @@ impl OhttpRelayInstance {
 impl Drop for OhttpRelayInstance {
     fn drop(&mut self) {
         if let Some(mut process) = self.process.take() {
+            // Kill and wait for exit so the port is fully released.
+            // start_kill() alone returns immediately — the process may
+            // still hold the port when the next test tries to bind it.
             let _ = process.start_kill();
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                if let Ok(rt) = rt {
+                    let _ = rt.block_on(async {
+                        tokio::time::timeout(std::time::Duration::from_secs(5), process.wait())
+                            .await
+                    });
+                }
+            })
+            .join()
+            .ok();
         }
     }
 }
@@ -251,6 +267,19 @@ impl Drop for OhttpRelayManager {
             && let Some(mut process) = instance.process.take()
         {
             let _ = process.start_kill();
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                if let Ok(rt) = rt {
+                    let _ = rt.block_on(async {
+                        tokio::time::timeout(std::time::Duration::from_secs(5), process.wait())
+                            .await
+                    });
+                }
+            })
+            .join()
+            .ok();
         }
     }
 }

@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -19,28 +18,15 @@ use tracing::{debug, info};
 
 use crate::error::{E2eError, E2eResult};
 
-/// Base port range start for relay servers (tests will allocate from here).
-const PORT_RANGE_START: u16 = 18100;
-
-/// Global port counter to defend against TCP TIME_WAIT collisions.
-static NEXT_PORT: AtomicU16 = AtomicU16::new(PORT_RANGE_START);
-
-/// Reserve an available port by binding to port 0.
+/// Reserve an available port pair (relay + metrics) by binding to port 0.
 ///
 /// Asks the OS to assign a free port, then immediately releases it.
-/// The atomic counter provides a second layer of uniqueness across
-/// parallel tests — even if the OS reassigns the same port to a
-/// different test between release and relay spawn, the counter
-/// ensures each test gets a distinct allocation.
+/// The metrics port (relay + 1000) is also probed.
 ///
-/// Previous approach used check-then-act (`is_port_available`), which
-/// had a TOCTOU race under parallel nextest execution.
+/// There is a small TOCTOU window between releasing the listeners and
+/// the relay binary binding — mitigated by the retry loop in `spawn_one`.
 pub fn find_available_port() -> E2eResult<u16> {
     for _ in 0..100 {
-        // Advance counter to avoid reusing ports from recent tests
-        // (defends against TCP TIME_WAIT collisions).
-        let _seq = NEXT_PORT.fetch_add(2, Ordering::SeqCst);
-
         // Ask the OS for a free port (bind to :0).
         let listener = TcpListener::bind("127.0.0.1:0")
             .map_err(|e| E2eError::relay(format!("Failed to bind ephemeral port: {e}")))?;
