@@ -67,7 +67,7 @@ fn create_ohttp_transport(ohttp_relay_url: &str, ohttp_key: &[u8]) -> HttpTransp
 
 // @scenario: sync:OHTTP key fetch
 #[tokio::test]
-async fn test_ohttp_key_bootstrap_via_relay() {
+async fn integration_ohttp_key_bootstrap_via_relay() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // Fetch OHTTP key config via ohttp-relay → vauchi-relay
@@ -103,7 +103,7 @@ async fn test_ohttp_key_bootstrap_via_relay() {
 
 // @scenario: sync:OHTTP send
 #[tokio::test]
-async fn test_send_and_fetch_via_ohttp() {
+async fn integration_ohttp_send_and_fetch() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // 1. Fetch OHTTP key
@@ -164,10 +164,11 @@ async fn test_send_and_fetch_via_ohttp() {
 
     // 7. Verify fetch returns empty after ack
     let transport4 = create_ohttp_transport(&ohttp_url, &key_bytes);
-    let fetched_after = transport4.fetch(&[recipient_id]);
-    assert!(fetched_after.is_ok());
+    let after_blobs = transport4
+        .fetch(&[recipient_id])
+        .expect("fetch after ack should succeed");
     assert!(
-        fetched_after.unwrap().is_empty(),
+        after_blobs.is_empty(),
         "fetch after ack should return no blobs"
     );
 
@@ -179,7 +180,7 @@ async fn test_send_and_fetch_via_ohttp() {
 
 // @scenario: exchange:OHTTP relay exchange
 #[tokio::test]
-async fn test_exchange_offer_claim_complete_via_ohttp() {
+async fn integration_ohttp_exchange_offer_claim_complete() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // Fetch OHTTP key
@@ -229,7 +230,7 @@ async fn test_exchange_offer_claim_complete_via_ohttp() {
 
 // @scenario: sync:OHTTP fail-closed
 #[tokio::test]
-async fn test_fail_closed_without_ohttp() {
+async fn integration_ohttp_fail_closed_without_config() {
     // Transport with allow_direct=false and no OHTTP client must refuse requests.
     let config = HttpTransportConfig {
         relay_url: "http://127.0.0.1:1".to_string(),
@@ -253,7 +254,7 @@ async fn test_fail_closed_without_ohttp() {
 
 // @scenario: sync:OHTTP stale key
 #[tokio::test]
-async fn test_ohttp_with_garbage_key_returns_error() {
+async fn integration_ohttp_with_garbage_key_returns_error() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // Use a valid-format but wrong key (generate a fresh one not matching the relay)
