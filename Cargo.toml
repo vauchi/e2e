@@ -66,6 +66,10 @@ ohttp = { version = "0.7", default-features = false, features = ["client", "rust
 axum = "0.7"
 tower = "0.5"
 
+# Key fingerprint verification
+sha2 = "0.10"
+hex = "0.4"
+
 [[bin]]
 name = "seed-contacts"
 path = "src/bin/seed_contacts.rs"
@@ -129,6 +133,10 @@ path = "tests/yaml_scenarios.rs"
 [[test]]
 name = "ohttp_integration"
 path = "tests/ohttp_integration.rs"
+
+[[test]]
+name = "ohttp_advanced"
+path = "tests/ohttp_advanced.rs"
 
 [[test]]
 name = "version_enforcement"
