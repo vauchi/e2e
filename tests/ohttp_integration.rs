@@ -281,3 +281,64 @@ async fn integration_ohttp_with_garbage_key_returns_error() {
     ohttp_mgr.stop().await;
     relay_mgr.stop_all().await;
 }
+
+// ── Smoke: OHTTP key bootstrap + send ──────────────────────────────
+// Minimal OHTTP smoke tests for MR gate.
+
+// @scenario: sync:OHTTP key bootstrap + send
+#[tokio::test]
+async fn smoke_ohttp_key_bootstrap_and_send() {
+    let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
+
+    // 1. Fetch OHTTP key
+    let client = reqwest::Client::new();
+    let key_bytes = client
+        .get(format!("{}/v2/ohttp-key", ohttp_url))
+        .send()
+        .await
+        .expect("fetch key")
+        .bytes()
+        .await
+        .expect("read key");
+
+    assert!(!key_bytes.is_empty(), "OHTTP key must not be empty");
+
+    // 2. Verify key is valid
+    let ohttp_client = OhttpClient::new(key_bytes.to_vec());
+    assert!(
+        ohttp_client.is_ok(),
+        "OHTTP key must be valid: {:?}",
+        ohttp_client.err()
+    );
+
+    // 3. Send via OHTTP
+    let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    assert!(result.is_ok(), "send via OHTTP failed: {:?}", result.err());
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
+
+// @scenario: sync:OHTTP fail-closed
+#[tokio::test]
+async fn smoke_ohttp_fail_closed() {
+    // Transport with allow_direct=false and no OHTTP must refuse.
+    let config = HttpTransportConfig {
+        relay_url: "http://127.0.0.1:1".to_string(),
+        timeout_ms: 1_000,
+        proxy: ProxyConfig::None,
+        allow_direct: false,
+        pinned_certs: vec![],
+    };
+    let transport = HttpTransport::new(config);
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("OHTTP not configured"),
+        "should fail-closed without OHTTP"
+    );
+}
