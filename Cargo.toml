@@ -62,6 +62,10 @@ vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 # OHTTP key generation for stale-key error tests
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"] }
 
+# Mock gateway for IP obfuscation verification tests
+axum = "0.7"
+tower = "0.5"
+
 [[bin]]
 name = "seed-contacts"
 path = "src/bin/seed_contacts.rs"

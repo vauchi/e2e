@@ -250,6 +250,239 @@ async fn integration_ohttp_fail_closed_without_config() {
     );
 }
 
+// ── P1.5: IP Obfuscation Verification ─────────────────────────────
+
+// @scenario: sync:OHTTP IP obfuscation
+#[tokio::test]
+async fn integration_ohttp_relay_strips_client_identity() {
+    use std::net::SocketAddr;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    /// Headers that, if forwarded, would leak the client's identity.
+    const IDENTIFYING_HEADERS: &[&str] = &[
+        "x-forwarded-for",
+        "x-real-ip",
+        "forwarded",
+        "via",
+        "x-client-ip",
+        "cf-connecting-ip",
+        "true-client-ip",
+        "cookie",
+        "authorization",
+        "x-custom-client-id",
+    ];
+
+    /// Recorded metadata from a request received by the mock gateway.
+    #[derive(Debug, Clone)]
+    struct RecordedRequest {
+        remote_addr: SocketAddr,
+        headers: Vec<(String, String)>,
+        method: String,
+        uri: String,
+    }
+
+    // ── 1. Spawn a mock gateway that records all request metadata ──
+
+    let recorded: Arc<Mutex<Vec<RecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
+    let recorded_clone = recorded.clone();
+
+    let mock_app = {
+        use axum::{
+            Router,
+            body::Bytes,
+            extract::ConnectInfo,
+            http::StatusCode,
+            routing::{get, post},
+        };
+
+        let rec = recorded_clone.clone();
+        let ohttp_handler =
+            move |ConnectInfo(addr): ConnectInfo<SocketAddr>,
+                  request: axum::http::Request<axum::body::Body>| {
+                let rec = rec.clone();
+                async move {
+                    let headers: Vec<(String, String)> = request
+                        .headers()
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<binary>").to_string()))
+                        .collect();
+
+                    rec.lock().await.push(RecordedRequest {
+                        remote_addr: addr,
+                        headers,
+                        method: request.method().to_string(),
+                        uri: request.uri().to_string(),
+                    });
+
+                    // Return a dummy OHTTP response (400 is fine — we only care about
+                    // what headers arrived, not a valid OHTTP exchange).
+                    StatusCode::BAD_REQUEST
+                }
+            };
+
+        let rec2 = recorded_clone.clone();
+        let key_handler =
+            move |ConnectInfo(addr): ConnectInfo<SocketAddr>,
+                  request: axum::http::Request<axum::body::Body>| {
+                let rec2 = rec2.clone();
+                async move {
+                    let headers: Vec<(String, String)> = request
+                        .headers()
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("<binary>").to_string()))
+                        .collect();
+
+                    rec2.lock().await.push(RecordedRequest {
+                        remote_addr: addr,
+                        headers,
+                        method: "GET".to_string(),
+                        uri: "/v2/ohttp-key".to_string(),
+                    });
+
+                    // Return a dummy key (enough to record the request metadata).
+                    (
+                        StatusCode::OK,
+                        [("content-type", "application/ohttp-keys")],
+                        Bytes::from_static(&[0xAA, 0xBB]),
+                    )
+                }
+            };
+
+        Router::new()
+            .route("/v2/ohttp", post(ohttp_handler))
+            .route("/v2/ohttp-key", get(key_handler))
+            .route("/health", get(|| async { StatusCode::OK }))
+    };
+
+    let mock_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind mock gateway");
+    let mock_addr = mock_listener.local_addr().expect("mock gateway addr");
+    let mock_url = format!("http://{mock_addr}");
+
+    tokio::spawn(async move {
+        axum::serve(
+            mock_listener,
+            mock_app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    // ── 2. Spawn ohttp-relay pointing at the mock gateway ─────────
+
+    let mut ohttp_mgr =
+        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
+    ohttp_mgr.spawn(&mock_url).await.expect("spawn ohttp-relay");
+    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
+    let ohttp_port = ohttp_mgr.instance().expect("instance").port;
+
+    // ── 3. Client sends requests WITH identifying headers ─────────
+
+    let client = reqwest::Client::new();
+
+    // 3a. Key fetch with identifying headers
+    let _key_resp = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .header("X-Forwarded-For", "192.168.1.42")
+        .header("X-Real-Ip", "10.0.0.99")
+        .header("Forwarded", "for=203.0.113.50")
+        .header("Via", "1.1 client-proxy.example.com")
+        .header("Cookie", "session=secret-token-12345")
+        .header("Authorization", "Bearer client-jwt-token")
+        .header("X-Custom-Client-Id", "unique-device-fingerprint")
+        .send()
+        .await
+        .expect("key fetch through ohttp-relay");
+
+    // 3b. OHTTP blob forward with identifying headers
+    let _ohttp_resp = client
+        .post(format!("{ohttp_url}/v2/ohttp"))
+        .header("Content-Type", "message/ohttp-req")
+        .header("X-Forwarded-For", "192.168.1.42")
+        .header("X-Real-Ip", "10.0.0.99")
+        .header("Forwarded", "for=203.0.113.50")
+        .header("Via", "1.1 client-proxy.example.com")
+        .header("Cookie", "session=secret-token-12345")
+        .header("Authorization", "Bearer client-jwt-token")
+        .header("X-Custom-Client-Id", "unique-device-fingerprint")
+        .header("True-Client-Ip", "172.16.0.5")
+        .header("Cf-Connecting-Ip", "198.51.100.78")
+        .body(vec![0x01, 0x02, 0x03])
+        .send()
+        .await
+        .expect("OHTTP forward through ohttp-relay");
+
+    // ── 4. Verify: no client-identifying information reached the gateway ──
+
+    let requests = recorded.lock().await;
+    assert!(
+        requests.len() >= 2,
+        "mock gateway should have received at least 2 requests (key + ohttp), got {}",
+        requests.len()
+    );
+
+    for (i, req) in requests.iter().enumerate() {
+        // 4a. Remote address must be ohttp-relay, not the test client
+        assert_eq!(
+            req.remote_addr.ip(),
+            std::net::IpAddr::from([127, 0, 0, 1]),
+            "request {i} ({} {}): remote IP must be loopback",
+            req.method,
+            req.uri
+        );
+        // The connection must come from the ohttp-relay process, not the test client.
+        // We can't check the exact ephemeral port, but we verify it's NOT the ohttp-relay's
+        // listen port (that would mean the client connected directly to the gateway).
+        assert_ne!(
+            req.remote_addr.port(),
+            ohttp_port,
+            "request {i}: connection must NOT come from ohttp-relay's listen port \
+             (that would indicate a misconfigured test, not a real forwarded connection)"
+        );
+
+        // 4b. No identifying headers must be present
+        let header_names: Vec<&str> = req.headers.iter().map(|(k, _)| k.as_str()).collect();
+        for &forbidden in IDENTIFYING_HEADERS {
+            assert!(
+                !header_names.contains(&forbidden),
+                "request {i} ({} {}): identifying header '{}' was forwarded to the gateway — \
+                 ohttp-relay must strip all client headers. Headers present: {:?}",
+                req.method,
+                req.uri,
+                forbidden,
+                header_names
+            );
+        }
+
+        // 4c. Specifically verify none of the injected client IP values appear
+        //     anywhere in the header values
+        let client_ips = [
+            "192.168.1.42",
+            "10.0.0.99",
+            "203.0.113.50",
+            "172.16.0.5",
+            "198.51.100.78",
+        ];
+        for (hdr_name, hdr_value) in &req.headers {
+            for client_ip in &client_ips {
+                assert!(
+                    !hdr_value.contains(client_ip),
+                    "request {i} ({} {}): client IP '{}' leaked in header '{}': '{}'",
+                    req.method,
+                    req.uri,
+                    client_ip,
+                    hdr_name,
+                    hdr_value
+                );
+            }
+        }
+    }
+
+    ohttp_mgr.stop().await;
+}
+
 // ── P2: Error cases ───���────────────────────────────────────────────
 
 // @scenario: sync:OHTTP stale key
