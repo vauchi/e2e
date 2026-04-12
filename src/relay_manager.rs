@@ -157,6 +157,8 @@ pub struct RelayConfig {
     pub ohttp_enabled: bool,
     /// OHTTP key rotation interval in hours (default: 24).
     pub ohttp_key_rotation_hours: u64,
+    /// Override rotation interval in seconds (for key rotation tests).
+    pub ohttp_key_rotation_secs: Option<u64>,
     /// Version policy: minimum required client compat version (0 = no enforcement).
     pub version_min: Option<u16>,
     /// Version policy: version at which the relay warns clients to upgrade.
@@ -178,6 +180,7 @@ impl Default for RelayConfig {
             http_api_enabled: true,
             ohttp_enabled: true,
             ohttp_key_rotation_hours: 24,
+            ohttp_key_rotation_secs: None,
             version_min: None,
             version_warn: None,
             version_grace_days: None,
@@ -334,6 +337,12 @@ impl RelayManager {
                 "RELAY_OHTTP_KEY_ROTATION_HOURS".to_string(),
                 self.config.ohttp_key_rotation_hours.to_string(),
             );
+            if let Some(secs) = self.config.ohttp_key_rotation_secs {
+                env_vars.insert(
+                    "RELAY_OHTTP_KEY_ROTATION_SECS".to_string(),
+                    secs.to_string(),
+                );
+            }
         }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
         self.add_version_policy_env_vars(&mut env_vars);
@@ -558,6 +567,12 @@ impl RelayManager {
                 "RELAY_OHTTP_KEY_ROTATION_HOURS".to_string(),
                 self.config.ohttp_key_rotation_hours.to_string(),
             );
+            if let Some(secs) = self.config.ohttp_key_rotation_secs {
+                env_vars.insert(
+                    "RELAY_OHTTP_KEY_ROTATION_SECS".to_string(),
+                    secs.to_string(),
+                );
+            }
         }
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
         self.add_version_policy_env_vars(&mut env_vars);

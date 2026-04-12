@@ -483,6 +483,139 @@ async fn integration_ohttp_relay_strips_client_identity() {
     ohttp_mgr.stop().await;
 }
 
+// ── P1.4: Key Rotation Fallback ───────────────────────────────────
+
+/// Spawn a relay with fast key rotation (2s interval) + ohttp-relay.
+async fn spawn_ohttp_stack_fast_rotation() -> (RelayManager, OhttpRelayManager, String, String) {
+    let relay_config = RelayConfig {
+        http_api_enabled: true,
+        ohttp_enabled: true,
+        ohttp_key_rotation_hours: 1,
+        ohttp_key_rotation_secs: Some(2),
+        ..Default::default()
+    };
+
+    let mut relay_mgr = RelayManager::with_config(relay_config)
+        .await
+        .expect("relay manager");
+    relay_mgr.spawn(1).await.expect("spawn relay");
+
+    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
+
+    let mut ohttp_mgr =
+        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
+    ohttp_mgr
+        .spawn(&relay_http_url)
+        .await
+        .expect("spawn ohttp-relay");
+
+    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
+
+    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
+}
+
+// @scenario: sync:OHTTP key rotation fallback
+#[tokio::test]
+async fn integration_ohttp_key_rotation_grace_period() {
+    let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
+        spawn_ohttp_stack_fast_rotation().await;
+
+    let client = reqwest::Client::new();
+
+    // 1. Fetch initial key K1
+    let key_k1 = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch K1")
+        .bytes()
+        .await
+        .expect("read K1");
+    assert!(!key_k1.is_empty(), "K1 must not be empty");
+
+    // 2. Send with K1 — should succeed (K1 is current)
+    let transport_k1 = create_ohttp_transport(&ohttp_url, &key_k1);
+    let result = transport_k1.send_update(&"a".repeat(64), "dGVzdA==");
+    assert!(
+        result.is_ok(),
+        "send with current key K1 must succeed: {:?}",
+        result.err()
+    );
+
+    // 3. Wait for key rotation (2s interval + margin)
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 4. Verify key has actually rotated (new key != K1)
+    let key_k2 = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch K2")
+        .bytes()
+        .await
+        .expect("read K2");
+    assert_ne!(
+        key_k1.as_ref(),
+        key_k2.as_ref(),
+        "key must have rotated after waiting"
+    );
+
+    // 5. Send with stale K1 — should STILL succeed (S10 grace period)
+    let transport_stale = create_ohttp_transport(&ohttp_url, &key_k1);
+    let grace_result = transport_stale.send_update(&"b".repeat(64), "Z3JhY2U=");
+    assert!(
+        grace_result.is_ok(),
+        "send with stale K1 must succeed via S10 grace period: {:?}",
+        grace_result.err()
+    );
+
+    // 6. Wait for second rotation (K1 gets evicted, K2 becomes previous)
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 7. Verify another rotation happened
+    let key_k3 = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch K3")
+        .bytes()
+        .await
+        .expect("read K3");
+    assert_ne!(
+        key_k2.as_ref(),
+        key_k3.as_ref(),
+        "key must have rotated a second time"
+    );
+
+    // 8. Send with K1 — should FAIL (evicted after 2nd rotation)
+    let transport_evicted = create_ohttp_transport(&ohttp_url, &key_k1);
+    let evicted_result = transport_evicted.send_update(&"c".repeat(64), "ZXZpY3RlZA==");
+    assert!(
+        evicted_result.is_err(),
+        "send with doubly-stale K1 must fail (key evicted after 2nd rotation)"
+    );
+
+    // 9. Refetch key and send — should succeed (client recovery)
+    let key_fresh = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("refetch key")
+        .bytes()
+        .await
+        .expect("read fresh key");
+    let transport_fresh = create_ohttp_transport(&ohttp_url, &key_fresh);
+    let fresh_result = transport_fresh.send_update(&"d".repeat(64), "ZnJlc2g=");
+    assert!(
+        fresh_result.is_ok(),
+        "send with refetched key must succeed: {:?}",
+        fresh_result.err()
+    );
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
+
 // ── P2: Error cases ───���────────────────────────────────────────────
 
 // @scenario: sync:OHTTP stale key
