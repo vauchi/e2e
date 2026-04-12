@@ -36,7 +36,11 @@ pub fn find_available_port() -> E2eResult<u16> {
             .port();
 
         // Also verify the metrics port (port + 1000) is free.
-        let metrics_ok = TcpListener::bind(format!("127.0.0.1:{}", port + 1000)).is_ok();
+        // Skip ports that would overflow u16 when adding 1000.
+        let Some(metrics_port) = port.checked_add(1000) else {
+            continue;
+        };
+        let metrics_ok = TcpListener::bind(format!("127.0.0.1:{metrics_port}")).is_ok();
 
         // Drop both listeners to release the ports right before relay spawn.
         drop(listener);
