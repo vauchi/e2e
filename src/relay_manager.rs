@@ -20,39 +20,28 @@ use crate::error::{E2eError, E2eResult};
 
 /// Reserve an available port pair (relay + metrics) by binding to port 0.
 ///
-/// Asks the OS to assign a free port, then immediately releases it.
-/// The metrics port (relay + 1000) is also probed.
+/// Both ports are independently allocated from the OS ephemeral range,
+/// avoiding the fragile `relay + 1000` offset that fails under port pressure
+/// from parallel test binaries.
 ///
 /// There is a small TOCTOU window between releasing the listeners and
 /// the relay binary binding — mitigated by the retry loop in `spawn_one`.
 pub fn find_available_port() -> E2eResult<u16> {
-    for _ in 0..100 {
-        // Ask the OS for a free port (bind to :0).
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .map_err(|e| E2eError::relay(format!("Failed to bind ephemeral port: {e}")))?;
-        let port = listener
-            .local_addr()
-            .map_err(|e| E2eError::relay(format!("Failed to get local addr: {e}")))?
-            .port();
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| E2eError::relay(format!("Failed to bind ephemeral port: {e}")))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| E2eError::relay(format!("Failed to get local addr: {e}")))?
+        .port();
+    drop(listener);
+    Ok(port)
+}
 
-        // Also verify the metrics port (port + 1000) is free.
-        // Skip ports that would overflow u16 when adding 1000.
-        let Some(metrics_port) = port.checked_add(1000) else {
-            continue;
-        };
-        let metrics_ok = TcpListener::bind(format!("127.0.0.1:{metrics_port}")).is_ok();
-
-        // Drop both listeners to release the ports right before relay spawn.
-        drop(listener);
-
-        if metrics_ok {
-            return Ok(port);
-        }
-    }
-
-    Err(E2eError::relay(
-        "Could not find available port pair for relay server",
-    ))
+/// Reserve two independently-allocated ephemeral ports (relay + metrics).
+pub fn find_available_port_pair() -> E2eResult<(u16, u16)> {
+    let relay_port = find_available_port()?;
+    let metrics_port = find_available_port()?;
+    Ok((relay_port, metrics_port))
 }
 
 /// Timeout for relay startup.
@@ -280,14 +269,15 @@ impl RelayManager {
 
     /// Attempt to spawn a single relay instance.
     async fn try_spawn_one(&mut self, index: usize) -> E2eResult<()> {
-        // Allocate port dynamically if base_port is 0
-        let port = if self.config.base_port == 0 {
-            find_available_port()?
+        // Allocate ports dynamically if base_port is 0
+        let (port, metrics_port) = if self.config.base_port == 0 {
+            find_available_port_pair()?
         } else {
-            self.config.base_port + index as u16
+            (
+                self.config.base_port + index as u16,
+                self.config.base_port + index as u16 + 1000,
+            )
         };
-        // Metrics port is relay port + 1000
-        let metrics_port = port + 1000;
 
         info!("Spawning relay {} on port {}", index, port);
 
@@ -364,7 +354,8 @@ impl RelayManager {
         // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
         let http_url = format!("http://127.0.0.1:{}", metrics_port);
-        self.wait_for_health(port, index, &mut child).await?;
+        self.wait_for_health(port, metrics_port, index, &mut child)
+            .await?;
 
         let instance = RelayInstance {
             url,
@@ -388,9 +379,14 @@ impl RelayManager {
     /// the main port was checked, so a relay whose metrics port failed to bind
     /// (port conflict) passed the health check while the CLI — which connects
     /// to the metrics port — got "Connection refused".
-    async fn wait_for_health(&self, port: u16, index: usize, child: &mut Child) -> E2eResult<()> {
+    async fn wait_for_health(
+        &self,
+        port: u16,
+        metrics_port: u16,
+        index: usize,
+        child: &mut Child,
+    ) -> E2eResult<()> {
         let health_url = format!("http://127.0.0.1:{}/health", port);
-        let metrics_port = port + 1000;
         let metrics_url = format!("http://127.0.0.1:{}/health", metrics_port);
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(2))
@@ -589,7 +585,8 @@ impl RelayManager {
             .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
 
         // Wait for health
-        self.wait_for_health(port, index, &mut child).await?;
+        self.wait_for_health(port, metrics_port, index, &mut child)
+            .await?;
 
         // Update the instance
         if let Some(relay) = self.relays.get_mut(index) {
@@ -660,32 +657,40 @@ mod tests {
         assert_eq!(config.storage_backend, "memory");
     }
 
+    // @internal
     #[test]
     fn test_find_available_port() {
         let port1 = find_available_port().expect("Should find port");
         let port2 = find_available_port().expect("Should find port");
 
-        // OS-assigned ports must be distinct
         assert_ne!(port1, port2, "consecutive ports must differ");
-
-        // Ports must be non-privileged (>1024) and in valid u16 range
         assert!(port1 > 1024, "port {port1} should be non-privileged");
         assert!(port2 > 1024, "port {port2} should be non-privileged");
 
-        // Both the relay port and its metrics port (port+1000) must be bindable
-        // right after allocation — this is the whole point of the reservation.
-        for port in [port1, port2] {
-            let listener = TcpListener::bind(format!("127.0.0.1:{port}"));
-            assert!(
-                listener.is_ok(),
-                "port {port} should be bindable after allocation"
-            );
-            let metrics = TcpListener::bind(format!("127.0.0.1:{}", port + 1000));
-            assert!(
-                metrics.is_ok(),
-                "metrics port {} should be bindable",
-                port + 1000
-            );
-        }
+        // Port must be bindable right after allocation.
+        let listener = TcpListener::bind(format!("127.0.0.1:{port1}"));
+        assert!(
+            listener.is_ok(),
+            "port {port1} should be bindable after allocation"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_find_available_port_pair() {
+        let (relay, metrics) = find_available_port_pair().expect("Should find port pair");
+
+        assert_ne!(relay, metrics, "relay and metrics ports must differ");
+        assert!(relay > 1024, "relay port {relay} should be non-privileged");
+        assert!(
+            metrics > 1024,
+            "metrics port {metrics} should be non-privileged"
+        );
+
+        // Both ports must be bindable right after allocation.
+        let r = TcpListener::bind(format!("127.0.0.1:{relay}"));
+        assert!(r.is_ok(), "relay port {relay} should be bindable");
+        let m = TcpListener::bind(format!("127.0.0.1:{metrics}"));
+        assert!(m.is_ok(), "metrics port {metrics} should be bindable");
     }
 }
