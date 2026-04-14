@@ -88,6 +88,122 @@ fn create_ohttp_transport(ohttp_relay_url: &str, ohttp_key: &[u8]) -> HttpTransp
     transport
 }
 
+// ── P1.5: Key cache behavior ──────────────────────────────────────
+
+/// Spawn a relay with fast rotation (2s) and an ohttp-relay with a short cache (2s).
+/// This exercises the production-like path where the proxy caches keys.
+async fn spawn_ohttp_stack_cached_rotation() -> (RelayManager, OhttpRelayManager, String, String) {
+    let relay_config = RelayConfig {
+        http_api_enabled: true,
+        ohttp_enabled: true,
+        ohttp_key_rotation_hours: 1,
+        ohttp_key_rotation_secs: Some(2),
+        ..Default::default()
+    };
+
+    let mut relay_mgr = RelayManager::with_config(relay_config)
+        .await
+        .expect("relay manager");
+    relay_mgr.spawn(1).await.expect("spawn relay");
+
+    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
+
+    let ohttp_config = OhttpRelayConfig {
+        key_cache_ttl_secs: 2,
+        ..OhttpRelayConfig::default()
+    };
+    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
+    ohttp_mgr
+        .spawn(&relay_http_url)
+        .await
+        .expect("spawn ohttp-relay");
+
+    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
+
+    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
+}
+
+// @scenario: sync:OHTTP cached key remains valid for requests
+#[tokio::test]
+async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
+    let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
+        spawn_ohttp_stack_cached_rotation().await;
+
+    let client = reqwest::Client::new();
+
+    // 1. Fetch key (may be cached by the ohttp-relay proxy)
+    let key = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch key")
+        .bytes()
+        .await
+        .expect("read key");
+
+    // 2. Rapid re-fetch — should return the same bytes (key hasn't
+    //    rotated yet; the proxy may also be serving a cache hit)
+    let key_again = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch key again")
+        .bytes()
+        .await
+        .expect("read key again");
+    assert_eq!(
+        key.as_ref(),
+        key_again.as_ref(),
+        "rapid re-fetch must return the same key"
+    );
+
+    // 3. Send with cached key — must succeed
+    let transport = create_ohttp_transport(&ohttp_url, &key);
+    let blob_id = transport
+        .send_update(&"a".repeat(64), "dGVzdA==")
+        .expect("send with cached key must succeed");
+    assert!(!blob_id.is_empty(), "blob_id must be non-empty");
+
+    // 4. Wait for both cache TTL (2s) and rotation (2s) to expire.
+    //    3s guarantees exactly one rotation; the S10 grace period
+    //    retains the previous key so step 5 succeeds.
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    // 5. Verify the proxy cache has expired by checking that the
+    //    served key has changed (rotation happened + cache refreshed)
+    let key_after_expiry = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch key after expiry")
+        .bytes()
+        .await
+        .expect("read key after expiry");
+    assert_ne!(
+        key.as_ref(),
+        key_after_expiry.as_ref(),
+        "key must differ after cache TTL + rotation (proves cache expired)"
+    );
+
+    // 6. Send with the old (now stale) key — must still succeed
+    //    via the gateway's S10 grace period (previous key fallback)
+    let transport_stale = create_ohttp_transport(&ohttp_url, &key);
+    let grace_blob_id = transport_stale
+        .send_update(&"b".repeat(64), "Z3JhY2U=")
+        .expect("send with stale key must succeed via S10 grace");
+    assert!(!grace_blob_id.is_empty(), "grace blob_id must be non-empty");
+
+    // 7. Send with fresh key — must succeed
+    let transport_fresh = create_ohttp_transport(&ohttp_url, &key_after_expiry);
+    let fresh_blob_id = transport_fresh
+        .send_update(&"c".repeat(64), "ZnJlc2g=")
+        .expect("send with fresh key must succeed");
+    assert!(!fresh_blob_id.is_empty(), "fresh blob_id must be non-empty");
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
+
 // ── P2: Malformed / empty / oversized OHTTP blobs ─────────────────
 
 // @scenario: sync:OHTTP malformed blob
