@@ -31,6 +31,9 @@ pub struct OhttpRelayConfig {
     pub rate_limit_per_sec: u32,
     /// Request timeout in seconds.
     pub request_timeout_secs: u64,
+    /// TTL for caching upstream `/v2/ohttp-key` responses (seconds).
+    /// Set to 0 to disable caching. Default: 300.
+    pub key_cache_ttl_secs: u64,
 }
 
 impl Default for OhttpRelayConfig {
@@ -39,6 +42,7 @@ impl Default for OhttpRelayConfig {
             binary_path: None,
             rate_limit_per_sec: 100,
             request_timeout_secs: 30,
+            key_cache_ttl_secs: 300,
         }
     }
 }
@@ -176,6 +180,10 @@ impl OhttpRelayManager {
         env_vars.insert(
             "OHTTP_RELAY_REQUEST_TIMEOUT_SECS".to_string(),
             self.config.request_timeout_secs.to_string(),
+        );
+        env_vars.insert(
+            "OHTTP_RELAY_KEY_CACHE_TTL_SECS".to_string(),
+            self.config.key_cache_ttl_secs.to_string(),
         );
         env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
 

@@ -502,8 +502,11 @@ async fn spawn_ohttp_stack_fast_rotation() -> (RelayManager, OhttpRelayManager, 
 
     let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
 
-    let mut ohttp_mgr =
-        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
+    let ohttp_config = OhttpRelayConfig {
+        key_cache_ttl_secs: 0,
+        ..OhttpRelayConfig::default()
+    };
+    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
     ohttp_mgr
         .spawn(&relay_http_url)
         .await

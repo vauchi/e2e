@@ -231,6 +231,14 @@ impl RelayManager {
             return Ok(debug_path);
         }
 
+        // relay/ has its own Cargo workspace, so its binary lands in
+        // relay/target/ instead of the workspace-root target/.
+        let relay_own_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../relay/target/debug/vauchi-relay");
+        if relay_own_path.exists() {
+            return Ok(relay_own_path);
+        }
+
         Err(E2eError::relay(
             "Relay binary not found. Please run `just build-relay` first.",
         ))
