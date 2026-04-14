@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
 use crate::relay_manager::find_available_port;
@@ -109,7 +110,7 @@ impl OhttpRelayManager {
             Self::find_binary()?
         };
 
-        debug!(
+        info!(
             "Using vauchi-ohttp-relay binary at: {}",
             binary_path.display()
         );
@@ -190,12 +191,23 @@ impl OhttpRelayManager {
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
 
         let mut child = cmd
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn vauchi-ohttp-relay: {}", e)))?;
+
+        // Drain stderr in the background so the pipe buffer never fills.
+        // Lines are logged at warn level for post-mortem debugging.
+        if let Some(stderr) = child.stderr.take() {
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    warn!(target: "ohttp-relay", "{}", line);
+                }
+            });
+        }
 
         self.wait_for_health(port, &mut child).await?;
 

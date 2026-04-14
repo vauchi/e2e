@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
 
@@ -198,7 +199,7 @@ impl RelayManager {
             Self::find_relay_binary()?
         };
 
-        debug!("Using relay binary at: {}", binary_path.display());
+        info!("Using relay binary at: {}", binary_path.display());
 
         Ok(Self {
             config,
@@ -347,17 +348,25 @@ impl RelayManager {
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
-            // Redirect both stdout and stderr to null to prevent buffer filling.
-            // When pipes are not consumed, the buffer fills (~64KB) and the relay
-            // process blocks on write(), becoming unresponsive under heavy load.
-            // We use TCP health checks instead of monitoring stderr for readiness.
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
 
         let mut child = cmd
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
+
+        // Drain stderr in the background so the pipe buffer never fills.
+        // Lines are logged at warn level for post-mortem debugging.
+        if let Some(stderr) = child.stderr.take() {
+            let relay_idx = index;
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    warn!(target: "relay", relay = relay_idx, "{}", line);
+                }
+            });
+        }
 
         // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
@@ -583,14 +592,23 @@ impl RelayManager {
 
         let mut cmd = Command::new(&self.binary_path);
         cmd.envs(env_vars)
-            // Use null for both to prevent buffer filling (same as spawn_one)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
 
         let mut child = cmd
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
+
+        if let Some(stderr) = child.stderr.take() {
+            let relay_idx = index;
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    warn!(target: "relay", relay = relay_idx, "{}", line);
+                }
+            });
+        }
 
         // Wait for health
         self.wait_for_health(port, metrics_port, index, &mut child)

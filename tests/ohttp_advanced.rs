@@ -7,121 +7,17 @@
 //!
 //! Split from `ohttp_integration.rs` to stay within file-size limits.
 
-use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient, ProxyConfig};
+#[allow(dead_code)]
+mod ohttp_helpers;
+
+use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use vauchi_e2e_tests::relay_manager::{RelayConfig, RelayManager};
 
-/// Spawn vauchi-relay with OHTTP enabled + ohttp-relay forwarding proxy.
-async fn spawn_ohttp_stack() -> (RelayManager, OhttpRelayManager, String, String) {
-    let relay_config = RelayConfig {
-        http_api_enabled: true,
-        ohttp_enabled: true,
-        ohttp_key_rotation_hours: 1,
-        ..Default::default()
-    };
-
-    let mut relay_mgr = RelayManager::with_config(relay_config)
-        .await
-        .expect("relay manager");
-    relay_mgr.spawn(1).await.expect("spawn relay");
-
-    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
-
-    let mut ohttp_mgr =
-        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
-    ohttp_mgr
-        .spawn(&relay_http_url)
-        .await
-        .expect("spawn ohttp-relay");
-
-    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
-
-    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
-}
-
-/// Spawn a relay with fast key rotation (2s interval) + ohttp-relay.
-async fn spawn_ohttp_stack_fast_rotation() -> (RelayManager, OhttpRelayManager, String, String) {
-    let relay_config = RelayConfig {
-        http_api_enabled: true,
-        ohttp_enabled: true,
-        ohttp_key_rotation_hours: 1,
-        ohttp_key_rotation_secs: Some(2),
-        ..Default::default()
-    };
-
-    let mut relay_mgr = RelayManager::with_config(relay_config)
-        .await
-        .expect("relay manager");
-    relay_mgr.spawn(1).await.expect("spawn relay");
-
-    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
-
-    let ohttp_config = OhttpRelayConfig {
-        key_cache_ttl_secs: 0,
-        ..OhttpRelayConfig::default()
-    };
-    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
-    ohttp_mgr
-        .spawn(&relay_http_url)
-        .await
-        .expect("spawn ohttp-relay");
-
-    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
-
-    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
-}
-
-/// Create an HttpTransport with OHTTP encryption active.
-fn create_ohttp_transport(ohttp_relay_url: &str, ohttp_key: &[u8]) -> HttpTransport {
-    let config = HttpTransportConfig {
-        relay_url: ohttp_relay_url.to_string(),
-        timeout_ms: 10_000,
-        proxy: ProxyConfig::None,
-        allow_direct: false,
-        pinned_certs: vec![],
-    };
-    let mut transport = HttpTransport::new(config);
-
-    let client = OhttpClient::new(ohttp_key.to_vec()).expect("create OhttpClient from key");
-    transport.set_ohttp(client);
-
-    transport
-}
-
-// ── P1.5: Key cache behavior ──────────────────────────────────────
-
-/// Spawn a relay with fast rotation (2s) and an ohttp-relay with a short cache (2s).
-/// This exercises the production-like path where the proxy caches keys.
-async fn spawn_ohttp_stack_cached_rotation() -> (RelayManager, OhttpRelayManager, String, String) {
-    let relay_config = RelayConfig {
-        http_api_enabled: true,
-        ohttp_enabled: true,
-        ohttp_key_rotation_hours: 1,
-        ohttp_key_rotation_secs: Some(2),
-        ..Default::default()
-    };
-
-    let mut relay_mgr = RelayManager::with_config(relay_config)
-        .await
-        .expect("relay manager");
-    relay_mgr.spawn(1).await.expect("spawn relay");
-
-    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
-
-    let ohttp_config = OhttpRelayConfig {
-        key_cache_ttl_secs: 2,
-        ..OhttpRelayConfig::default()
-    };
-    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
-    ohttp_mgr
-        .spawn(&relay_http_url)
-        .await
-        .expect("spawn ohttp-relay");
-
-    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
-
-    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
-}
+use ohttp_helpers::{
+    ROTATION_WAIT_SECS, create_ohttp_transport, spawn_ohttp_stack,
+    spawn_ohttp_stack_cached_rotation, spawn_ohttp_stack_fast_rotation,
+};
 
 // @scenario: sync:OHTTP cached key remains valid for requests
 #[tokio::test]
@@ -167,7 +63,7 @@ async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
     // 4. Wait for both cache TTL (2s) and rotation (2s) to expire.
     //    3s guarantees exactly one rotation; the S10 grace period
     //    retains the previous key so step 5 succeeds.
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
 
     // 5. Verify the proxy cache has expired by checking that the
     //    served key has changed (rotation happened + cache refreshed)

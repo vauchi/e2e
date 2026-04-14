@@ -13,55 +13,15 @@
 //!
 //! These tests exercise the real binaries end-to-end — no mocks.
 
+#[allow(dead_code)]
+mod ohttp_helpers;
+
 use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
-use vauchi_e2e_tests::relay_manager::{RelayConfig, RelayManager};
 
-/// Spawn vauchi-relay with OHTTP enabled + ohttp-relay forwarding proxy.
-/// Returns (relay_manager, ohttp_relay_manager, relay_http_url, ohttp_relay_url).
-async fn spawn_ohttp_stack() -> (RelayManager, OhttpRelayManager, String, String) {
-    let relay_config = RelayConfig {
-        http_api_enabled: true,
-        ohttp_enabled: true,
-        ohttp_key_rotation_hours: 1,
-        ..Default::default()
-    };
-
-    let mut relay_mgr = RelayManager::with_config(relay_config)
-        .await
-        .expect("relay manager");
-    relay_mgr.spawn(1).await.expect("spawn relay");
-
-    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
-
-    let mut ohttp_mgr =
-        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
-    ohttp_mgr
-        .spawn(&relay_http_url)
-        .await
-        .expect("spawn ohttp-relay");
-
-    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
-
-    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
-}
-
-/// Create an HttpTransport configured to use the ohttp-relay, with OHTTP encryption active.
-fn create_ohttp_transport(ohttp_relay_url: &str, ohttp_key: &[u8]) -> HttpTransport {
-    let config = HttpTransportConfig {
-        relay_url: ohttp_relay_url.to_string(),
-        timeout_ms: 10_000,
-        proxy: ProxyConfig::None,
-        allow_direct: false,
-        pinned_certs: vec![],
-    };
-    let mut transport = HttpTransport::new(config);
-
-    let client = OhttpClient::new(ohttp_key.to_vec()).expect("create OhttpClient from key");
-    transport.set_ohttp(client);
-
-    transport
-}
+use ohttp_helpers::{
+    ROTATION_WAIT_SECS, create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_fast_rotation,
+};
 
 // ── P1: Key Bootstrap ──────────────────────────────────────────────
 
@@ -485,38 +445,6 @@ async fn integration_ohttp_relay_strips_client_identity() {
 
 // ── P1.4: Key Rotation Fallback ───────────────────────────────────
 
-/// Spawn a relay with fast key rotation (2s interval) + ohttp-relay.
-async fn spawn_ohttp_stack_fast_rotation() -> (RelayManager, OhttpRelayManager, String, String) {
-    let relay_config = RelayConfig {
-        http_api_enabled: true,
-        ohttp_enabled: true,
-        ohttp_key_rotation_hours: 1,
-        ohttp_key_rotation_secs: Some(2),
-        ..Default::default()
-    };
-
-    let mut relay_mgr = RelayManager::with_config(relay_config)
-        .await
-        .expect("relay manager");
-    relay_mgr.spawn(1).await.expect("spawn relay");
-
-    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
-
-    let ohttp_config = OhttpRelayConfig {
-        key_cache_ttl_secs: 0,
-        ..OhttpRelayConfig::default()
-    };
-    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
-    ohttp_mgr
-        .spawn(&relay_http_url)
-        .await
-        .expect("spawn ohttp-relay");
-
-    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
-
-    (relay_mgr, ohttp_mgr, relay_http_url, ohttp_url)
-}
-
 // @scenario: sync:OHTTP key rotation fallback
 #[tokio::test]
 async fn integration_ohttp_key_rotation_grace_period() {
@@ -546,7 +474,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
     );
 
     // 3. Wait for key rotation (2s interval + margin)
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
 
     // 4. Verify key has actually rotated (new key != K1)
     let key_k2 = client
@@ -573,7 +501,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
     );
 
     // 6. Wait for second rotation (K1 gets evicted, K2 becomes previous)
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
 
     // 7. Verify another rotation happened
     let key_k3 = client
