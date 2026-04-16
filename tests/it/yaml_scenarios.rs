@@ -22,6 +22,8 @@
 use vauchi_e2e_tests::prelude::*;
 
 /// Run all smoke-tier YAML scenarios.
+// @internal
+// @internal
 #[tokio::test]
 async fn yaml_smoke_scenarios() {
     let mut loader = ScenarioLoader::new_default();
@@ -48,6 +50,8 @@ async fn yaml_smoke_scenarios() {
 }
 
 /// Run all integration-tier YAML scenarios.
+// @internal
+// @internal
 #[tokio::test]
 async fn yaml_integration_scenarios() {
     let mut loader = ScenarioLoader::new_default();
@@ -74,6 +78,8 @@ async fn yaml_integration_scenarios() {
 }
 
 /// Run all edge-case YAML scenarios.
+// @internal
+// @internal
 #[tokio::test]
 #[ignore = "edge scenarios use unimplemented YAML actions (partition_network, offline_exchange)"]
 async fn yaml_edge_scenarios() {
@@ -101,6 +107,8 @@ async fn yaml_edge_scenarios() {
 }
 
 /// Verify all YAML scenarios can be loaded and parsed (no runtime infra needed).
+// @internal
+// @internal
 #[tokio::test]
 async fn yaml_scenarios_parse_successfully() {
     let mut loader = ScenarioLoader::new_default();
