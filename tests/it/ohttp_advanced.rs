@@ -8,7 +8,7 @@
 //! Split from `ohttp_integration.rs` to stay within file-size limits.
 
 #[allow(dead_code)]
-mod ohttp_helpers;
+use crate::ohttp_helpers;
 
 use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};

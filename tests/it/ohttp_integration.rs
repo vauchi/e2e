@@ -14,7 +14,7 @@
 //! These tests exercise the real binaries end-to-end — no mocks.
 
 #[allow(dead_code)]
-mod ohttp_helpers;
+use crate::ohttp_helpers;
 
 use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
