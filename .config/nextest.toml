@@ -9,7 +9,7 @@
 max-threads = 1
 
 [[profile.default.overrides]]
-filter = "binary(ohttp_integration) | binary(cross_platform)"
+filter = "test(/ohttp_integration::/) | test(/cross_platform::/)"
 test-group = "relay-tests"
 
 [profile.ci.junit]
@@ -17,5 +17,5 @@ test-group = "relay-tests"
 path = "junit.xml"
 
 [[profile.ci.overrides]]
-filter = "binary(ohttp_integration) | binary(cross_platform)"
+filter = "test(/ohttp_integration::/) | test(/cross_platform::/)"
 test-group = "relay-tests"
