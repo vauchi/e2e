@@ -23,6 +23,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Smoke test: Basic CLI exchange between two users.
 /// Tags: smoke, exchange
 /// Feature: contact_exchange.feature
+// @internal
 #[tokio::test]
 async fn smoke_cli_exchange() {
     let mut orch = Orchestrator::new();
@@ -53,6 +54,7 @@ async fn smoke_cli_exchange() {
 /// Integration test: Device linking across CLI instances.
 /// Tags: integration, device-linking
 /// Feature: device_management.feature
+// @internal
 #[tokio::test]
 async fn integration_device_linking() {
     let mut orch = Orchestrator::new();
@@ -91,6 +93,7 @@ async fn integration_device_linking() {
 /// Integration test: Exchange between users with different device counts.
 /// Tags: integration, exchange, multi-device
 /// Feature: contact_exchange.feature
+// @internal
 #[tokio::test]
 async fn integration_mixed_devices() {
     let mut orch = Orchestrator::new();
@@ -151,6 +154,7 @@ async fn integration_mixed_devices() {
 /// - App built for simulator
 ///
 /// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
+// @internal
 #[tokio::test]
 #[ignore = "requires Maestro CLI and iOS simulator - Phase 2"]
 async fn test_ios_simulator_exchange() {
@@ -185,6 +189,7 @@ async fn test_ios_simulator_exchange() {
 /// - APK built and installed
 ///
 /// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
+// @internal
 #[tokio::test]
 #[ignore = "requires Maestro CLI and Android emulator - Phase 2"]
 async fn test_android_emulator_exchange() {
@@ -216,6 +221,7 @@ async fn test_android_emulator_exchange() {
 /// - xvfb for headless testing on Linux
 ///
 /// The TauriDevice is implemented at `e2e/src/device/tauri.rs`
+// @internal
 #[tokio::test]
 #[ignore = "requires Desktop binary and xvfb - run `cargo build -p vauchi-desktop --release` first"]
 async fn test_desktop_exchange() {
@@ -272,6 +278,7 @@ async fn test_desktop_exchange() {
 /// - expectrl crate for PTY automation (uses `script` command for /dev/tty)
 ///
 /// The TuiDevice is implemented at `e2e/src/device/tui.rs`
+// @internal
 #[tokio::test]
 #[ignore = "requires TUI binary - run `cargo build -p vauchi-tui --release` first"]
 async fn test_tui_exchange() {

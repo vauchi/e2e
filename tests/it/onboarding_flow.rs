@@ -25,6 +25,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Traces: onboarding.feature:16-21 "Welcome screen on first launch"
 /// Traces: onboarding.feature:24-31 "Value proposition is clear"
 /// Traces: onboarding.feature:34-39 "Skip to restore for existing users"
+// @internal
 #[tokio::test]
 async fn test_welcome_screen_value_proposition() {
     let mut orch = Orchestrator::new();
@@ -87,6 +88,7 @@ async fn test_welcome_screen_value_proposition() {
 /// 2. Phone (optional)
 /// 3. Email (optional)
 /// 4. Preview and confirm
+// @internal
 #[tokio::test]
 async fn test_card_creation_wizard_steps() {
     let mut orch = Orchestrator::new();
@@ -174,6 +176,7 @@ async fn test_card_creation_wizard_steps() {
 /// Traces: onboarding.feature:143-148 "First exchange tutorial"
 /// Traces: onboarding.feature:135-140 "Prompt for first exchange"
 /// Traces: onboarding.feature:151-155 "Exchange success celebration"
+// @internal
 #[tokio::test]
 async fn test_first_exchange_tutorial_overlay() {
     let mut orch = Orchestrator::new();
@@ -248,6 +251,7 @@ async fn test_first_exchange_tutorial_overlay() {
 /// Traces: onboarding.feature:170-176 "Demo contact for solo users"
 /// Traces: demo_contact.feature:21-26 "Demo contact appears for users with no contacts"
 /// Traces: demo_contact.feature:34-39 "Demo contact is visually distinct"
+// @internal
 #[tokio::test]
 #[ignore = "demo contact is a UI-layer virtual contact, not in contacts DB — needs Maestro/mobile test"]
 async fn test_demo_contact_visible_on_start() {
@@ -318,6 +322,7 @@ async fn test_demo_contact_visible_on_start() {
 ///
 /// Time-to-value (TTV) is critical for user retention.
 /// This test ensures the minimal path to a functional card is fast.
+// @internal
 #[tokio::test]
 async fn test_time_to_value_under_2_minutes() {
     let start = Instant::now();
@@ -424,6 +429,7 @@ async fn test_time_to_value_under_2_minutes() {
 /// Tags: smoke, onboarding, restore
 /// Traces: onboarding.feature:34-39 "Skip to restore for existing users"
 /// Traces: onboarding.feature:42-48 "Link to existing device"
+// @internal
 #[tokio::test]
 async fn smoke_skip_onboarding_for_restore() {
     let mut orch = Orchestrator::new();
@@ -480,6 +486,7 @@ async fn smoke_skip_onboarding_for_restore() {
 /// Integration test: Multi-device onboarding via device linking.
 /// Tags: integration, onboarding, device-linking
 /// Traces: onboarding.feature:42-48 "Link to existing device"
+// @internal
 #[tokio::test]
 async fn integration_link_to_existing_device() {
     let mut orch = Orchestrator::new();

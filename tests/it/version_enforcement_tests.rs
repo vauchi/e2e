@@ -41,6 +41,7 @@ async fn spawn_relay_with_version_policy(
 // @internal
 /// Client sends version matching `APP_COMPAT_VERSION` (1). Relay has min=1, warn=1.
 /// Should get 200 OK with version headers.
+// @internal
 #[tokio::test]
 async fn current_client_connects_normally() {
     let (_mgr, http_url) = spawn_relay_with_version_policy(1, 1, 14).await;
@@ -89,6 +90,7 @@ async fn current_client_connects_normally() {
 /// Relay has min=99 (above any real client). Since the relay does not persist
 /// `min_version_changed_at` yet (always `None`), there is no grace period —
 /// the client is immediately rejected with HTTP 426.
+// @internal
 #[tokio::test]
 async fn old_client_rejected_without_grace() {
     let (_mgr, http_url) = spawn_relay_with_version_policy(99, 99, 1).await;
@@ -124,6 +126,7 @@ async fn old_client_rejected_without_grace() {
 // @internal
 /// Relay has min=1, warn=99. Client sends version 1 (at min, below warn).
 /// Should get 200 with `X-Min-Version: 1` and `X-Warn-Version: 99`.
+// @internal
 #[tokio::test]
 async fn client_receives_warning_headers() {
     let (_mgr, http_url) = spawn_relay_with_version_policy(1, 99, 14).await;
@@ -164,6 +167,7 @@ async fn client_receives_warning_headers() {
 // @internal
 /// Relay has min=1. Client sends no `X-App-Compat-Version` header.
 /// Should be treated as version 0 and rejected with 426.
+// @internal
 #[tokio::test]
 async fn missing_version_header_treated_as_zero() {
     let (_mgr, http_url) = spawn_relay_with_version_policy(1, 1, 14).await;
@@ -191,6 +195,7 @@ async fn missing_version_header_treated_as_zero() {
 // @internal
 /// Relay has min=0, warn=0 (default). Even clients without the version header
 /// should be allowed through.
+// @internal
 #[tokio::test]
 async fn no_enforcement_when_min_is_zero() {
     let (_mgr, http_url) = spawn_relay_with_version_policy(0, 0, 14).await;

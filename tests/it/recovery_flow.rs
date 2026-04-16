@@ -16,6 +16,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Smoke test: Recovery claim creation.
 /// Tags: smoke, recovery
 /// Feature: contact_recovery.feature
+// @internal
 #[tokio::test]
 async fn smoke_recovery_setup() {
     let mut orch = Orchestrator::new();
@@ -73,6 +74,7 @@ async fn smoke_recovery_setup() {
 /// Integration test: Contact verification.
 /// Tags: integration, verification
 /// Feature: contact_exchange.feature
+// @internal
 #[tokio::test]
 async fn integration_contact_verification() {
     let mut orch = Orchestrator::new();
@@ -143,6 +145,7 @@ async fn integration_contact_verification() {
 /// 4. Bob, Carol, Dave vouch for Alice
 /// 5. Alice collects vouchers and creates proof
 /// 6. Bob verifies the proof
+// @internal
 #[tokio::test]
 async fn integration_recovery_happy_path() {
     let mut orch = Orchestrator::new();
@@ -317,6 +320,7 @@ async fn integration_recovery_happy_path() {
 /// Integration test: Insufficient vouchers.
 /// Tags: integration, recovery
 /// Traces: contact_recovery.feature:109-117 "Insufficient trusted vouchers"
+// @internal
 #[tokio::test]
 async fn integration_recovery_insufficient_vouchers() {
     let mut orch = Orchestrator::new();

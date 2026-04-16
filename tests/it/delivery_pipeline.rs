@@ -19,6 +19,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Integration test: Card update delivered end-to-end via relay.
 /// Tags: integration, delivery, relay
 /// Feature: message_delivery.feature
+// @internal
 #[tokio::test]
 async fn integration_card_update_delivered_via_relay() {
     let mut orch = Orchestrator::new();
@@ -73,6 +74,7 @@ async fn integration_card_update_delivered_via_relay() {
 /// Integration test: Pending message survives relay restart.
 /// Tags: integration, delivery, persistence
 /// Feature: message_delivery.feature
+// @internal
 #[tokio::test]
 async fn integration_delivery_survives_relay_restart() {
     let mut orch = Orchestrator::new();
@@ -134,6 +136,7 @@ async fn integration_delivery_survives_relay_restart() {
 /// Integration test: Update delivered to all linked devices of recipient.
 /// Tags: integration, delivery, multi-device
 /// Feature: message_delivery.feature
+// @internal
 #[tokio::test]
 async fn integration_multi_device_delivery() {
     let mut orch = Orchestrator::new();
@@ -194,6 +197,7 @@ async fn integration_multi_device_delivery() {
 /// Integration test: Partial delivery when one device is offline.
 /// Tags: integration, delivery, multi-device, offline
 /// Feature: message_delivery.feature
+// @internal
 #[tokio::test]
 async fn integration_partial_multi_device_delivery() {
     let mut orch = Orchestrator::new();

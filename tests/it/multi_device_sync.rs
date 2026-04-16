@@ -27,6 +27,7 @@ use vauchi_e2e_tests::prelude::*;
 ///
 /// Previously ignored: CLI sync hung due to infinite refetch loop in
 /// HttpTransportAdapter (fixed in core `fba8f32c`).
+// @internal
 #[tokio::test]
 async fn smoke_card_update() {
     let mut orch = Orchestrator::new();
@@ -146,6 +147,7 @@ async fn smoke_card_update() {
 /// Integration test: Device linking propagates existing contacts.
 /// Tags: integration, device-linking, sync
 /// Feature: device_management.feature
+// @internal
 #[tokio::test]
 async fn integration_device_receives_contacts() {
     let mut orch = Orchestrator::new();
@@ -196,6 +198,7 @@ async fn integration_device_receives_contacts() {
 /// Integration test: Multiple sequential card edits on one device are durable.
 /// Tags: integration, sync, sequential
 /// Feature: sync_updates.feature
+// @internal
 #[tokio::test]
 async fn integration_sequential_card_edits() {
     let mut orch = Orchestrator::new();
@@ -265,6 +268,7 @@ async fn integration_sequential_card_edits() {
 /// Known limitation: inter-device card sync is not yet implemented.
 /// Each linked device maintains its own card independently. Changes made
 /// on Device A do not propagate to Device B during sync. See #38.
+// @internal
 #[tokio::test]
 #[ignore = "inter-device card sync not yet implemented (#38)"]
 async fn integration_cross_device_card_convergence() {

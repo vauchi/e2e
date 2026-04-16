@@ -42,6 +42,7 @@ use vauchi_e2e_tests::prelude::*;
 ///
 /// TODO: Make `QR_EXPIRY_SECONDS` configurable via env var or builder param
 /// in vauchi-core so E2E tests can use a short TTL (e.g. 5s).
+// @internal
 #[tokio::test]
 #[ignore = "requires binaries + takes 5min (QR_EXPIRY_SECONDS hardcoded in core)"]
 async fn test_exchange_expired_qr() {
@@ -113,6 +114,7 @@ async fn test_exchange_expired_qr() {
 /// 1. Alice generates an exchange QR code
 /// 2. Alice scans her own QR code
 /// 3. Exchange should fail with "SelfExchange" error
+// @internal
 #[tokio::test]
 async fn test_exchange_self_exchange() {
     let mut orch = Orchestrator::new();
@@ -173,6 +175,7 @@ async fn test_exchange_self_exchange() {
 /// 2. Alice generates a new QR code
 /// 3. Bob scans Alice's new QR code
 /// 4. Exchange should detect duplicate and warn/update (not create duplicate)
+// @internal
 #[tokio::test]
 async fn test_exchange_already_contact() {
     let mut orch = Orchestrator::new();
@@ -266,6 +269,7 @@ async fn test_exchange_already_contact() {
 /// 1. Alice creates identity
 /// 2. Alice attempts to complete exchange with garbage QR data
 /// 3. Exchange should fail with "Invalid QR" or parse error
+// @internal
 #[tokio::test]
 async fn test_exchange_malformed_qr() {
     let mut orch = Orchestrator::new();
@@ -351,6 +355,7 @@ async fn test_exchange_malformed_qr() {
 /// 1. Alice creates identity
 /// 2. Alice scans a URL QR code (not a Vauchi contact code)
 /// 3. Exchange should fail with "Not a Vauchi contact code" error
+// @internal
 #[tokio::test]
 async fn test_exchange_non_vauchi_qr() {
     let mut orch = Orchestrator::new();
@@ -428,6 +433,7 @@ async fn test_exchange_non_vauchi_qr() {
 /// 2. Alice generates QR code
 /// 3. Bob scans QR but relay is unavailable (stopped)
 /// 4. Exchange should fail gracefully, no partial state stored
+// @internal
 #[tokio::test]
 async fn test_exchange_network_failure() {
     let mut orch = Orchestrator::new();

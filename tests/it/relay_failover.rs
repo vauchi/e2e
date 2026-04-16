@@ -25,6 +25,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Integration test: Relay failover and recovery.
 /// Tags: integration, relay, failover
 /// Feature: relay_network.feature
+// @internal
 #[tokio::test]
 async fn integration_relay_failover() {
     let config = OrchestratorConfig {
@@ -87,6 +88,7 @@ async fn integration_relay_failover() {
 /// Integration test: Updates during relay outage sync after recovery.
 /// Tags: integration, relay, offline
 /// Feature: relay_network.feature
+// @internal
 #[tokio::test]
 async fn integration_updates_during_outage() {
     let config = OrchestratorConfig {
@@ -178,6 +180,7 @@ async fn integration_updates_during_outage() {
 /// Integration test: Graceful degradation when all relays unavailable.
 /// Tags: integration, relay, edge-case
 /// Feature: relay_network.feature
+// @internal
 #[tokio::test]
 async fn integration_no_relays() {
     let config = OrchestratorConfig {

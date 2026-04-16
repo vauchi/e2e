@@ -140,6 +140,7 @@ fn e2e_address_field_generates_directions_uri() {
 /// Defense-in-depth: javascript: URIs are blocked at two layers:
 /// 1. Input validation: `add_own_field` rejects javascript: for Website fields
 /// 2. Output blocking: `to_uri()` blocks dangerous schemes even for Custom fields
+// @internal
 #[test]
 fn e2e_javascript_uri_blocked_after_exchange() {
     // Layer 1: Website field type rejects javascript: at input

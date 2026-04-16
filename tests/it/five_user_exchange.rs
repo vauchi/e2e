@@ -23,6 +23,7 @@ use vauchi_e2e_tests::prelude::*;
 /// Integration test: Full mesh exchange between five users.
 /// Tags: integration, exchange, multi-user
 /// Feature: contact_exchange.feature
+// @internal
 #[tokio::test]
 async fn integration_five_user_exchange() {
     // Setup orchestrator
@@ -73,6 +74,7 @@ async fn integration_five_user_exchange() {
 /// Integration test: Sequential chain exchange (A->B->C->D->E).
 /// Tags: integration, exchange, sequential
 /// Feature: contact_exchange.feature
+// @internal
 #[tokio::test]
 async fn integration_sequential_exchange() {
     let mut orch = Orchestrator::new();
@@ -137,6 +139,7 @@ async fn integration_sequential_exchange() {
 /// Integration test: Contact sync across all linked devices.
 /// Tags: integration, sync, multi-device
 /// Feature: sync_updates.feature
+// @internal
 #[tokio::test]
 async fn integration_contact_sync() {
     let mut orch = Orchestrator::new();
