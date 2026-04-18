@@ -170,8 +170,8 @@ test:smoke:
         echo "Building CLI binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
-        cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
-        cp "$BUILD_TMPDIR/cli/target/release/vauchi" .smoke-bin/
+        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+        cp "$BUILD_TMPDIR/cli/target/debug/vauchi" .smoke-bin/
         echo "$CLI_HEAD" > .smoke-bin/cli.sha
       else
         echo "CLI binary cached (${CLI_HEAD:0:8})"
@@ -264,8 +264,8 @@ test:integration:
         echo "Building CLI binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
-        cargo build --release --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
-        cp "$BUILD_TMPDIR/cli/target/release/vauchi" "$E2E_BIN_DIR/"
+        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+        cp "$BUILD_TMPDIR/cli/target/debug/vauchi" "$E2E_BIN_DIR/"
 
         echo "Building ohttp-relay binary..."
         git clone --depth=1 --branch main \
