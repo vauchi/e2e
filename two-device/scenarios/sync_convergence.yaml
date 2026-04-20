@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: com.vauchi
+name: Sync Convergence — Two Devices (Scaffold)
+---
+# Phase 4 Task 4.3 — Layer 4 gate for the sync-convergence
+# invariant: after Alice updates her card, Bob's contact store
+# must observe the update within a bounded window. A regression
+# that silently drops a sync payload (or routes it to the wrong
+# contact) fails this scenario deterministically.
+#
+# Precondition: `symmetric_exchange.yaml` ran successfully so
+# both devices hold each other's contact cards. This scenario
+# re-boots both devices from that end-state and drives the
+# Alice-side update.
+#
+# Status: SCAFFOLD. Device A drive is authored; device B
+# observation path is the next Phase 4 increment alongside
+# symmetric_exchange.yaml's subflow plumbing. See
+# `_private/docs/reference/2026-04-20-two-device-test-runbook.md`
+# for orchestrator setup.
+#
+# Expected complete flow (once device-B plumbing lands):
+#   1. Alice and Bob both launch with a pre-shared contact
+#      state (from symmetric_exchange.yaml's end).
+#   2. Alice opens her own card, edits the display name to
+#      "Alice v2", saves.
+#   3. Wait for the sync window (bounded — default 30s; override
+#      via `VAUCHI_SYNC_WINDOW_S`).
+#   4. Bob's Contacts screen must show "Alice v2" within the
+#      window.
+#   5. If Bob still shows "Alice" after the window: fail with
+#      "sync diverged — A={new-name} B={observed-name}" rather
+#      than a generic timeout, so the failure mode is
+#      immediately diagnosable.
+
+# ── Alice: open her own card and edit the display name ────────
+
+- launchApp
+
+- waitForAnimationToEnd
+- tapOn: "Your Card"
+- waitForAnimationToEnd
+
+- tapOn: "Edit"
+- waitForAnimationToEnd
+
+# Edit the display name — test-helper id (post-fix). The
+# onboarding `display_name` TextInput carries `id: "display_name"`
+# already; the card-edit screen's equivalent should too, and
+# is tracked via
+# `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.
+- tapOn:
+    id: "display_name"
+- inputText: "Alice v2"
+- hideKeyboard
+
+- tapOn: "Save"
+- waitForAnimationToEnd
+
+# Post-state assertion — Alice's own card shows the new name
+# locally before sync even runs. If this fails, the bug is
+# local-save, not cross-device sync.
+- assertVisible: "Alice v2"
+
+# ── Scaffold stop: Bob's device observation path ──────────────
+#
+# The next Phase 4 increment adds a Maestro subflow keyed off
+# `${DEVICE_B_SERIAL}` that:
+#   - launches the app on device B,
+#   - navigates to Contacts,
+#   - extendedWaitUntil asserts `visible: "Alice v2"` with a
+#     timeout equal to `${VAUCHI_SYNC_WINDOW_S}` (default 30s),
+#   - on timeout, writes the last-observed contact state to
+#     /tmp/vauchi_sync_convergence_B.txt so the harness can
+#     diagnose whether sync landed a stale value (rather than
+#     nothing at all).
+#
+# Orchestrator responsibilities (e2e/two-device/orchestrator.sh):
+#   - Bound the sync window via VAUCHI_SYNC_WINDOW_S.
+#   - On failure, read /tmp/vauchi_sync_convergence_B.txt (if
+#     present) and include it in the exit message.
