@@ -28,3 +28,13 @@ name: Generate QR Code (Android)
 
 # Take screenshot for QR extraction
 - takeScreenshot: /tmp/vauchi_qr_screenshot.png
+
+# Post-state assertion — Layer 3 gate (plan Task 3.2). The
+# exchange screen must still be active after the QR is rendered;
+# a regression that auto-dismisses the screen or routes elsewhere
+# after display-start would have still captured a QR screenshot
+# from the brief moment before dismissal. This catches that class
+# of bug. Phase 4's two-device harness owns the symmetric-exchange
+# invariant; this single-device flow only checks the hand-off
+# point is reachable.
+- assertVisible: "Your QR Code"

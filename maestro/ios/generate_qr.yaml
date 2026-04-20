@@ -29,6 +29,14 @@ name: Generate QR Code
 # Take screenshot for QR extraction
 - takeScreenshot: /tmp/vauchi_qr_screenshot.png
 
+# Post-state assertion — Layer 3 gate (plan Task 3.2). The
+# exchange screen must still be active after the QR is rendered;
+# a regression that auto-dismisses would have still captured a
+# QR screenshot from the brief moment before dismissal. Phase 4
+# owns the symmetric-exchange invariant; this flow only checks
+# the hand-off point is reachable.
+- assertVisible: "Scan this code"
+
 # If the app shows the QR data as text (for accessibility)
 - runFlow:
     when:

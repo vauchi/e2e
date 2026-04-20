@@ -28,6 +28,15 @@ name: Sync with Relay (Android)
     notVisible: "Syncing..."
     timeout: 15000
 
+# Post-state assertions — Layer 3 gate (plan Task 3.2). After
+# sync completes, the Contacts list view must still be the
+# active screen (no error page, no unexpected modal). Weaker
+# than a content-based assertion but catches the common
+# "spinner hid because of error" failure mode.
+- assertVisible: "Contacts"
+- assertNotVisible: "Connection failed"
+- assertNotVisible: "Error"
+
 # Alternative: Check for sync status in settings
 - runFlow:
     when:

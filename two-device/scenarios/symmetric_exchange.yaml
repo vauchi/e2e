@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: com.vauchi
+name: Symmetric Exchange — Two Devices (Scaffold)
+---
+# Phase 4 Task 4.2 — Layer 4 regression test for the
+# unilateral-exchange-race class of bugs
+# (`_private/docs/problems/2026-03-31-unilateral-exchange-race`).
+#
+# Goal: verify that after a QR exchange, BOTH device-A's contact
+# store AND device-B's contact store contain the other's card.
+# A one-sided completion (what on-device repro 2026-04-20 showed
+# on Android↔Android) must fail this scenario deterministically,
+# not as a timeout.
+#
+# Status: SCAFFOLD. This file currently only drives device A
+# via Maestro's single-device contract; device B's subflow
+# (keyed off `${DEVICE_B_SERIAL}`) is authored once the
+# orchestrator's Maestro subflow plumbing is confirmed on real
+# AVDs. See `../orchestrator.sh` and the runbook at
+# `_private/docs/reference/2026-04-20-two-device-test-runbook.md`.
+#
+# Negative-control requirement (plan Task 4.2 Step 4):
+#   When run with `VAUCHI_DEVICE_B_DELAY=60`, the scenario must
+#   fail with a diagnostic naming "unilateral completion", not a
+#   generic timeout. The orchestrator owns injecting the delay;
+#   this YAML owns the assertion shape.
+
+- launchApp:
+    clearState: true
+
+# ── Onboard Alice ────────────────────────────────────────────
+
+- assertVisible: "Create New Identity"
+- tapOn: "Create New Identity"
+- assertVisible: "What's your name?"
+- inputText: "Alice"
+- hideKeyboard
+- tapOn: "Next"
+- tapOn: "Skip for now"
+- tapOn: "Looks good!"
+- tapOn: "Finish setup"
+- waitForAnimationToEnd:
+    timeout: 15000
+- assertVisible: "Your Card"
+
+# ── Scaffold stop: the following sections need the orchestrator
+# to drive device B in parallel. Pseudocode for the complete
+# scenario (to be expanded into concrete Maestro steps + subflow
+# invocations keyed off `${DEVICE_B_SERIAL}` once the AVD
+# plumbing is verified):
+#
+#   1. Start exchange on both devices (Alice + Bob).
+#   2. Alice presents QR → Bob scans; Bob presents QR → Alice
+#      scans.
+#   3. Both devices exit the Exchange screen to their Contacts
+#      list.
+#   4. Assert Alice's Contacts contains "Bob" AND Bob's Contacts
+#      contains "Alice". Either missing → fail with
+#      "unilateral completion", not a timeout.
+#
+# Until the orchestrator pieces are wired, this scenario is a
+# skeleton driving only device A's side. `orchestrator.sh`
+# installs the APK on both emulators; adding Maestro subflows
+# targeted by serial is the next increment.
+
+- tapOn: "Exchange"
+- waitForAnimationToEnd:
+    timeout: 10000
+- assertVisible: "Your QR Code"

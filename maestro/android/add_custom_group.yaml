@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: com.vauchi
+name: Add Custom Group During Onboarding (Android)
+---
+# Regression test for `2026-04-20-onboarding-custom-group-add-invisible`.
+#
+# Today's bug: the `groups_setup` screen's custom-group TextInput has
+# no commit affordance. Tapping "Continue" silently auto-adds the
+# pending text then navigates away, so the user never sees their
+# entry reflected in the selected-groups list.
+#
+# Expected behaviour (post-fix):
+#  1. User types a custom group name into the TextInput.
+#  2. User taps the commit affordance.
+#  3. The group appears in the selected list on the same screen.
+#  4. User can type + commit a second custom group without leaving.
+#
+# This flow fails today (step 2 has nothing to tap) and will pass
+# once the fix lands. Gate is `just e2e-maestro-critical`; not
+# required per-MR until the fix lands.
+
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# ── Advance to the groups_setup screen ────────────────────────
+
+- assertVisible: "Create New Identity"
+- tapOn: "Create New Identity"
+
+- assertVisible: "What's your name?"
+- inputText: "Maestro Test"
+- hideKeyboard
+- tapOn: "Next"
+
+# ── We're on the groups_setup screen ─────────────────────────
+# Precondition: the screen must show the custom-group TextInput.
+
+- assertVisible: "Add a custom group"
+
+# ── First custom group ───────────────────────────────────────
+
+- tapOn:
+    id: "custom_group"
+- inputText: "MyCustomGroup"
+- hideKeyboard
+
+# Commit affordance — expected to exist post-fix. The exact id
+# here tracks the `submit_custom_group` action_id the handler
+# already consumes (`core/vauchi-app/src/ui/onboarding.rs:606`),
+# so the a11y identifier should land as `submit_custom_group`
+# when the fix lands. If the fix uses a different id, update
+# this `tapOn` line in the same MR.
+- tapOn:
+    id: "submit_custom_group"
+
+- waitForAnimationToEnd
+
+# Post-state: the group must be visible in the selected list on
+# the same screen (user did not navigate away).
+- assertVisible: "MyCustomGroup"
+- assertVisible: "Add a custom group"
+
+# ── Second custom group (proves the flow handles multiple) ───
+
+- tapOn:
+    id: "custom_group"
+- inputText: "AnotherGroup"
+- hideKeyboard
+- tapOn:
+    id: "submit_custom_group"
+
+- waitForAnimationToEnd
+
+- assertVisible: "MyCustomGroup"
+- assertVisible: "AnotherGroup"

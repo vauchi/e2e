@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi.ios
+name: Add Custom Group During Onboarding
+---
+# Regression test for `2026-04-20-onboarding-custom-group-add-invisible`.
+#
+# Today's bug: the `groups_setup` screen's custom-group TextInput has
+# no commit affordance. Tapping "Continue" silently auto-adds the
+# pending text then navigates away — on iOS the user sees the
+# ContactInfo screen appear without confirmation; their typed entry
+# is lost from the visible flow.
+#
+# Expected behaviour (post-fix):
+#  1. User types a custom group name.
+#  2. User taps the commit affordance.
+#  3. The group appears in the selected list on the same screen.
+#  4. User can repeat without leaving.
+#
+# Fails today; passes post-fix. Sibling to Android's
+# `add_custom_group.yaml`. Gate is `just e2e-maestro-critical`.
+
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# ── Advance to the groups_setup screen ────────────────────────
+
+- assertVisible: "Create New Identity"
+- tapOn: "Create New Identity"
+
+- assertVisible: "What's your name?"
+- inputText: "Maestro Test"
+- tapOn: "Next"
+
+- assertVisible: "Add a custom group"
+
+# ── First custom group ───────────────────────────────────────
+
+- tapOn:
+    id: "custom_group"
+- inputText: "MyCustomGroup"
+
+# Commit affordance expected post-fix. The a11y identifier
+# should match the `submit_custom_group` action_id the handler
+# at `core/vauchi-app/src/ui/onboarding.rs:606` already consumes.
+- tapOn:
+    id: "submit_custom_group"
+
+- waitForAnimationToEnd
+
+- assertVisible: "MyCustomGroup"
+- assertVisible: "Add a custom group"
+
+# ── Second custom group ──────────────────────────────────────
+
+- tapOn:
+    id: "custom_group"
+- inputText: "AnotherGroup"
+- tapOn:
+    id: "submit_custom_group"
+
+- waitForAnimationToEnd
+
+- assertVisible: "MyCustomGroup"
+- assertVisible: "AnotherGroup"
