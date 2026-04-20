@@ -8,7 +8,7 @@
 # Environment variables:
 #   DECOY_NAME - Display name for the decoy contact (required)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 

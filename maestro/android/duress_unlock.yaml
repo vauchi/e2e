@@ -10,7 +10,7 @@
 #   DECOY_NAME - Expected decoy contact name (required)
 #   REAL_CONTACT_NAME - A real contact name that should NOT appear (required)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 

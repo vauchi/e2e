@@ -11,7 +11,7 @@
 # WARNING: This flow destroys the identity. Run last.
 # Precondition: Identity must already exist (run create_identity.yaml first)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 
@@ -34,4 +34,4 @@ appId: com.vauchi
     timeout: 15000
 
 # Verify data wiped — app returns to onboarding
-- assertVisible: "Create New Identity"
+- assertVisible: "Create new identity"

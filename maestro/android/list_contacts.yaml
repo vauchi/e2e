@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: com.vauchi
+appId: app.vauchi
 name: List Contacts (Android)
 ---
 # List all contacts and output their names

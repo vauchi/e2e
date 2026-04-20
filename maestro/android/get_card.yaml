@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: com.vauchi
+appId: app.vauchi
 name: Get Contact Card (Android)
 ---
 # Get a contact's card details

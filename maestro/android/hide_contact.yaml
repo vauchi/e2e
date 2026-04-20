@@ -7,7 +7,7 @@
 # Environment variables:
 #   CONTACT_NAME - Name of the contact to hide (required)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 

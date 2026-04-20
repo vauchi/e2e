@@ -6,7 +6,7 @@
 # Sends a configured emergency broadcast and verifies confirmation.
 # Requires emergency broadcast to be configured first.
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 

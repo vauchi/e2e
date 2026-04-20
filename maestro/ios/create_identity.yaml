@@ -17,10 +17,10 @@ name: Create Identity
 - waitForAnimationToEnd
 
 # Check if we're on the welcome/onboarding screen
-- assertVisible: "Create New Identity"
+- assertVisible: "Create new identity"
 
 # Tap to begin identity creation
-- tapOn: "Create New Identity"
+- tapOn: "Create new identity"
 
 # Enter display name
 - assertVisible: "What's your name?"

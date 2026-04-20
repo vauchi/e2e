@@ -7,7 +7,7 @@
 # Environment variables:
 #   DURESS_PIN - 6-digit duress PIN (required, must differ from app password)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 

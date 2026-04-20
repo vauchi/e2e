@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: com.vauchi
+appId: app.vauchi
 name: Add Custom Group During Onboarding (Android)
 ---
 # Regression test for `2026-04-20-onboarding-custom-group-add-invisible`.
@@ -29,13 +29,13 @@ name: Add Custom Group During Onboarding (Android)
 
 # ── Advance to the groups_setup screen ────────────────────────
 
-- assertVisible: "Create New Identity"
-- tapOn: "Create New Identity"
+- assertVisible: "Create new identity"
+- tapOn: "Create new identity"
 
 - assertVisible: "What's your name?"
 - inputText: "Maestro Test"
 - hideKeyboard
-- tapOn: "Next"
+- tapOn: "Continue"
 
 # ── We're on the groups_setup screen ─────────────────────────
 # Precondition: the screen must show the custom-group TextInput.

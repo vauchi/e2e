@@ -29,12 +29,12 @@ name: Add Custom Group During Onboarding
 
 # ── Advance to the groups_setup screen ────────────────────────
 
-- assertVisible: "Create New Identity"
-- tapOn: "Create New Identity"
+- assertVisible: "Create new identity"
+- tapOn: "Create new identity"
 
 - assertVisible: "What's your name?"
 - inputText: "Maestro Test"
-- tapOn: "Next"
+- tapOn: "Continue"
 
 - assertVisible: "Add a custom group"
 

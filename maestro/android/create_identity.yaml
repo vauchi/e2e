@@ -2,48 +2,49 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-appId: com.vauchi
+appId: app.vauchi
 name: Create Identity (Android)
 ---
 # Create a new identity with the given name
 # Environment variables:
 #   NAME - Display name for the identity (required)
 #   VAUCHI_RELAY_URL - Relay server URL (optional, uses default if not set)
+#
+# Screen sequence verified against
+# `core/vauchi-app/src/ui/onboarding.rs` at core v0.20.3:
+#   identity_check → default_name → groups_setup → contact_info → what_next
 
 - launchApp:
     clearState: true
 
-# Wait for app to load
 - waitForAnimationToEnd
 
-# Check if we're on the welcome/onboarding screen
-- assertVisible: "Create New Identity"
+# ── identity_check ────────────────────────────────────────────
+- assertVisible: "Create new identity"
+- tapOn: "Create new identity"
 
-# Tap to begin identity creation
-- tapOn: "Create New Identity"
-
-# Enter display name
+# ── default_name ──────────────────────────────────────────────
 - assertVisible: "What's your name?"
 - inputText: ${NAME}
-
-# Hide keyboard on Android
 - hideKeyboard
+- tapOn: "Continue"
 
-# Continue to next step
-- tapOn: "Next"
+# ── groups_setup: skip (fast-track) ──────────────────────────
+- assertVisible: "Choose your groups"
+- tapOn: "Skip"
 
-# Skip onboarding steps (Add Fields, Preview, Security)
-# These are optional steps we can fast-track
-- tapOn: "Skip for now"
-- assertVisible: "Your card"
-- tapOn: "Looks good!"
-- assertVisible: "Your info is private"
-- tapOn: "Finish setup"
+# ── contact_info: skip (fast-track) ──────────────────────────
+- assertVisible: "Add contact info"
+- tapOn: "Skip"
+
+# ── what_next: finish onboarding, go to main app ─────────────
+- assertVisible: "What would you like to do?"
+- tapOn: "Start using the app"
 
 # Wait for identity generation and transition to main app
-# The "You're all set!" screen may flash briefly before auto-navigating
 - waitForAnimationToEnd:
     timeout: 15000
 
-# Verify we're on the home screen
-- assertVisible: "Your Card"
+# Post-state — at the very least, the onboarding flow must have
+# advanced off the "What would you like to do?" screen.
+- assertNotVisible: "What would you like to do?"

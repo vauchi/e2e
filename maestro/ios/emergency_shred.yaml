@@ -40,4 +40,4 @@ appId: app.vauchi.ios
     timeout: 15000
 
 # Step 4: Verify data wiped — app returns to onboarding
-- assertVisible: "Create New Identity"
+- assertVisible: "Create new identity"

@@ -12,7 +12,7 @@
 #
 # Precondition: Identity must already exist (run create_identity.yaml first)
 
-appId: com.vauchi
+appId: app.vauchi
 
 ---
 
