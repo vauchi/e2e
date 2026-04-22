@@ -129,8 +129,17 @@ test:smoke:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  # Per-ref cache slot with main as fallback. Previous key used
+  # CI_DEFAULT_BRANCH literally, so every MR wrote back to the same
+  # `smoke-binaries-main` slot — concurrent MRs would last-write-win
+  # each other's uploads, cost ~30-60s of wasted upload per pipeline.
+  # Correctness is already guarded by the per-binary SHA check in the
+  # script body below; this change just eliminates upload churn and
+  # gives each branch a stable cache lineage.
   cache:
-    key: smoke-binaries-${CI_DEFAULT_BRANCH}
+    key: smoke-binaries-${CI_COMMIT_REF_SLUG}
+    fallback_keys:
+      - smoke-binaries-${CI_DEFAULT_BRANCH}
     paths:
       - .smoke-bin/
     policy: pull-push
@@ -223,7 +232,9 @@ test:integration:
     - job: test:smoke
       optional: true
   cache:
-    key: smoke-binaries-${CI_DEFAULT_BRANCH}
+    key: smoke-binaries-${CI_COMMIT_REF_SLUG}
+    fallback_keys:
+      - smoke-binaries-${CI_DEFAULT_BRANCH}
     paths:
       - .smoke-bin/
     policy: pull-push  # Write back rebuilt binaries so next run uses fresh cache
