@@ -2320,9 +2320,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.12"
+version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
+checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -3327,6 +3327,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
+source = "git+https://gitlab.com/vauchi/relay.git?branch=main#f3547cf3cbb915d1a623c14418efefbd26a0cd17"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -4013,11 +4014,3 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
-
-[[patch.unused]]
-name = "vauchi-app"
-version = "0.19.26"
-
-[[patch.unused]]
-name = "vauchi-core"
-version = "0.19.26"
