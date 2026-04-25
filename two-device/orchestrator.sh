@@ -30,10 +30,19 @@
 #   - APK_PATH        — path to the debug APK installed on both
 #
 # Config via env (pre-running):
-#   - VAUCHI_AVD_A       (default: vauchi-test-0)
-#   - VAUCHI_AVD_B       (default: vauchi-test-1)
-#   - VAUCHI_APK_PATH    (default: android/app/build/outputs/apk/debug/app-debug.apk)
+#   - VAUCHI_AVD_A          (default: vauchi-test-0)
+#   - VAUCHI_AVD_B          (default: vauchi-test-1)
+#   - VAUCHI_APK_PATH       (default: android/app/build/outputs/apk/debug/app-debug.apk)
 #   - VAUCHI_BOOT_TIMEOUT_S (default: 120)
+#
+# Scenario-specific env (read inside scenarios, not by the orchestrator):
+#   - VAUCHI_DEVICE_B_DELAY (symmetric_exchange.sh) — sleep before
+#     Bob's onboarding to drive the negative-control "unilateral
+#     completion" branch. Default: 0 (no delay).
+#   - VAUCHI_2DEV_LOG_DIR   (symmetric_exchange.sh) — Maestro
+#     sub-flow log directory. Default: /tmp/vauchi-2dev-logs.
+#   - VAUCHI_SYNC_WINDOW_S  (sync_convergence.yaml) — bound on the
+#     cross-device sync convergence window. Default: 30.
 
 set -euo pipefail
 
@@ -46,10 +55,23 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCENARIO_FILE="$SCRIPT_DIR/scenarios/${SCENARIO}.yaml"
 
-if [[ ! -f "$SCENARIO_FILE" ]]; then
-    printf 'orchestrator: scenario not found: %s\n' "$SCENARIO_FILE" >&2
+# A scenario can ship as either a Maestro YAML (single-device) or a
+# shell script (multi-device coordinator that fans out subflows via
+# `maestro --device <serial> test ...`). Resolve in that order so a
+# `.sh` scenario takes precedence if both happen to exist.
+SCENARIO_FILE=""
+for ext in sh yaml; do
+    candidate="$SCRIPT_DIR/scenarios/${SCENARIO}.${ext}"
+    if [[ -f "$candidate" ]]; then
+        SCENARIO_FILE="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$SCENARIO_FILE" ]]; then
+    printf 'orchestrator: scenario not found: %s/scenarios/%s.{sh,yaml}\n' \
+        "$SCRIPT_DIR" "$SCENARIO" >&2
     exit 2
 fi
 
@@ -63,6 +85,23 @@ BOOT_TIMEOUT_S="${VAUCHI_BOOT_TIMEOUT_S:-120}"
 command -v adb       >/dev/null || { echo "orchestrator: adb not in PATH"; exit 2; }
 command -v emulator  >/dev/null || { echo "orchestrator: emulator not in PATH"; exit 2; }
 command -v maestro   >/dev/null || { echo "orchestrator: maestro not in PATH"; exit 2; }
+
+# `symmetric_exchange.sh` decodes QR screenshots with zbarimg. The
+# orchestrator pre-checks here so the failure surfaces before two
+# AVDs spend a minute booting.
+case "$SCENARIO" in
+    symmetric_exchange)
+        command -v zbarimg >/dev/null || {
+            cat >&2 <<'EOF'
+orchestrator: zbarimg not in PATH — required by symmetric_exchange.
+  macOS:           brew install zbar
+  Debian/Ubuntu:   apt install zbar-tools
+  Alpine:          apk add zbar
+EOF
+            exit 2
+        }
+        ;;
+esac
 
 [[ -f "$APK_PATH" ]] || {
     echo "orchestrator: APK not found at $APK_PATH"

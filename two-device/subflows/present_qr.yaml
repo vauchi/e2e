@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Present QR (two-device subflow)
+---
+# Subflow: from the post-onboarding home screen, open the Exchange
+# tab and screenshot the rendered QR. The orchestrator passes
+# `QR_OUT` so each device writes to a distinct path
+# (e.g. `/tmp/vauchi_2dev_qr_A.png` vs `..._B.png`); the host then
+# decodes both with `zbarimg` and feeds peer QR data into the
+# `scan_qr_manual.yaml` subflow.
+#
+# The screen does NOT auto-dismiss — `assertVisible: "Your QR Code"`
+# after the screenshot is the same Layer 3 post-state guard as in
+# `e2e/maestro/android/generate_qr.yaml`.
+
+- waitForAnimationToEnd
+- tapOn: "Exchange"
+- waitForAnimationToEnd:
+    timeout: 10000
+- assertVisible: "Your QR Code"
+- takeScreenshot: ${QR_OUT}
+- assertVisible: "Your QR Code"

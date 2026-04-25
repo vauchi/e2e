@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Assert Alice's Contacts contains Bob (two-device subflow)
+---
+# Subflow: navigate to Contacts and assert that "Bob" is visible.
+# Run on `${DEVICE_A_SERIAL}` after the symmetric exchange phase.
+# Failure here means Alice's side did not persist Bob's card —
+# i.e. unilateral completion (the regression from
+# `_private/docs/problems/2026-03-31-unilateral-exchange-race`).
+#
+# The orchestrator distinguishes "A missing Bob" from
+# "B missing Alice" by tracking each subflow's exit code
+# separately (see `symmetric_exchange.sh`).
+
+- waitForAnimationToEnd
+- tapOn: "Contacts"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "Bob"

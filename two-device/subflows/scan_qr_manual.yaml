@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Scan peer QR via manual entry (two-device subflow)
+---
+# Subflow: from the Exchange tab, open the Add-Contact / scanner
+# path, switch to manual entry, and paste the peer's QR string
+# (`${QR_DATA}`, supplied by the orchestrator after `zbarimg`-
+# decoding the peer device's screenshot). After the exchange
+# protocol runs, land back on Contacts.
+#
+# Mirrors the manual-entry path in
+# `e2e/maestro/android/complete_exchange.yaml`. Used here so the
+# two-device harness avoids camera-bridging across emulators.
+
+# Re-enter the app to land on the home tab — `present_qr.yaml`
+# left the device on the Exchange screen and "Add Contact" is
+# reached from home (matches the convention in
+# `e2e/maestro/android/complete_exchange.yaml`).
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Add Contact"
+- waitForAnimationToEnd
+- tapOn: "Enter Code Manually"
+- assertVisible: "Paste or type the code"
+- inputText: ${QR_DATA}
+- hideKeyboard
+- tapOn: "Connect"
+- waitForAnimationToEnd:
+    timeout: 15000
+- assertVisible: "Contact added"
+- tapOn: "Done"
+- assertVisible: "Contacts"

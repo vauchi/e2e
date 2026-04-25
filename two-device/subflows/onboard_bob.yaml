@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Onboard Bob (two-device subflow)
+---
+# Subflow: drive a single device through fresh onboarding with the
+# display name "Bob". Mirror of `onboard_alice.yaml`. Both flows
+# run in parallel against the two emulators booted by
+# `orchestrator.sh`.
+
+- launchApp:
+    clearState: true
+
+- assertVisible: "Create New Identity"
+- tapOn: "Create New Identity"
+- assertVisible: "What's your name?"
+- inputText: "Bob"
+- hideKeyboard
+- tapOn: "Next"
+- tapOn: "Skip for now"
+- tapOn: "Looks good!"
+- tapOn: "Finish setup"
+- waitForAnimationToEnd:
+    timeout: 15000
+- assertVisible: "Your Card"
