@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Bob observes updated name (two-device subflow)
+---
+# Subflow: navigate to Contacts on Bob's device and wait — bounded
+# by `${SYNC_WINDOW_MS}` — for `${NEW_NAME}` to appear in the
+# rendered list. A pull-to-refresh swipe triggers a sync poll
+# matching the convention in `e2e/maestro/android/sync.yaml`.
+#
+# A failure here means Alice's card update did not propagate to
+# Bob within the window. The orchestrator distinguishes
+# "diverged" (Bob still sees the OLD name) from "contact lost"
+# (Bob sees neither old nor new) by running the sibling
+# `bob_diagnose_no_update.yaml` after this subflow's failure.
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Contacts"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Pull-to-refresh — same gesture used by `sync.yaml` to trigger a
+# relay poll on the Contacts list.
+- swipe:
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- extendedWaitUntil:
+    visible: ${NEW_NAME}
+    timeout: ${SYNC_WINDOW_MS}

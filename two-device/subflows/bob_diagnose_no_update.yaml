@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Bob diagnose missing update (two-device subflow)
+---
+# Subflow: only invoked by `sync_convergence.sh` after
+# `bob_observe_updated_name.yaml` failed within the sync window.
+# Disambiguates two failure modes by asserting on the OLD name:
+#
+#   - assertVisible succeeds → Bob's local store still holds the
+#     pre-update card. Verdict: `sync diverged`.
+#   - assertVisible fails    → the contact is gone entirely.
+#     Verdict: `contact lost`.
+#
+# `${OLD_NAME}` is supplied by the scenario script.
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Contacts"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- assertVisible: ${OLD_NAME}

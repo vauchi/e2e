@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Alice edits display name (two-device subflow)
+---
+# Subflow: open Alice's own card, change the display name to
+# `${NEW_NAME}`, save. Used by `sync_convergence.sh` to drive the
+# update Bob's device must observe within the bounded sync window.
+#
+# Reuses the `display_name` testTag convention used during
+# onboarding; the same id is expected to be set on the card-edit
+# screen's display-name TextInput. If the field is missing, the
+# `tapOn: id: "display_name"` step fails — that is the regression
+# captured in
+# `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Your Card"
+- waitForAnimationToEnd
+
+- tapOn: "Edit"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "display_name"
+- inputText: ${NEW_NAME}
+- hideKeyboard
+
+- tapOn: "Save"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Local sanity check — Alice's card itself must show the new name
+# before we ask whether sync propagated. If this fails, the bug is
+# local-save, not cross-device sync.
+- assertVisible: ${NEW_NAME}

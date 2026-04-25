@@ -86,14 +86,15 @@ command -v adb       >/dev/null || { echo "orchestrator: adb not in PATH"; exit 
 command -v emulator  >/dev/null || { echo "orchestrator: emulator not in PATH"; exit 2; }
 command -v maestro   >/dev/null || { echo "orchestrator: maestro not in PATH"; exit 2; }
 
-# `symmetric_exchange.sh` decodes QR screenshots with zbarimg. The
-# orchestrator pre-checks here so the failure surfaces before two
-# AVDs spend a minute booting.
+# Both `symmetric_exchange.sh` and `sync_convergence.sh` decode QR
+# screenshots with zbarimg (the latter establishes a symmetric
+# exchange precondition before exercising sync). Pre-check here
+# so the failure surfaces before two AVDs spend a minute booting.
 case "$SCENARIO" in
-    symmetric_exchange)
+    symmetric_exchange | sync_convergence)
         command -v zbarimg >/dev/null || {
-            cat >&2 <<'EOF'
-orchestrator: zbarimg not in PATH — required by symmetric_exchange.
+            cat >&2 <<EOF
+orchestrator: zbarimg not in PATH — required by ${SCENARIO}.
   macOS:           brew install zbar
   Debian/Ubuntu:   apt install zbar-tools
   Alpine:          apk add zbar
