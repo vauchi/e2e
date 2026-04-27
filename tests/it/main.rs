@@ -4,6 +4,12 @@
 
 //! Consolidated integration test binary for vauchi-e2e.
 
+#[cfg(feature = "flame")]
+#[ctor::ctor]
+fn flame_init() {
+    vauchi_e2e_tests::flame::init_layer();
+}
+
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;

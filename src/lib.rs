@@ -60,6 +60,8 @@
 
 pub mod device;
 pub mod error;
+#[cfg(feature = "flame")]
+pub mod flame;
 pub mod ohttp_relay_manager;
 pub mod orchestrator;
 pub mod relay_manager;

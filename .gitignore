@@ -21,6 +21,9 @@ test-*-data/
 data/
 *.log
 
+# Profiling artifacts (tracing-flame folded traces, rendered SVGs)
+/artifacts/
+
 # CI local testing
 .gitlab-ci-local/
 

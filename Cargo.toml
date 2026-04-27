@@ -13,6 +13,11 @@ license = "AGPL-3.0-or-later"
 # Enable JUnit XML output for CI
 junit = []
 
+# Enable tracing-flame layer for profiling. Generates a `.folded` trace
+# file under `e2e/artifacts/flame/` (or `$VAUCHI_FLAME_OUT`) that can be
+# rendered to SVG via `inferno-flamegraph`. See `just flame-e2e <test>`.
+flame = ["dep:tracing-subscriber", "dep:tracing-flame", "dep:ctor"]
+
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
 vauchi-core = { git = "https://gitlab.com/vauchi/core.git", branch = "main" }
@@ -42,6 +47,11 @@ anyhow = "1"
 
 # Logging
 tracing = "0.1"
+
+# Profiling (enabled via `flame` feature)
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+tracing-flame = { version = "0.2", optional = true }
+ctor = { version = "0.2", optional = true }
 
 # PTY automation for TUI testing
 expectrl = "0.7"
