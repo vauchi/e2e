@@ -68,7 +68,8 @@ impl CliDevice {
 
     /// Find the CLI binary in the workspace.
     fn find_cli_binary() -> E2eResult<PathBuf> {
-        // Try E2E_BIN_DIR first (SHA-cached binaries from build-binaries.sh)
+        // Try E2E_BIN_DIR first (SHA-cached binaries from build-binaries.sh).
+        // CI bakes a release-or-debug binary at this path per repo policy.
         if let Ok(dir) = std::env::var("E2E_BIN_DIR") {
             let path = PathBuf::from(&dir).join("vauchi");
             if path.exists() {
@@ -76,17 +77,28 @@ impl CliDevice {
             }
         }
 
-        // Try release binary first
+        // Prefer the debug binary for local dev runs.
+        //
+        // Why debug over release: `cli/src/commands/common.rs` gates the
+        // `VAUCHI_ALLOW_DIRECT` env var on `#[cfg(debug_assertions)]`.
+        // The orchestrator sets that env var so the CLI fetches the
+        // ephemeral OHTTP key from the just-spawned test relay; in a
+        // release build the gate compiles out, the CLI falls back to
+        // the bundled production OHTTP key, and HPKE Open fails on the
+        // test relay's ephemeral key with HTTP 400. Preferring debug
+        // here makes the env var actually work for local `just test`.
+        // Production-style coverage (release CLI vs production relay
+        // key) is provided by the SHA-cached `E2E_BIN_DIR` path used in
+        // CI, which sits ahead of this fallback.
+        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi");
+        if debug_path.exists() {
+            return Ok(debug_path);
+        }
+
         let release_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
         if release_path.exists() {
             return Ok(release_path);
-        }
-
-        // Try debug binary
-        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi");
-        if debug_path.exists() {
-            return Ok(debug_path);
         }
 
         Err(E2eError::cli_execution(
