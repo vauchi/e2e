@@ -16,7 +16,7 @@ junit = []
 # Enable tracing-flame layer for profiling. Generates a `.folded` trace
 # file under `e2e/artifacts/flame/` (or `$VAUCHI_FLAME_OUT`) that can be
 # rendered to SVG via `inferno-flamegraph`. See `just flame-e2e <test>`.
-flame = ["dep:tracing-subscriber", "dep:tracing-flame", "dep:ctor"]
+flame = ["dep:tracing-flame"]
 
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
@@ -45,13 +45,16 @@ humantime-serde = "1"
 thiserror = "2"
 anyhow = "1"
 
-# Logging
+# Logging — fmt subscriber is installed unconditionally by
+# `test_logging::init` so subprocess relay/cli stderr (forwarded via
+# `tracing::warn!(target = "relay", ...)`) is visible during tests.
+# `ctor` is used to install the subscriber once at process start.
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ctor = "0.2"
 
 # Profiling (enabled via `flame` feature)
-tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 tracing-flame = { version = "0.2", optional = true }
-ctor = { version = "0.2", optional = true }
 
 # PTY automation for TUI testing
 expectrl = "0.7"

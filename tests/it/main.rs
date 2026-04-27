@@ -4,10 +4,15 @@
 
 //! Consolidated integration test binary for vauchi-e2e.
 
-#[cfg(feature = "flame")]
+/// Install the test tracing subscriber once at process start.
+///
+/// Always installs a fmt layer so subprocess stderr forwarded by the
+/// orchestrator (`tracing::warn!(target = "relay", ...)`) reaches the
+/// test output. With `--features flame`, also installs a tracing-flame
+/// layer for `.folded` profile capture.
 #[ctor::ctor]
-fn flame_init() {
-    vauchi_e2e_tests::flame::init_layer();
+fn tracing_init() {
+    vauchi_e2e_tests::test_logging::init();
 }
 
 mod contact_actions;

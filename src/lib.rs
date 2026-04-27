@@ -60,13 +60,13 @@
 
 pub mod device;
 pub mod error;
-#[cfg(feature = "flame")]
-pub mod flame;
 pub mod ohttp_relay_manager;
 pub mod orchestrator;
 pub mod relay_manager;
 pub mod report;
 pub mod scenario;
+pub mod subprocess_log;
+pub mod test_logging;
 pub mod user;
 pub mod yaml;
 

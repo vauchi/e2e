@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
@@ -186,11 +185,21 @@ impl OhttpRelayManager {
             "OHTTP_RELAY_KEY_CACHE_TTL_SECS".to_string(),
             self.config.key_cache_ttl_secs.to_string(),
         );
-        env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
+        // Forward the parent's RUST_LOG so test runs can opt into more
+        // verbose subprocess logging. Default to `warn` for quiet
+        // happy-path runs.
+        let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        env_vars.insert("RUST_LOG".to_string(), log_level);
+        // Strip ANSI colour codes — see relay_manager comment.
+        env_vars.insert("NO_COLOR".to_string(), "1".to_string());
 
         let mut cmd = Command::new(&self.binary_path);
+        // Pipe both stdout and stderr — the ohttp-relay's
+        // tracing-subscriber writes to stdout by default; panics and
+        // unconfigured eprintln! lines land on stderr. Both must be
+        // drained or pipe-buffer fill stalls the subprocess.
         cmd.envs(env_vars)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
@@ -198,15 +207,25 @@ impl OhttpRelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn vauchi-ohttp-relay: {}", e)))?;
 
-        // Drain stderr in the background so the pipe buffer never fills.
-        // Lines are logged at warn level for post-mortem debugging.
+        if let Some(stdout) = child.stdout.take() {
+            let fd = stdout
+                .into_owned_fd()
+                .expect("ChildStdout → OwnedFd (Unix only)");
+            crate::subprocess_log::drain_pipe(
+                fd,
+                "ohttp-relay-stdout".to_string(),
+                |line| warn!(target: "ohttp-relay", "{}", line),
+            );
+        }
         if let Some(stderr) = child.stderr.take() {
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    warn!(target: "ohttp-relay", "{}", line);
-                }
-            });
+            let fd = stderr
+                .into_owned_fd()
+                .expect("ChildStderr → OwnedFd (Unix only)");
+            crate::subprocess_log::drain_pipe(
+                fd,
+                "ohttp-relay-stderr".to_string(),
+                |line| warn!(target: "ohttp-relay", "{}", line),
+            );
         }
 
         self.wait_for_health(port, &mut child).await?;

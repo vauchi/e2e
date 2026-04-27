@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
@@ -343,12 +342,28 @@ impl RelayManager {
                 );
             }
         }
-        env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
+        // Forward the parent's RUST_LOG so test runs can opt into more
+        // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
+        // the relay rejects a request). Default to `warn` for quiet
+        // happy-path runs.
+        let relay_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        env_vars.insert("RUST_LOG".to_string(), relay_log);
+        // Strip ANSI colour codes — the subprocess's tty detection
+        // treats the inherited stdout/stderr as a colour-capable
+        // terminal, but the bytes are then re-emitted by the test's
+        // own subscriber, which double-renders escape sequences as
+        // literal text. NO_COLOR is the de-facto standard.
+        env_vars.insert("NO_COLOR".to_string(), "1".to_string());
         self.add_version_policy_env_vars(&mut env_vars);
 
         let mut cmd = Command::new(&self.binary_path);
+        // Pipe both stdout and stderr — vauchi-relay's tracing
+        // subscriber writes to stdout by default (RUST_LOG INFO and
+        // above), while panics and unconfigured eprintln! land on
+        // stderr. Draining both surfaces the relay's actual diagnosis
+        // when a request fails.
         cmd.envs(env_vars)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
@@ -356,17 +371,7 @@ impl RelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
 
-        // Drain stderr in the background so the pipe buffer never fills.
-        // Lines are logged at warn level for post-mortem debugging.
-        if let Some(stderr) = child.stderr.take() {
-            let relay_idx = index;
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    warn!(target: "relay", relay = relay_idx, "{}", line);
-                }
-            });
-        }
+        spawn_relay_drains(&mut child, index);
 
         // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
@@ -587,12 +592,24 @@ impl RelayManager {
                 );
             }
         }
-        env_vars.insert("RUST_LOG".to_string(), "warn".to_string());
+        // Forward the parent's RUST_LOG so test runs can opt into more
+        // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
+        // the relay rejects a request). Default to `warn` for quiet
+        // happy-path runs.
+        let relay_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        env_vars.insert("RUST_LOG".to_string(), relay_log);
+        // Strip ANSI colour codes — the subprocess's tty detection
+        // treats the inherited stdout/stderr as a colour-capable
+        // terminal, but the bytes are then re-emitted by the test's
+        // own subscriber, which double-renders escape sequences as
+        // literal text. NO_COLOR is the de-facto standard.
+        env_vars.insert("NO_COLOR".to_string(), "1".to_string());
         self.add_version_policy_env_vars(&mut env_vars);
 
         let mut cmd = Command::new(&self.binary_path);
+        // See spawn-site comment above on why both pipes are drained.
         cmd.envs(env_vars)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
@@ -600,15 +617,7 @@ impl RelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
 
-        if let Some(stderr) = child.stderr.take() {
-            let relay_idx = index;
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    warn!(target: "relay", relay = relay_idx, "{}", line);
-                }
-            });
-        }
+        spawn_relay_drains(&mut child, index);
 
         // Wait for health
         self.wait_for_health(port, metrics_port, index, &mut child)
@@ -667,6 +676,37 @@ impl Drop for RelayManager {
             .join()
             .ok();
         }
+    }
+}
+
+/// Spawn OS-thread drainers for `child`'s stdout and stderr pipes,
+/// emitting each line as a `tracing::warn!(target = "relay", ...)`.
+///
+/// vauchi-relay's tracing-subscriber writes log records to **stdout**
+/// (the default `fmt::Subscriber` writer); panics and unconfigured
+/// `eprintln!` lines hit stderr. The orchestrator pipes both so the
+/// next time a test fails because the relay rejected a request, the
+/// relay's own log line explaining the rejection surfaces.
+fn spawn_relay_drains(child: &mut Child, index: usize) {
+    if let Some(stdout) = child.stdout.take() {
+        let fd = stdout
+            .into_owned_fd()
+            .expect("ChildStdout → OwnedFd (Unix only)");
+        crate::subprocess_log::drain_pipe(
+            fd,
+            format!("relay-{index}-stdout"),
+            move |line| warn!(target: "relay", relay = index, "{}", line),
+        );
+    }
+    if let Some(stderr) = child.stderr.take() {
+        let fd = stderr
+            .into_owned_fd()
+            .expect("ChildStderr → OwnedFd (Unix only)");
+        crate::subprocess_log::drain_pipe(
+            fd,
+            format!("relay-{index}-stderr"),
+            move |line| warn!(target: "relay", relay = index, "{}", line),
+        );
     }
 }
 
