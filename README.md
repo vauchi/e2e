@@ -205,23 +205,21 @@ just e2e-all
 
 ## Architecture
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                     E2E Test Orchestrator (Rust)                    │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐          │
-│  │   Relay A    │    │   Relay B    │    │  Test Clock  │          │
-│  │  :18080      │    │  :18081      │    │  (simulated) │          │
-│  └──────────────┘    └──────────────┘    └──────────────┘          │
-│         │                   │                                       │
-│  ┌──────┴───────────────────┴──────────────────────────────┐       │
-│  │              Device Abstraction Layer                    │       │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐        │       │
-│  │  │CliDevice│ │Maestro  │ │ Tauri   │ │   TUI   │        │       │
-│  │  │  (CLI)  │ │ (Mobile)│ │(Desktop)│ │(Terminal│        │       │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘        │       │
-│  └──────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Orchestrator["E2E Test Orchestrator (Rust)"]
+        RelayA["Relay A<br/>:18080"]
+        RelayB["Relay B<br/>:18081"]
+        Clock["Test Clock<br/>(simulated)"]
+        subgraph DAL["Device Abstraction Layer"]
+            CliDevice["CliDevice<br/>(CLI)"]
+            Maestro["Maestro<br/>(Mobile)"]
+            Tauri["Tauri<br/>(Desktop)"]
+            TUI["TUI<br/>(Terminal)"]
+        end
+        RelayA --- DAL
+        RelayB --- DAL
+    end
 ```
 
 ## Troubleshooting
