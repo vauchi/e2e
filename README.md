@@ -208,6 +208,7 @@ just e2e-all
 ```mermaid
 flowchart TB
     subgraph Orchestrator["E2E Test Orchestrator (Rust)"]
+        Gateway["OHTTP Gateway<br/>(local test instance)"]
         RelayA["Relay A<br/>:18080"]
         RelayB["Relay B<br/>:18081"]
         Clock["Test Clock<br/>(simulated)"]
@@ -217,10 +218,18 @@ flowchart TB
             Tauri["Tauri<br/>(Desktop)"]
             TUI["TUI<br/>(Terminal)"]
         end
-        RelayA --- DAL
-        RelayB --- DAL
+        DAL -- "OHTTP" --> Gateway
+        Gateway --> RelayA
+        Gateway --> RelayB
     end
 ```
+
+> **Note:** The orchestrator includes an `OhttpRelayManager` that
+> spawns a local OHTTP gateway, so tests can exercise the same
+> client→gateway→relay transport path as production (per ADR-037).
+> Today only OHTTP-specific test suites opt in via the
+> `spawn_ohttp_stack` helpers; making OHTTP the default for all
+> full-stack scenarios is tracked as a follow-up.
 
 ## Troubleshooting
 
