@@ -186,60 +186,6 @@ impl Orchestrator {
             );
         }
 
-        // F13-DIAG (TEMPORARY — remove with un-ignore MR once root-caused):
-        // probe both outer-hop routes the cli will exercise, from the
-        // orchestrator's view of the URL. The cli sees `HTTP 404` in CI
-        // but the orchestrator's earlier probe to /v2/ohttp returned 502
-        // (route exists, body invalid as expected). This widens the
-        // diagnostic to /v2/ohttp-key + binary-identity to disambiguate
-        // suspect 1 (stale CI binary) from suspect 2 (header forwarding).
-        if let Some(outer_url) = self.ohttp_relay_url() {
-            let trimmed = outer_url.trim_end_matches('/').to_string();
-            let envelope_url = format!("{trimmed}/v2/ohttp");
-            let key_url = format!("{trimmed}/v2/ohttp-key");
-
-            // Probe POST /v2/ohttp with empty body — expect 502 (route
-            // exists, gateway rejects empty payload). 404 here would
-            // confirm the outer-hop binary is missing the route entirely.
-            match reqwest::Client::new()
-                .post(&envelope_url)
-                .header("content-type", "message/ohttp-req")
-                .body(b"\x00".to_vec())
-                .send()
-                .await
-            {
-                Ok(resp) => eprintln!(
-                    "F13-DIAG: orchestrator POST {envelope_url} -> {} (expect 502)",
-                    resp.status().as_u16()
-                ),
-                Err(e) => {
-                    eprintln!("F13-DIAG: orchestrator POST {envelope_url} -> reqwest err: {e}")
-                }
-            }
-
-            // Probe GET /v2/ohttp-key — expect 200 (key proxy must work
-            // for clients with allow_direct=true). 404 here would also
-            // confirm a missing-route outer-hop.
-            match reqwest::Client::new().get(&key_url).send().await {
-                Ok(resp) => eprintln!(
-                    "F13-DIAG: orchestrator GET {key_url} -> {} (expect 200)",
-                    resp.status().as_u16()
-                ),
-                Err(e) => eprintln!("F13-DIAG: orchestrator GET {key_url} -> reqwest err: {e}"),
-            }
-
-            // Capture the cli binary identity that subprocesses will use,
-            // so the CI log unambiguously records which binary saw 404.
-            let cli_path = std::env::var("E2E_BIN_DIR")
-                .map(|d| format!("{d}/vauchi (E2E_BIN_DIR)"))
-                .unwrap_or_else(|_| "<fallback path resolution>".to_string());
-            eprintln!("F13-DIAG: cli subprocess path will be: {cli_path}");
-            eprintln!(
-                "F13-DIAG: outer_hop_url passed to cli via --relay: {}",
-                self.primary_cli_relay_url().unwrap_or_default()
-            );
-        }
-
         self.started = true;
 
         Ok(())

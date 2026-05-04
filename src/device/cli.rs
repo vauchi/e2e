@@ -163,34 +163,11 @@ impl CliDevice {
             args.join(" ")
         );
 
-        // F13-DIAG (TEMPORARY — remove with un-ignore MR once root-caused).
-        // Print the env keys passed to the spawned cli so the CI log
-        // shows whether `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX` is
-        // actually reaching the release binary in the failing run.
-        eprintln!(
-            "F13-DIAG: spawn {} --relay {} {} (extra_env keys: {:?}, suppress_allow_direct={suppress_allow_direct})",
-            self.cli_path.display(),
-            self.relay_url,
-            args.join(" "),
-            self.extra_env.keys().collect::<Vec<_>>(),
-        );
-
         let cmd_desc = format!("vauchi {}", args.join(" "));
         let output = tokio::time::timeout(std::time::Duration::from_secs(60), cmd.output())
             .await
             .map_err(|_| E2eError::timeout(format!("CLI command timed out after 60s: {cmd_desc}")))?
             .map_err(|e| E2eError::cli_execution(format!("Failed to run CLI command: {}", e)))?;
-
-        // F13-DIAG (TEMPORARY): always surface subprocess stdout/stderr,
-        // not just on failure. The 404 surfaces inside the cli's
-        // NetworkError chain — having stderr in the test log makes the
-        // exact upstream response visible without rerunning with trace.
-        eprintln!(
-            "F13-DIAG: {cmd_desc} -> exit {:?}\n  stdout: {}\n  stderr: {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        );
 
         trace!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));
         trace!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));

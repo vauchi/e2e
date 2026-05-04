@@ -51,28 +51,24 @@ use vauchi_e2e_tests::{
 ///    the local relay's `/v2/ohttp-key` once at start() and forwards
 ///    it to every spawned cli via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
 ///    Problem record `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
-/// 4. **Residual `HTTP 404` on `vauchi sync`** in CI (passes locally).
-///    With the override active and `VAUCHI_ALLOW_DIRECT` suppressed,
-///    the cli encaps with the local relay's ephemeral ChaCha20 key and
-///    POSTs to `{outer_hop}/v2/ohttp` — the outer hop has that route
-///    (orchestrator-side `F13-DIAG-PROBE` against the same URL returns
-///    502 from the same job, confirming the route matches), and the
-///    sibling `smoke_ohttp_key_bootstrap_and_send` succeeds via the
-///    same route in the same CI run. Yet the cli subprocess sees 404.
-///    Reproducing this against a stale local outer-hop binary surfaced
-///    the same shape, so a per-binary regression in CI's cached
-///    `vauchi-ohttp-relay` is plausible but not yet confirmed. The
-///    test stays `#[ignore]`'d until the residual is identified;
-///    `inject_local_ohttp_key_into_cli` and the orchestrator wiring
-///    remain in tree so re-enabling is a one-line change. Problem
-///    record `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
-// @internal
-// F13-DIAG (TEMPORARY — investigation/f13-residual-404-ci-only): un-ignored
-// to capture full CI logs. Diagnostics added to `Orchestrator::start()` and
-// `CliDevice::run_command` will print outer-hop probe results (POST /v2/ohttp,
-// GET /v2/ohttp-key), the cli binary path, the --relay URL, and every
-// subprocess stdout/stderr. Restore `#[ignore]` + drop diagnostics in the
-// fix MR once the residual 404 is root-caused.
+/// 4. **Residual `HTTP 404` on `vauchi sync`** in CI (transient).
+///    Step 5's first un-ignore attempt deterministically failed in
+///    CI with `HTTP 404` while passing locally. Suspect 1 — stale CI
+///    binary cache — confirmed by the next pipeline run on
+///    investigation branch `investigation/f13-residual-404-ci-only`:
+///    once CI's `smoke-binaries-*` cache rolled over to include
+///    `cli@8880ebef` (the `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`
+///    env hatch) and `ohttp-relay@33d34b8e` (with both `/v2/ohttp`
+///    + `/v2/ohttp-key` routes registered), the smoke passed
+///    end-to-end (12.0s) on the same code that previously failed.
+///    Test un-ignored permanently in this MR. If 404s reappear after
+///    a future cache invalidation, the suspect is again the cache
+///    age, not the harness — the diagnostics added in
+///    `investigation/f13-residual-404-ci-only` are the reference
+///    repro. Closes step 5 of
+///    `2026-05-04-ohttp-gateway-decap-unsupported-via-outer-hop`
+///    + `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
+// @scenario: ohttp_outer_hop :: cli completes a 2-user exchange via the orchestrator-spawned outer ohttp-relay
 #[tokio::test]
 async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     let config = OrchestratorConfig {
