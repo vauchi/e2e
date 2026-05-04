@@ -67,7 +67,12 @@ use vauchi_e2e_tests::{
 ///    remain in tree so re-enabling is a one-line change. Problem
 ///    record `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
 // @internal
-#[ignore = "F13 follow-up: HTTP 404 on cli sync via outer hop in CI — see body"]
+// F13-DIAG (TEMPORARY — investigation/f13-residual-404-ci-only): un-ignored
+// to capture full CI logs. Diagnostics added to `Orchestrator::start()` and
+// `CliDevice::run_command` will print outer-hop probe results (POST /v2/ohttp,
+// GET /v2/ohttp-key), the cli binary path, the --relay URL, and every
+// subprocess stdout/stderr. Restore `#[ignore]` + drop diagnostics in the
+// fix MR once the residual 404 is root-caused.
 #[tokio::test]
 async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     let config = OrchestratorConfig {
