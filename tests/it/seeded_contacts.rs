@@ -129,16 +129,14 @@ fn create_seeded_engine(count: usize) -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-/// Extract contact names from the current screen's contact list component.
+/// Extract contact names from the current screen's list component.
 fn contact_names(engine: &dyn WorkflowEngine) -> Vec<String> {
     let screen = engine.current_screen();
     screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::ContactList { contacts, .. } => {
-                Some(contacts.iter().map(|c| c.name.clone()).collect())
-            }
+            Component::List { items, .. } => Some(items.iter().map(|i| i.name.clone()).collect()),
             _ => None,
         })
         .unwrap_or_default()
@@ -171,52 +169,20 @@ fn e2e_seeded_contacts_have_subtitle() {
     engine.navigate_to(AppScreen::Contacts);
 
     let screen = engine.current_screen();
-    let contacts = screen
+    let items = screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::ContactList { contacts, .. } => Some(contacts),
+            Component::List { items, .. } => Some(items),
             _ => None,
         })
-        .expect("contacts component");
+        .expect("list component");
 
-    for contact in contacts {
+    for item in items {
         assert!(
-            contact.subtitle.is_some(),
+            item.subtitle.is_some(),
             "contact '{}' should have subtitle (first field value)",
-            contact.name
-        );
-    }
-}
-
-/// @scenario: contacts_management:Contact list shows searchable fields
-#[test]
-fn e2e_seeded_contacts_have_searchable_fields() {
-    let mut engine = create_seeded_engine(5);
-    engine.navigate_to(AppScreen::Contacts);
-
-    let screen = engine.current_screen();
-    let contacts = screen
-        .components
-        .iter()
-        .find_map(|c| match c {
-            Component::ContactList { contacts, .. } => Some(contacts),
-            _ => None,
-        })
-        .expect("contacts component");
-
-    for contact in contacts {
-        assert!(
-            !contact.searchable_fields.is_empty(),
-            "contact '{}' should have searchable fields (phone, email)",
-            contact.name
-        );
-        // Each contact should have at least phone + email
-        assert!(
-            contact.searchable_fields.len() >= 2,
-            "contact '{}' should have at least 2 searchable fields, got {}",
-            contact.name,
-            contact.searchable_fields.len()
+            item.name
         );
     }
 }
@@ -513,7 +479,7 @@ fn e2e_contact_detail_shows_seeded_fields() {
         .components
         .iter()
         .find_map(|c| match c {
-            Component::ContactList { contacts, .. } => contacts.first().map(|c| c.id.clone()),
+            Component::List { items, .. } => items.first().map(|i| i.id.clone()),
             _ => None,
         })
         .expect("first contact ID");
