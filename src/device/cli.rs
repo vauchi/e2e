@@ -6,6 +6,7 @@
 //!
 //! Controls the Vauchi CLI as a subprocess to simulate device operations.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Output;
 use std::sync::Mutex;
@@ -30,6 +31,10 @@ pub struct CliDevice {
     cli_path: PathBuf,
     /// Public ID captured from init output.
     public_id: Mutex<Option<String>>,
+    /// Extra env vars to set on every spawned `vauchi` subprocess.
+    /// Used by the orchestrator to inject test-only overrides like
+    /// `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX` (F13 step 5).
+    extra_env: HashMap<String, String>,
 }
 
 impl CliDevice {
@@ -46,6 +51,7 @@ impl CliDevice {
             relay_url: relay_url.into(),
             cli_path,
             public_id: Mutex::new(None),
+            extra_env: HashMap::new(),
         })
     }
 
@@ -63,7 +69,17 @@ impl CliDevice {
             relay_url: relay_url.into(),
             cli_path,
             public_id: Mutex::new(None),
+            extra_env: HashMap::new(),
         })
+    }
+
+    /// Set extra environment variables to pass to every spawned
+    /// `vauchi` subprocess. Replaces any previously-set extras. Used
+    /// by the orchestrator to inject test-only overrides like
+    /// `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+    pub fn with_extra_env(mut self, extra_env: HashMap<String, String>) -> Self {
+        self.extra_env = extra_env;
+        self
     }
 
     /// Find the CLI binary in the workspace.
@@ -121,6 +137,10 @@ impl CliDevice {
             .args(args)
             .stdin(std::process::Stdio::null())
             .env("VAUCHI_ALLOW_DIRECT", "1");
+
+        for (k, v) in &self.extra_env {
+            cmd.env(k, v);
+        }
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",

@@ -20,6 +20,14 @@ use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use crate::relay_manager::{RelayConfig, RelayManager};
 use crate::user::{User, UserBuilder};
 
+/// Env var read by the cli (`cli/src/commands/common.rs`) to override
+/// `OhttpConfig::bundled_gateway_key`. The orchestrator fetches the
+/// freshly-spawned local relay's `/v2/ohttp-key` and sets this env on
+/// every spawned `vauchi` subprocess so the release cli can encap to a
+/// key the local relay can decrypt. See problem record
+/// `_private/docs/problems/2026-05-04-f13-cli-bundled-key-injection-for-e2e/`.
+const CLI_BUNDLED_OHTTP_KEY_HEX_ENV: &str = "VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX";
+
 /// Configuration for the orchestrator.
 #[derive(Debug, Clone)]
 pub struct OrchestratorConfig {
@@ -46,6 +54,18 @@ pub struct OrchestratorConfig {
     /// Configuration for the spawned ohttp-relay (only used when
     /// `with_ohttp_relay` is `true`).
     pub ohttp_relay_config: OhttpRelayConfig,
+    /// Inject the spawned local relay's OHTTP gateway key into every
+    /// cli subprocess via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+    /// Required for the F11 outer-hop smoke test against `E2E_BIN_DIR`
+    /// (release cli) — the release binary compiles out the
+    /// `VAUCHI_ALLOW_DIRECT` escape hatch and would otherwise fall back
+    /// to the compiled-in production bundled key, whose pubkey the
+    /// ephemeral local relay cannot decrypt.
+    ///
+    /// Off by default — only the smoke test that exercises the outer
+    /// hop end-to-end needs it. See problem record
+    /// `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
+    pub inject_local_ohttp_key_into_cli: bool,
 }
 
 impl Default for OrchestratorConfig {
@@ -56,6 +76,7 @@ impl Default for OrchestratorConfig {
             operation_delay: Duration::from_millis(100),
             with_ohttp_relay: false,
             ohttp_relay_config: OhttpRelayConfig::default(),
+            inject_local_ohttp_key_into_cli: false,
         }
     }
 }
@@ -70,6 +91,10 @@ pub struct Orchestrator {
     ohttp_relay_manager: Option<OhttpRelayManager>,
     users: HashMap<String, Arc<RwLock<User>>>,
     started: bool,
+    /// Hex-encoded local relay gateway key, populated on `start()` when
+    /// `inject_local_ohttp_key_into_cli` is `true`. Forwarded to every
+    /// spawned cli subprocess via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+    cli_bundled_ohttp_key_hex: Option<String>,
 }
 
 impl Orchestrator {
@@ -86,6 +111,7 @@ impl Orchestrator {
             ohttp_relay_manager: None,
             users: HashMap::new(),
             started: false,
+            cli_bundled_ohttp_key_hex: None,
         }
     }
 
@@ -132,6 +158,34 @@ impl Orchestrator {
         }
 
         self.relay_manager = Some(relay_manager);
+
+        // Fetch the freshly-spawned local relay's OHTTP gateway key
+        // and stash it as the bundled-key override for every cli we
+        // launch. Without this, the release cli (`E2E_BIN_DIR/vauchi`,
+        // which compiles out the `VAUCHI_ALLOW_DIRECT` hatch) would
+        // fall back to the production bundled key whose pubkey the
+        // local relay's ephemeral private key cannot decrypt — see
+        // F13 step 5 caveat in
+        // `2026-05-04-ohttp-gateway-decap-unsupported-via-outer-hop`.
+        if self.config.inject_local_ohttp_key_into_cli {
+            let relay_http_url = self.primary_relay_http_url()?;
+            let key_url = format!("{}/v2/ohttp-key", relay_http_url.trim_end_matches('/'));
+            debug!("Fetching local relay OHTTP gateway key from {key_url}");
+            let bytes = reqwest::get(&key_url)
+                .await
+                .map_err(|e| E2eError::scenario(format!("Failed to fetch {key_url}: {e}")))?
+                .error_for_status()
+                .map_err(|e| E2eError::scenario(format!("{key_url} returned non-2xx: {e}")))?
+                .bytes()
+                .await
+                .map_err(|e| E2eError::scenario(format!("Failed to read {key_url} body: {e}")))?;
+            self.cli_bundled_ohttp_key_hex = Some(hex::encode(&bytes));
+            info!(
+                "Injecting local relay OHTTP gateway key into cli subprocesses ({} bytes)",
+                bytes.len()
+            );
+        }
+
         self.started = true;
 
         Ok(())
@@ -234,8 +288,14 @@ impl Orchestrator {
 
         info!("Adding user '{}' with {} device(s)", name, device_count);
 
+        let mut extra_env = HashMap::new();
+        if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
+            extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
+        }
+
         let user = UserBuilder::new(&name, relay_url)
             .with_devices(device_count)
+            .with_extra_env(extra_env)
             .build()?;
 
         let user = Arc::new(RwLock::new(user));

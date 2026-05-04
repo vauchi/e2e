@@ -6,6 +6,7 @@
 //!
 //! Represents a Vauchi user with one or more linked devices.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -79,6 +80,18 @@ impl User {
 
     /// Add a CLI device to this user with an optional relay URL.
     pub fn add_cli_device(&mut self, relay_url: &str) -> E2eResult<usize> {
+        self.add_cli_device_with_env(relay_url, &HashMap::new())
+    }
+
+    /// Add a CLI device to this user with an optional relay URL and
+    /// extra environment variables forwarded to every spawned `vauchi`
+    /// subprocess. The orchestrator uses this to inject test-only
+    /// overrides such as `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+    pub fn add_cli_device_with_env(
+        &mut self,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+    ) -> E2eResult<usize> {
         let device_name = format!("device_{}", self.devices.len());
         let full_name = format!("{}_{}", self.name, device_name);
 
@@ -94,7 +107,7 @@ impl User {
             device_name, self.name, url
         );
 
-        let device = CliDevice::new(&full_name, url)?;
+        let device = CliDevice::new(&full_name, url)?.with_extra_env(extra_env.clone());
         let device: Box<dyn Device> = Box::new(device);
         self.devices.push(Arc::new(RwLock::new(device)));
 
@@ -114,9 +127,19 @@ impl User {
 
     /// Add multiple CLI devices at once.
     pub fn add_cli_devices(&mut self, count: usize, relay_url: &str) -> E2eResult<Vec<usize>> {
+        self.add_cli_devices_with_env(count, relay_url, &HashMap::new())
+    }
+
+    /// Add multiple CLI devices, each receiving the same extra env vars.
+    pub fn add_cli_devices_with_env(
+        &mut self,
+        count: usize,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+    ) -> E2eResult<Vec<usize>> {
         let mut indices = Vec::with_capacity(count);
         for _ in 0..count {
-            let index = self.add_cli_device(relay_url)?;
+            let index = self.add_cli_device_with_env(relay_url, extra_env)?;
             indices.push(index);
         }
         Ok(indices)
@@ -402,6 +425,7 @@ pub struct UserBuilder {
     relay_url: String,
     device_count: usize,
     device_types: Vec<DeviceType>,
+    extra_env: HashMap<String, String>,
 }
 
 impl UserBuilder {
@@ -412,6 +436,7 @@ impl UserBuilder {
             relay_url: relay_url.into(),
             device_count: 1,
             device_types: Vec::new(),
+            extra_env: HashMap::new(),
         }
     }
 
@@ -429,16 +454,31 @@ impl UserBuilder {
         self
     }
 
+    /// Set extra env vars passed to every spawned cli subprocess for
+    /// this user's devices. Used by the orchestrator to inject
+    /// test-only overrides like `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+    pub fn with_extra_env(mut self, extra_env: HashMap<String, String>) -> Self {
+        self.extra_env = extra_env;
+        self
+    }
+
     /// Build the user.
     pub fn build(self) -> E2eResult<User> {
         let mut user = User::with_relay(&self.name, &self.relay_url);
 
         if self.device_types.is_empty() {
             // Default to CLI devices
-            user.add_cli_devices(self.device_count, &self.relay_url)?;
+            user.add_cli_devices_with_env(self.device_count, &self.relay_url, &self.extra_env)?;
         } else {
             for device_type in self.device_types.into_iter() {
-                user.add_device(&self.relay_url, device_type)?;
+                match device_type {
+                    DeviceType::Cli => {
+                        user.add_cli_device_with_env(&self.relay_url, &self.extra_env)?;
+                    }
+                    _ => {
+                        user.add_device(&self.relay_url, device_type)?;
+                    }
+                }
             }
         }
 
@@ -446,6 +486,9 @@ impl UserBuilder {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests verify private UserBuilder default state and
+// the no-op path for zero-device users — no pub accessors exist for either,
+// and adding any just to satisfy structure rules would widen API surface.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -62,6 +62,9 @@ expectrl = "0.7"
 # HTTP client for Desktop test server
 reqwest = { version = "0.12", features = ["json"] }
 
+# Hex encoding (orchestrator-injected OHTTP bundled key for cli subprocesses)
+hex = "0.4"
+
 # Random number generation
 rand = "0.8"
 
@@ -81,7 +84,6 @@ tower = "0.5"
 
 # Key fingerprint verification
 sha2 = "0.10"
-hex = "0.4"
 
 [[bin]]
 name = "seed-contacts"

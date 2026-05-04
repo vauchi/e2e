@@ -32,20 +32,26 @@ use vauchi_e2e_tests::{
 ///    didn't proxy that path. Fixed by `core!765`
 ///    (`refactor: drop adapter health-check probe (F12 Option A)`).
 /// 2. **Decap "Unsupported" 502** (revealed after F12). With the
-///    routing fixed, the gateway now receives encrypted envelopes
-///    but rejects them with `OHTTP decapsulate failed:
-///    configuration was not supported`, which the outer hop
-///    surfaces as HTTP 502. Suspect: the cli's encap parameters
-///    don't match what the gateway advertises — possibly a stale
-///    cached key, KEM-config mismatch, or a layer-2 issue with
-///    the post-F6 ChaCha20-Poly1305 cipher selection. Tracked as
-///    F13 (problem record TBD); needs deeper investigation than
-///    fits the F11 Phase 1 PR.
-///
-/// The negative-path test below DOES run — it pins backward
-/// compatibility for the default opt-out config.
-// @internal
-#[ignore = "F13 follow-up: gateway decap rejects with Unsupported — see body"]
+///    routing fixed, the gateway received encrypted envelopes but
+///    rejected them with `OHTTP decapsulate failed: configuration
+///    was not supported`. Root cause was the stale pre-ADR-046
+///    `BUNDLED_OHTTP_KEY` advertising AES-128-GCM after relay!267
+///    swapped the gateway to ChaCha20-Poly1305-only. Bundled key
+///    regenerated in `core!766`; problem record
+///    `2026-05-04-ohttp-gateway-decap-unsupported-via-outer-hop`.
+/// 3. **Pubkey mismatch on local relay** (revealed by F13 step 5
+///    analysis). After the cipher fix the cli encaps to the
+///    *production* pubkey baked into the bundled key, but the
+///    test harness spawns a fresh local relay with an **ephemeral**
+///    keypair — decap still fails. The release E2E_BIN_DIR cli
+///    compiles out the `VAUCHI_ALLOW_DIRECT` escape hatch, so the
+///    fallback to the bundled production key is unconditional.
+///    Fixed by orchestrator-injected key:
+///    `OrchestratorConfig::inject_local_ohttp_key_into_cli` fetches
+///    the local relay's `/v2/ohttp-key` once at start() and forwards
+///    it to every spawned cli via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
+///    Problem record `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
+// @scenario: ohttp_outer_hop :: cli completes a 2-user exchange via the orchestrator-spawned outer ohttp-relay
 #[tokio::test]
 async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     let config = OrchestratorConfig {
@@ -54,6 +60,7 @@ async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
             ..Default::default()
         },
         with_ohttp_relay: true,
+        inject_local_ohttp_key_into_cli: true,
         ..Default::default()
     };
     let mut orch = Orchestrator::with_config(config);
