@@ -18,12 +18,28 @@ async fn spawn_relay_with_version_policy(
     warn: u16,
     grace_days: u16,
 ) -> (RelayManager, String) {
+    spawn_relay_with_version_policy_aged(min, warn, grace_days, None).await
+}
+
+/// Variant that lets the test set `min_version_changed_at` to an
+/// arbitrary unix timestamp (via `RELAY_VERSION_CHANGED_AT_SECS`) so
+/// it can simulate "grace already expired" or any other temporal
+/// position. `aged_at_secs = Some(0)` puts the change at unix epoch
+/// — guarantees grace expired regardless of `grace_days`. Production
+/// must NOT set this env var; the relay logs WARN if it does.
+async fn spawn_relay_with_version_policy_aged(
+    min: u16,
+    warn: u16,
+    grace_days: u16,
+    aged_at_secs: Option<u64>,
+) -> (RelayManager, String) {
     let config = RelayConfig {
         http_api_enabled: true,
         ohttp_enabled: false,
         version_min: Some(min),
         version_warn: Some(warn),
         version_grace_days: Some(grace_days),
+        version_changed_at_secs: aged_at_secs,
         ..Default::default()
     };
 
@@ -84,29 +100,23 @@ async fn current_client_connects_normally() {
     );
 }
 
-// ── Scenario 2: Old client rejected (no grace) ───────────────────
+// ── Scenario 2: Old client rejected (grace expired) ──────────────
 
 // @internal
-/// Relay has min=99 (above any real client). Originally written when
-/// the relay did NOT persist `min_version_changed_at` — so even with
-/// `grace_days=1`, the grace deadline was `None` and the client was
-/// rejected immediately with HTTP 426.
+/// Relay has min=99 (above any real client). The
+/// `version_changed_at_secs = Some(0)` override pegs
+/// `min_version_changed_at` at the unix epoch via
+/// `RELAY_VERSION_CHANGED_AT_SECS` — guarantees grace has long expired
+/// regardless of `grace_days`. Old client (version=1) is rejected
+/// with HTTP 426. Pins the rejection path of the version-policy
+/// state machine.
 ///
-/// Now the relay persists `min_version_changed_at` on first start
-/// (relay/src/main.rs ~L213), and `VersionPolicyConfig::new()` rejects
-/// `grace_days=0` as invalid (defense-in-depth — never lock out
-/// clients without warning). So this test as written can no longer
-/// exercise the rejection path on a fresh test relay.
-///
-/// Ignored pending a proper rejection-path harness — either an env
-/// var that lets the relay read an aged `min_version_changed_at`, or
-/// a SQLite-backed test setup that pre-seeds the config table.
-/// Tracked in `_private/docs/problems/2026-04-27-version-enforcement-tests-fail`.
+/// Harness shipped per `2026-04-27-version-enforcement-tests-fail`
+/// Option A (env-var override).
 // @internal
-#[ignore = "needs rejection-path harness — see problem record"]
 #[tokio::test]
 async fn old_client_rejected_without_grace() {
-    let (_mgr, http_url) = spawn_relay_with_version_policy(99, 99, 1).await;
+    let (_mgr, http_url) = spawn_relay_with_version_policy_aged(99, 99, 1, Some(0)).await;
 
     let client = reqwest::Client::new();
     let resp = client
@@ -178,20 +188,18 @@ async fn client_receives_warning_headers() {
 // ── Scenario 4: Missing header treated as version 0 ──────────────
 
 // @internal
-/// Relay has min=1. Client sends no `X-App-Compat-Version` header.
-/// Originally expected version 0 to be rejected with 426 — but now
-/// that the relay persists a fresh `min_version_changed_at` for any
-/// `min_version > 0`, the 14-day grace puts version 0 into
-/// `AllowedWithDeadline` (HTTP 200 + deadline header) instead.
+/// Relay has min=1, grace_days=14, with `min_version_changed_at`
+/// pegged at unix epoch via the test override — so the grace window
+/// expired ~56 years ago. Client sends no `X-App-Compat-Version`
+/// header → treated as version 0 → below min → rejected with 426
+/// (no grace remaining).
 ///
-/// Ignored alongside `old_client_rejected_without_grace` — same
-/// rejection-path harness gap. Tracked in problem record
-/// `2026-04-27-version-enforcement-tests-fail`.
+/// Harness shipped per `2026-04-27-version-enforcement-tests-fail`
+/// Option A.
 // @internal
-#[ignore = "needs rejection-path harness — see problem record"]
 #[tokio::test]
 async fn missing_version_header_treated_as_zero() {
-    let (_mgr, http_url) = spawn_relay_with_version_policy(1, 1, 14).await;
+    let (_mgr, http_url) = spawn_relay_with_version_policy_aged(1, 1, 14, Some(0)).await;
 
     let client = reqwest::Client::new();
     let resp = client

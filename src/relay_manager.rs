@@ -154,6 +154,13 @@ pub struct RelayConfig {
     pub version_warn: Option<u16>,
     /// Version policy: grace period days after min_version is raised.
     pub version_grace_days: Option<u16>,
+    /// Version policy: override `min_version_changed_at` to a specific
+    /// unix timestamp (seconds). Sets `RELAY_VERSION_CHANGED_AT_SECS`
+    /// in the spawned relay's env. Test-only — production deployments
+    /// must NOT set this. Used to age the timestamp past the grace
+    /// window so rejection-path tests can fire deterministically. See
+    /// `2026-04-27-version-enforcement-tests-fail`.
+    pub version_changed_at_secs: Option<u64>,
 }
 
 impl Default for RelayConfig {
@@ -173,6 +180,7 @@ impl Default for RelayConfig {
             version_min: None,
             version_warn: None,
             version_grace_days: None,
+            version_changed_at_secs: None,
         }
     }
 }
@@ -505,6 +513,9 @@ impl RelayManager {
         }
         if let Some(grace) = self.config.version_grace_days {
             env_vars.insert("RELAY_VERSION_GRACE_DAYS".to_string(), grace.to_string());
+        }
+        if let Some(t) = self.config.version_changed_at_secs {
+            env_vars.insert("RELAY_VERSION_CHANGED_AT_SECS".to_string(), t.to_string());
         }
     }
 
