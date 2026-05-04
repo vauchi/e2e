@@ -135,12 +135,34 @@ impl CliDevice {
             .arg("--relay")
             .arg(&self.relay_url)
             .args(args)
-            .stdin(std::process::Stdio::null())
-            .env("VAUCHI_ALLOW_DIRECT", "1");
+            .stdin(std::process::Stdio::null());
+
+        // Force the cli through the bundled-key path when the orchestrator
+        // injects an OHTTP override. With `VAUCHI_ALLOW_DIRECT=1`, the
+        // debug cli's `resolve_ohttp_key` does a direct fetch and shadows
+        // the bundle, exercising a different code path than the release
+        // binary takes — and that path 404s in CI for the F11 outer-hop
+        // smoke. Suppress the direct-fetch hatch when an override is
+        // present so debug + release run the same resolve order.
+        let suppress_allow_direct = self
+            .extra_env
+            .contains_key("VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX");
+        if !suppress_allow_direct {
+            cmd.env("VAUCHI_ALLOW_DIRECT", "1");
+        }
 
         for (k, v) in &self.extra_env {
             cmd.env(k, v);
         }
+
+        // F13 diagnostic — temporary, remove once CI passes
+        eprintln!(
+            "F13-DIAG: spawn vauchi {} (relay={}) extra_env={:?} suppress_allow_direct={}",
+            args.join(" "),
+            self.relay_url,
+            self.extra_env.keys().collect::<Vec<_>>(),
+            suppress_allow_direct
+        );
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",
