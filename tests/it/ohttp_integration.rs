@@ -562,7 +562,7 @@ async fn integration_ohttp_with_garbage_key_returns_error() {
             hpke::Kem::X25519Sha256,
             vec![SymmetricSuite::new(
                 hpke::Kdf::HkdfSha256,
-                hpke::Aead::Aes128Gcm,
+                hpke::Aead::ChaCha20Poly1305,
             )],
         )
         .unwrap();
