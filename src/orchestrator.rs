@@ -16,6 +16,7 @@ use tokio::time::sleep;
 use tracing::{debug, info};
 
 use crate::error::{E2eError, E2eResult};
+use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use crate::relay_manager::{RelayConfig, RelayManager};
 use crate::user::{User, UserBuilder};
 
@@ -28,6 +29,23 @@ pub struct OrchestratorConfig {
     pub relay_count: usize,
     /// Delay between operations (for observability).
     pub operation_delay: Duration,
+    /// Spawn an `OhttpRelayManager` (the outer privacy hop) alongside
+    /// the relay, and route CLI traffic through it. When `false` (default
+    /// today), the CLI talks directly to the relay's OHTTP gateway —
+    /// the OHTTP envelope is still encrypted, but the gateway operator
+    /// sees the client IP.
+    ///
+    /// Production runs every request through an outer ohttp-relay per
+    /// ADR-037 (gateway and forwarding-relay must be distinct
+    /// entities). Setting this to `true` makes the test harness exercise
+    /// the same path, catching outer-hop regressions (proxy caching,
+    /// rate limiting, header forwarding) before release.
+    ///
+    /// Source record: `_private/docs/problems/2026-04-27-e2e-ohttp-default/`.
+    pub with_ohttp_relay: bool,
+    /// Configuration for the spawned ohttp-relay (only used when
+    /// `with_ohttp_relay` is `true`).
+    pub ohttp_relay_config: OhttpRelayConfig,
 }
 
 impl Default for OrchestratorConfig {
@@ -36,6 +54,8 @@ impl Default for OrchestratorConfig {
             relay_config: RelayConfig::default(),
             relay_count: 1,
             operation_delay: Duration::from_millis(100),
+            with_ohttp_relay: false,
+            ohttp_relay_config: OhttpRelayConfig::default(),
         }
     }
 }
@@ -47,6 +67,7 @@ impl Default for OrchestratorConfig {
 pub struct Orchestrator {
     config: OrchestratorConfig,
     relay_manager: Option<RelayManager>,
+    ohttp_relay_manager: Option<OhttpRelayManager>,
     users: HashMap<String, Arc<RwLock<User>>>,
     started: bool,
 }
@@ -62,24 +83,53 @@ impl Orchestrator {
         Self {
             config,
             relay_manager: None,
+            ohttp_relay_manager: None,
             users: HashMap::new(),
             started: false,
         }
     }
 
-    /// Start the orchestrator (spawn relays).
+    /// Start the orchestrator (spawn relays, optionally an
+    /// `OhttpRelayManager` per `OrchestratorConfig::with_ohttp_relay`).
+    ///
+    /// When the outer ohttp-relay is enabled, multi-relay configurations
+    /// (`relay_count > 1`) currently fan out to a single ohttp-relay
+    /// pointing at relay 0; supporting per-relay outer hops is a Phase
+    /// 2 follow-up. Tests that need multiple relays today should
+    /// disable `with_ohttp_relay`.
     pub async fn start(&mut self) -> E2eResult<()> {
         if self.started {
             return Err(E2eError::scenario("Orchestrator already started"));
         }
 
         info!(
-            "Starting orchestrator with {} relay(s)",
-            self.config.relay_count
+            "Starting orchestrator with {} relay(s){}",
+            self.config.relay_count,
+            if self.config.with_ohttp_relay {
+                " + ohttp-relay"
+            } else {
+                ""
+            }
         );
 
         let mut relay_manager = RelayManager::with_config(self.config.relay_config.clone()).await?;
         relay_manager.spawn(self.config.relay_count).await?;
+
+        if self.config.with_ohttp_relay {
+            if self.config.relay_count > 1 {
+                return Err(E2eError::scenario(
+                    "with_ohttp_relay does not yet support relay_count > 1 \
+                     (see Phase 2 of 2026-04-27-e2e-ohttp-default)",
+                ));
+            }
+            let upstream = relay_manager.relay_http_url(0).ok_or_else(|| {
+                E2eError::scenario("relay HTTP URL unavailable for ohttp-relay forwarding")
+            })?;
+            let upstream = upstream.to_string();
+            let mut ohttp_mgr = OhttpRelayManager::new(self.config.ohttp_relay_config.clone())?;
+            ohttp_mgr.spawn(&upstream).await?;
+            self.ohttp_relay_manager = Some(ohttp_mgr);
+        }
 
         self.relay_manager = Some(relay_manager);
         self.started = true;
@@ -87,8 +137,12 @@ impl Orchestrator {
         Ok(())
     }
 
-    /// Stop the orchestrator (cleanup relays).
+    /// Stop the orchestrator (cleanup ohttp-relay first, then relays —
+    /// tear down outside-in so the proxy doesn't outlive its upstream).
     pub async fn stop(&mut self) -> E2eResult<()> {
+        if let Some(mut ohttp_mgr) = self.ohttp_relay_manager.take() {
+            ohttp_mgr.stop().await;
+        }
         if let Some(mut relay_manager) = self.relay_manager.take() {
             info!("Stopping orchestrator");
             relay_manager.stop_all().await;
@@ -123,6 +177,32 @@ impl Orchestrator {
             .ok_or_else(|| E2eError::scenario("No relay HTTP API available"))
     }
 
+    /// Get the URL the CLI should use as its `--relay`.
+    ///
+    /// When `OrchestratorConfig::with_ohttp_relay` is `true`, returns
+    /// the spawned ohttp-relay's URL — the CLI then talks
+    /// (client → ohttp-relay → relay-gateway), matching the
+    /// production-like ADR-037 path. Otherwise returns the direct
+    /// relay HTTP URL — the CLI's OHTTP envelope still encrypts
+    /// payloads, but the gateway operator sees the client IP.
+    ///
+    /// New code should prefer this over `primary_relay_http_url()`
+    /// — it transparently routes through the outer hop when one is
+    /// configured.
+    pub fn primary_cli_relay_url(&self) -> E2eResult<String> {
+        if let Some(ohttp_mgr) = self.ohttp_relay_manager.as_ref()
+            && let Some(url) = ohttp_mgr.url()
+        {
+            return Ok(url);
+        }
+        self.primary_relay_http_url()
+    }
+
+    /// Get the spawned ohttp-relay URL, if `with_ohttp_relay` is active.
+    pub fn ohttp_relay_url(&self) -> Option<String> {
+        self.ohttp_relay_manager.as_ref().and_then(|m| m.url())
+    }
+
     /// Get all relay URLs.
     pub fn all_relay_urls(&self) -> Vec<String> {
         self.relay_manager
@@ -147,8 +227,10 @@ impl Orchestrator {
         device_count: usize,
     ) -> E2eResult<Arc<RwLock<User>>> {
         let name = name.into();
-        // CLI uses HTTP transport — pass the HTTP API URL (v2 endpoints, OHTTP)
-        let relay_url = self.primary_relay_http_url()?;
+        // CLI uses HTTP transport — when `with_ohttp_relay` is on, this
+        // returns the outer hop's URL (CLI → ohttp-relay → gateway);
+        // otherwise the direct relay HTTP URL (CLI → gateway).
+        let relay_url = self.primary_cli_relay_url()?;
 
         info!("Adding user '{}' with {} device(s)", name, device_count);
 

@@ -26,6 +26,7 @@ mod ohttp_advanced;
 mod ohttp_helpers;
 mod ohttp_integration;
 mod onboarding_flow;
+mod orchestrator_default_ohttp;
 mod recovery_flow;
 mod relay_failover;
 mod resistance_features;
