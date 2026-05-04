@@ -25,26 +25,27 @@ use vauchi_e2e_tests::{
 /// Phase 1 smoke: orchestrator spawns ohttp-relay when configured,
 /// routes the CLI through it, and a basic exchange completes.
 ///
-/// Currently `#[ignore]`d pending a follow-up: `HttpTransportAdapter::connect()`
-/// calls `health_check()` against `<relay_url>/v2/health`, but
-/// `vauchi-ohttp-relay` only proxies `/v2/ohttp` + `/v2/ohttp-key`
-/// (see `ohttp-relay/src/router.rs::build_router`). Routing the CLI
-/// through the ohttp-relay therefore returns HTTP 404 from the
-/// outer hop on every health check, which `vauchi sync` surfaces
-/// as `network error: Connection failed: HTTP 404`.
+/// 2026-05-04 history:
 ///
-/// Production has the same path-coverage shape — production deploys
-/// must handle this either by (a) extending the ohttp-relay to
-/// transparently forward all `/v2/*` paths, (b) skipping the
-/// adapter health check when OHTTP is configured, or (c) splitting
-/// the cli's transport URL into `relay_url` (direct) + `ohttp_url`
-/// (proxied). Option (c) is the cleanest separation and is what
-/// the F11 Phase 2 record will explore.
+/// 1. **Routing 404** (initial finding). The CLI's adapter-level
+///    `health_check()` hit `/v2/health` directly; the outer hop
+///    didn't proxy that path. Fixed by `core!765`
+///    (`refactor: drop adapter health-check probe (F12 Option A)`).
+/// 2. **Decap "Unsupported" 502** (revealed after F12). With the
+///    routing fixed, the gateway now receives encrypted envelopes
+///    but rejects them with `OHTTP decapsulate failed:
+///    configuration was not supported`, which the outer hop
+///    surfaces as HTTP 502. Suspect: the cli's encap parameters
+///    don't match what the gateway advertises — possibly a stale
+///    cached key, KEM-config mismatch, or a layer-2 issue with
+///    the post-F6 ChaCha20-Poly1305 cipher selection. Tracked as
+///    F13 (problem record TBD); needs deeper investigation than
+///    fits the F11 Phase 1 PR.
 ///
 /// The negative-path test below DOES run — it pins backward
 /// compatibility for the default opt-out config.
 // @internal
-#[ignore = "needs cli/ohttp-relay path-coverage resolution — see body comment"]
+#[ignore = "F13 follow-up: gateway decap rejects with Unsupported — see body"]
 #[tokio::test]
 async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     let config = OrchestratorConfig {
