@@ -184,24 +184,6 @@ impl Orchestrator {
                 "Injecting local relay OHTTP gateway key into cli subprocesses ({} bytes)",
                 bytes.len()
             );
-
-            // F13 diagnostic — temporary, remove once CI passes.
-            if let Some(outer_url) = self.ohttp_relay_url() {
-                let probe_url = format!("{}/v2/ohttp", outer_url.trim_end_matches('/'));
-                match reqwest::Client::new()
-                    .post(&probe_url)
-                    .header("content-type", "message/ohttp-req")
-                    .body(b"\x00".to_vec())
-                    .send()
-                    .await
-                {
-                    Ok(resp) => eprintln!(
-                        "F13-DIAG-PROBE: POST {probe_url} -> {}",
-                        resp.status().as_u16()
-                    ),
-                    Err(e) => eprintln!("F13-DIAG-PROBE: POST {probe_url} -> reqwest err: {e}"),
-                }
-            }
         }
 
         self.started = true;

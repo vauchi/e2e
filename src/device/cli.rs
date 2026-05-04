@@ -155,15 +155,6 @@ impl CliDevice {
             cmd.env(k, v);
         }
 
-        // F13 diagnostic — temporary, remove once CI passes
-        eprintln!(
-            "F13-DIAG: spawn vauchi {} (relay={}) extra_env={:?} suppress_allow_direct={}",
-            args.join(" "),
-            self.relay_url,
-            self.extra_env.keys().collect::<Vec<_>>(),
-            suppress_allow_direct
-        );
-
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",
             self.cli_path.display(),
