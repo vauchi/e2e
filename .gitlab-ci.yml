@@ -77,6 +77,43 @@ lint:format:
 lint:clippy:
   extends: [.rust-runner-readonly, .lint-clippy, .validation-rust, .timeout-quick]
 
+# ADR-046: HPKE-internal AEAD must be ChaCha20-Poly1305 (not AES-GCM).
+# `scripts/scripts/check-aead.sh` greps `*.rs` for forbidden
+# `hpke::Aead::Aes128Gcm` / `Aes256Gcm` symbols outside the
+# `// ADR-046-EXEMPT: <reason>` allow-list.
+#
+# e2e is the only repo that actively imports `hpke::` today
+# (`tests/it/ohttp_integration.rs` exercises the OHTTP path with
+# `Aead::ChaCha20Poly1305`). The morning audit (A-3, 2026-05-08)
+# wired this gate into core + relay; e2e was missed even though
+# it was the most exposed consumer. Follow-up audit B-1 closes
+# the gap. Pre-commit also runs the script
+# (`scripts/hooks/pre-commit:174-194`) but pre-commit is bypassable
+# (`--no-verify`) and absent on machines that didn't install the
+# hook. CI is the durable gate.
+lint:adr-046:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache bash ripgrep git
+    - |
+      if [ ! -d ../scripts ]; then
+        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+      else
+        git -C ../scripts pull --ff-only 2>/dev/null || true
+      fi
+  script:
+    - bash ../scripts/scripts/check-aead.sh .
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+
 # ============================================================
 # Security Stage (change-based, gated by lint)
 # ============================================================
