@@ -61,6 +61,7 @@ fn e2e_phone_field_generates_tel_uri_after_exchange() {
         FieldType::Phone,
         "Mobile",
         "+41791234567",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -85,6 +86,7 @@ fn e2e_phone_secondary_actions_include_call_sms_copy() {
         FieldType::Phone,
         "Mobile",
         "+1-555-123-4567",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -111,6 +113,7 @@ fn e2e_address_field_generates_directions_uri() {
         FieldType::Address,
         "Home",
         "Bahnhofstrasse 1, 8001 Zurich",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -146,7 +149,7 @@ fn e2e_javascript_uri_blocked_after_exchange() {
     // Layer 1: Website field type rejects javascript: at input
     let mut bob = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
-    let field = ContactField::new(FieldType::Website, "Malicious", "javascript:alert(1)");
+    let field = ContactField::new(FieldType::Website, "Malicious", "javascript:alert(1)", 0);
     let result = bob.add_own_field(field);
     assert!(
         result.is_err(),
@@ -158,6 +161,7 @@ fn e2e_javascript_uri_blocked_after_exchange() {
         FieldType::Custom,
         "Malicious",
         "javascript:alert(1)",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -179,6 +183,7 @@ fn e2e_file_uri_blocked_after_exchange() {
         FieldType::Custom,
         "Exploit",
         "file:///etc/passwd",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -198,10 +203,10 @@ fn e2e_file_uri_blocked_after_exchange() {
 #[test]
 fn e2e_allowed_schemes_work_after_exchange() {
     let bob_fields = vec![
-        ContactField::new(FieldType::Phone, "Phone", "+41791234567"),
-        ContactField::new(FieldType::Email, "Email", "bob@example.com"),
-        ContactField::new(FieldType::Website, "Web", "https://example.com"),
-        ContactField::new(FieldType::Address, "Home", "Zurich, Switzerland"),
+        ContactField::new(FieldType::Phone, "Phone", "+41791234567", 0),
+        ContactField::new(FieldType::Email, "Email", "bob@example.com", 0),
+        ContactField::new(FieldType::Website, "Web", "https://example.com", 0),
+        ContactField::new(FieldType::Address, "Home", "Zurich, Switzerland", 0),
     ];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 
@@ -246,6 +251,7 @@ fn e2e_mastodon_federated_handle_generates_correct_url() {
         FieldType::Social,
         "Mastodon",
         "@bob@fosstodon.org",
+        0,
     )];
     let (alice, _bob) = exchange_with_fields(vec![], bob_fields);
 

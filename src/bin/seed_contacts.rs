@@ -42,10 +42,16 @@ fn main() {
             FieldType::Email,
             "Email",
             "test@vauchi.app",
+            0,
         ))
         .expect("Failed to add own field");
     vauchi
-        .add_own_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-0000"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "Mobile",
+            "+1-555-0000",
+            0,
+        ))
         .expect("Failed to add own field");
 
     // Create groups
@@ -70,9 +76,9 @@ fn main() {
         let email: String = FreeEmail().fake_with_rng(&mut rng);
 
         let mut card = ContactCard::new(&name);
-        card.add_field(ContactField::new(FieldType::Phone, "Mobile", &phone))
+        card.add_field(ContactField::new(FieldType::Phone, "Mobile", &phone, 0))
             .expect("add phone");
-        card.add_field(ContactField::new(FieldType::Email, "Email", &email))
+        card.add_field(ContactField::new(FieldType::Email, "Email", &email, 0))
             .expect("add email");
 
         // Address for ~40% of contacts
@@ -83,6 +89,7 @@ fn main() {
                 FieldType::Address,
                 "Address",
                 &format!("{}, {}", street, city),
+                0,
             ))
             .expect("add address");
         }
@@ -98,6 +105,7 @@ fn main() {
                     name.to_lowercase().replace(' ', ""),
                     domain
                 ),
+                0,
             ))
             .expect("add website");
         }

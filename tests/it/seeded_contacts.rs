@@ -70,9 +70,9 @@ fn seed_contacts(vauchi: &Vauchi, count: usize) -> (String, String, String) {
         );
 
         let mut card = ContactCard::new(name);
-        card.add_field(ContactField::new(FieldType::Phone, "Mobile", &phone))
+        card.add_field(ContactField::new(FieldType::Phone, "Mobile", &phone, 0))
             .expect("add phone");
-        card.add_field(ContactField::new(FieldType::Email, "Email", &email))
+        card.add_field(ContactField::new(FieldType::Email, "Email", &email, 0))
             .expect("add email");
 
         if i % 5 < 2 {
@@ -80,6 +80,7 @@ fn seed_contacts(vauchi: &Vauchi, count: usize) -> (String, String, String) {
                 FieldType::Address,
                 "Address",
                 &format!("{} Main St, Springfield", 100 + i * 10),
+                0,
             ))
             .expect("add address");
         }
@@ -119,10 +120,16 @@ fn create_seeded_engine(count: usize) -> AppEngine {
             FieldType::Email,
             "Email",
             "test@vauchi.app",
+            0,
         ))
         .expect("add own field");
     vauchi
-        .add_own_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-0000"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "Mobile",
+            "+1-555-0000",
+            0,
+        ))
         .expect("add own field");
 
     seed_contacts(&vauchi, count);
