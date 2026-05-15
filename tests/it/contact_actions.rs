@@ -40,10 +40,20 @@ fn exchange_with_fields(
     let bob_pk = *bob.identity().unwrap().signing_public_key();
 
     // Simulate exchange: each side creates a Contact from the other's card
-    let bob_contact = Contact::from_exchange(bob_pk, bob_card, SymmetricKey::generate());
+    let bob_contact = Contact::from_exchange(
+        bob_pk,
+        bob_card,
+        SymmetricKey::generate(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     alice.add_contact(bob_contact).unwrap();
 
-    let alice_contact = Contact::from_exchange(alice_pk, alice_card, SymmetricKey::generate());
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        alice_card,
+        SymmetricKey::generate(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     bob.add_contact(alice_contact).unwrap();
 
     (alice, bob)

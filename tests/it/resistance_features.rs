@@ -16,7 +16,12 @@ fn make_contact(pk_byte: u8, name: &str) -> Contact {
     let mut pk = [0u8; 32];
     pk[0] = pk_byte;
     let card = ContactCard::new(name);
-    Contact::from_exchange(pk, card, SymmetricKey::generate())
+    Contact::from_exchange(
+        pk,
+        card,
+        SymmetricKey::generate(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
 }
 
 // ============================================================
