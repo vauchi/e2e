@@ -106,11 +106,30 @@ impl CliDevice {
         // Production-style coverage (release CLI vs production relay
         // key) is provided by the SHA-cached `E2E_BIN_DIR` path used in
         // CI, which sits ahead of this fallback.
+        //
+        // The cli/ crate is its own Cargo workspace, so a bare `cargo
+        // build` in cli/ lands at `cli/target/debug/vauchi`. The
+        // workspace-root `target/debug/vauchi` is a historical-residue
+        // location with no current producer — check it after the
+        // cli-local path so a stale artifact there can't shadow a fresh
+        // cli build.
+        let cli_local_debug =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../cli/target/debug/vauchi");
+        if cli_local_debug.exists() {
+            return Ok(cli_local_debug);
+        }
+
         let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi");
         if debug_path.exists() {
             return Ok(debug_path);
         }
 
+        // Release fallback retained for OVERRIDE-mode tests: when the
+        // orchestrator injects `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`
+        // (release-allowed escape hatch in cli/src/commands/common.rs),
+        // a release binary can still encap to the orchestrator-spawned
+        // relay's key. DIRECT-mode tests (no override) need a debug
+        // binary above.
         let release_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
         if release_path.exists() {
