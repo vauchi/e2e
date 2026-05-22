@@ -141,11 +141,6 @@ impl CliDevice {
         ))
     }
 
-    /// Get the data directory path.
-    pub fn data_dir_path(&self) -> &std::path::Path {
-        self.data_dir.path()
-    }
-
     /// Run a CLI command and return the output.
     async fn run_command(&self, args: &[&str]) -> E2eResult<Output> {
         let mut cmd = Command::new(&self.cli_path);

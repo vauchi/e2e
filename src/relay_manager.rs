@@ -59,9 +59,6 @@ pub struct RelayInstance {
     pub metrics_port: u16,
     /// The child process handle.
     process: Option<Child>,
-    /// Index of this relay in the manager (reserved for future use).
-    #[allow(dead_code)]
-    index: usize,
 }
 
 impl RelayInstance {
@@ -393,7 +390,6 @@ impl RelayManager {
             port,
             metrics_port,
             process: Some(child),
-            index,
         };
 
         self.relays.push(instance);

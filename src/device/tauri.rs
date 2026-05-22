@@ -116,12 +116,6 @@ impl TauriDevice {
         ))
     }
 
-    /// Get the data directory path.
-    #[allow(dead_code)]
-    pub fn data_dir_path(&self) -> &std::path::Path {
-        self.data_dir.path()
-    }
-
     /// Check if the app process is running.
     pub async fn is_running(&self) -> bool {
         self.process.lock().await.is_some()

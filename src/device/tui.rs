@@ -88,8 +88,6 @@ fn find_tui_binary() -> E2eResult<PathBuf> {
 /// This is stored separately to avoid complex generics.
 struct PtySession {
     session: Session,
-    #[allow(dead_code)]
-    log_file: std::fs::File,
 }
 
 impl PtySession {
@@ -98,11 +96,6 @@ impl PtySession {
         data_dir: &std::path::Path,
         relay_url: &str,
     ) -> E2eResult<Self> {
-        // Create log file for debugging
-        let log_path = data_dir.join("pty.log");
-        let log_file = std::fs::File::create(&log_path)
-            .map_err(|e| E2eError::device(format!("Failed to create log file: {}", e)))?;
-
         // Create a wrapper script to handle all the terminal setup
         // This avoids complex shell quoting issues
         let script_path = data_dir.join("run_tui.sh");
@@ -145,7 +138,7 @@ exec "{}"
         // Set default timeout
         session.set_expect_timeout(Some(DEFAULT_TIMEOUT));
 
-        Ok(Self { session, log_file })
+        Ok(Self { session })
     }
 
     fn send_key(&mut self, key: u8) -> E2eResult<()> {
@@ -329,8 +322,6 @@ pub struct TuiDevice {
     name: String,
     data_dir: TempDir,
     relay_url: String,
-    #[allow(dead_code)]
-    tui_path: PathBuf,
     session: TuiSession,
 }
 
@@ -344,21 +335,14 @@ impl TuiDevice {
         let relay_url = relay_url.into();
         let data_dir_path = data_dir.path().to_path_buf();
 
-        let session = TuiSession::new(tui_path.clone(), data_dir_path, relay_url.clone());
+        let session = TuiSession::new(tui_path, data_dir_path, relay_url.clone());
 
         Ok(Self {
             name: name.into(),
             data_dir,
             relay_url,
-            tui_path,
             session,
         })
-    }
-
-    /// Get the data directory path.
-    #[allow(dead_code)]
-    pub fn data_dir_path(&self) -> &std::path::Path {
-        self.data_dir.path()
     }
 }
 
