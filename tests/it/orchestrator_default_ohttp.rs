@@ -171,3 +171,96 @@ async fn smoke_orchestrator_default_skips_ohttp_relay() {
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
+
+/// Production-mirror: the client is configured exactly like production —
+/// `--relay` at the data relay, OHTTP routed through a *distinct*
+/// ohttp-relay (`VAUCHI_OHTTP_RELAY_URL`), and **no** bundled-key
+/// injection. A 2-user exchange + card-update sync must complete: the
+/// client bootstraps the gateway key by fetching it through the ohttp-relay
+/// and sends `POST /v2/ohttp` there.
+///
+/// Regression seal for `2026-05-25-relay-ohttp-forward-hop-502`: production
+/// had no OHTTP endpoint configured, so the client POSTed OHTTP blobs to the
+/// data relay (which doesn't serve `/v2/ohttp`) → kamal-proxy 502 → sync
+/// never worked. With the Option B fix (`core!966` + `cli!280`) the client
+/// routes OHTTP to the distinct ohttp-relay. If that regresses, `exchange`
+/// / `sync_all` below fail loudly.
+// @scenario: ohttp_outer_hop :: cli with split data/ohttp relay config completes exchange + card-update sync
+#[tokio::test]
+async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
+    let config = OrchestratorConfig {
+        relay_config: RelayConfig {
+            ohttp_enabled: true,
+            ..Default::default()
+        },
+        with_ohttp_relay: true,
+        // No `inject_local_ohttp_key_into_cli`: the client must fetch the
+        // live gateway key through the ohttp-relay (the Option B path).
+        ..Default::default()
+    };
+    let mut orch = Orchestrator::with_config(config);
+    orch.start().await.expect("Failed to start orchestrator");
+
+    // The split must be real: the data relay URL and the ohttp-relay URL
+    // must differ (mirrors relay.vauchi.app vs ohttp.vauchi.app). Users get
+    // `--relay = data` + `VAUCHI_OHTTP_RELAY_URL = ohttp`.
+    let data_url = orch
+        .primary_relay_http_url()
+        .expect("data relay HTTP URL should be available");
+    let ohttp_url = orch
+        .ohttp_relay_url()
+        .expect("ohttp-relay URL should be Some when with_ohttp_relay is on");
+    assert_ne!(
+        data_url, ohttp_url,
+        "production-mirror requires distinct data + ohttp-relay URLs"
+    );
+
+    orch.add_user_split_ohttp("Alice", 1)
+        .expect("Failed to add Alice (split ohttp)");
+    orch.add_user_split_ohttp("Bob", 1)
+        .expect("Failed to add Bob (split ohttp)");
+
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities (split ohttp)");
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Exchange via split data/ohttp config failed");
+
+    // Decisive step: Alice updates her card and syncs. The OHTTP POST must
+    // route to the ohttp-relay and the gateway key must have been fetched
+    // through it — both of which 502'd in production before the fix.
+    let alice = orch.user("Alice").expect("Alice exists");
+    let bob = orch.user("Bob").expect("Bob exists");
+    {
+        let alice = alice.read().await;
+        alice
+            .add_field("email", "Email", "alice@example.com")
+            .await
+            .expect("Failed to add Alice's email field");
+        alice
+            .sync_all()
+            .await
+            .expect("Alice sync via split ohttp failed (the relay-502 path)");
+    }
+    {
+        let bob = bob.read().await;
+        bob.sync_all()
+            .await
+            .expect("Bob sync via split ohttp failed");
+    }
+    {
+        let bob = bob.read().await;
+        let contacts = bob
+            .list_contacts()
+            .await
+            .expect("Failed to list Bob's contacts");
+        assert!(
+            !contacts.is_empty(),
+            "Bob should have Alice as a contact after split-ohttp card-update delivery"
+        );
+    }
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+}

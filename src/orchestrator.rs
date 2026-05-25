@@ -304,6 +304,47 @@ impl Orchestrator {
         Ok(user)
     }
 
+    /// Add a user configured **production-shaped**: `--relay` points at the
+    /// data relay's HTTP URL, and OHTTP traffic is routed through the
+    /// *distinct* ohttp-relay via `VAUCHI_OHTTP_RELAY_URL`.
+    ///
+    /// This mirrors production (`relay.vauchi.app` + a separate
+    /// `ohttp.vauchi.app`) so the client's OHTTP key bootstrap + routing are
+    /// exercised end-to-end — the exact split that `add_user` (which points
+    /// `--relay` straight at the ohttp-relay) does not cover. Deliberately
+    /// injects **no** bundled-key override: the client must fetch the live
+    /// gateway key through the ohttp-relay. Requires `with_ohttp_relay = true`.
+    /// Regression guard for `2026-05-25-relay-ohttp-forward-hop-502`.
+    pub fn add_user_split_ohttp(
+        &mut self,
+        name: impl Into<String>,
+        device_count: usize,
+    ) -> E2eResult<Arc<RwLock<User>>> {
+        let name = name.into();
+        let relay_url = self.primary_relay_http_url()?;
+        let ohttp_url = self.ohttp_relay_url().ok_or_else(|| {
+            E2eError::relay("add_user_split_ohttp requires OrchestratorConfig::with_ohttp_relay")
+        })?;
+
+        info!(
+            "Adding split-OHTTP user '{}' with {} device(s) (relay + distinct ohttp-relay)",
+            name, device_count
+        );
+
+        let mut extra_env = HashMap::new();
+        extra_env.insert("VAUCHI_OHTTP_RELAY_URL".to_string(), ohttp_url);
+
+        let user = UserBuilder::new(&name, relay_url)
+            .with_devices(device_count)
+            .with_extra_env(extra_env)
+            .build()?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+
+        Ok(user)
+    }
+
     /// Get a user by name.
     pub fn user(&self, name: &str) -> Option<Arc<RwLock<User>>> {
         self.users.get(name).cloned()
