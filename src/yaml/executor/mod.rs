@@ -73,7 +73,6 @@ impl ScenarioExecutor {
             println!("Executing scenario: {}", scenario.name);
         }
 
-        // Setup phase
         if let Err(e) = self.setup(scenario).await {
             return Ok(ScenarioResult {
                 name: scenario.name.clone(),
@@ -100,7 +99,6 @@ impl ScenarioExecutor {
 
         step_results.extend(steps);
 
-        // Cleanup
         if let Err(e) = self.cleanup().await
             && self.verbose
         {
@@ -168,7 +166,6 @@ impl ScenarioExecutor {
             self.relay_manager = Some(manager);
         }
 
-        // Setup users
         let relay_url = self
             .relay_manager
             .as_ref()

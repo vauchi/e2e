@@ -442,7 +442,6 @@ impl Orchestrator {
             user.complete_exchange(&qr_b).await?;
         }
 
-        // Both sync
         {
             let user = user_a.read().await;
             user.sync_all().await?;

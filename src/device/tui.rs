@@ -52,7 +52,6 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Find the TUI binary in the workspace.
 fn find_tui_binary() -> E2eResult<PathBuf> {
-    // Try release binary first
     let release_path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tui/target/release/vauchi-tui");
     if release_path.exists() {
@@ -360,8 +359,6 @@ impl Device for TuiDevice {
         &self.relay_url
     }
 
-    // === Identity Management ===
-
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
         // Start session if not running
         self.session.ensure_started().await?;
@@ -424,8 +421,6 @@ impl Device for TuiDevice {
         ))
     }
 
-    // === Exchange ===
-
     async fn generate_qr(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
 
@@ -444,8 +439,6 @@ impl Device for TuiDevice {
             "TUI cannot scan QR codes. Use CLI for programmatic exchange.".into(),
         ))
     }
-
-    // === Device Linking ===
 
     async fn start_device_link(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
@@ -514,8 +507,6 @@ impl Device for TuiDevice {
         Ok(devices)
     }
 
-    // === Sync ===
-
     async fn sync(&self) -> E2eResult<()> {
         self.session.ensure_started().await?;
 
@@ -535,8 +526,6 @@ impl Device for TuiDevice {
 
         Ok(())
     }
-
-    // === Contacts ===
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         self.session.ensure_started().await?;
@@ -571,8 +560,6 @@ impl Device for TuiDevice {
         let contacts = self.list_contacts().await?;
         Ok(contacts.into_iter().find(|c| c.name.contains(name_or_id)))
     }
-
-    // === Card Management ===
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
         self.session.ensure_started().await?;
@@ -712,13 +699,9 @@ impl Device for TuiDevice {
         Ok(())
     }
 
-    // === Network Simulation ===
-
     async fn set_network(&self, _config: NetworkConfig) -> E2eResult<()> {
         Ok(())
     }
-
-    // === App Lifecycle ===
 
     async fn kill_app(&self) -> E2eResult<()> {
         self.session.stop().await

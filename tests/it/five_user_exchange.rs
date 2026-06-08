@@ -30,7 +30,6 @@ async fn integration_five_user_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
-    // Create users with devices
     orch.add_user("Alice", 3).expect("Failed to add Alice");
     orch.add_user("Bob", 2).expect("Failed to add Bob");
     orch.add_user("Carol", 1).expect("Failed to add Carol");

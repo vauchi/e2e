@@ -154,10 +154,8 @@ fn contact_names(engine: &dyn WorkflowEngine) -> Vec<String> {
         .unwrap_or_default()
 }
 
-// ============================================================
 // E2E: Contact list with seeded data
 // Feature: contacts_management.feature @contacts @view
-// ============================================================
 
 /// @scenario: contacts_management:View all contacts with populated list
 #[test]
@@ -199,10 +197,8 @@ fn e2e_seeded_contacts_have_subtitle() {
     }
 }
 
-// ============================================================
 // E2E: Search by name
 // Feature: contacts_management.feature @contacts @search
-// ============================================================
 
 /// @scenario: contacts_management:Search contacts by name
 #[test]
@@ -255,10 +251,8 @@ fn e2e_search_no_match_returns_empty() {
     assert!(names.is_empty(), "nonsense query should return no results");
 }
 
-// ============================================================
 // E2E: Search by field value (email, phone)
 // Feature: contacts_management.feature @contacts @search
-// ============================================================
 
 /// @scenario: contacts_management:Search contacts by email
 #[test]
@@ -300,10 +294,8 @@ fn e2e_search_by_phone_matches() {
     assert_eq!(names[0], "Augusta Heller");
 }
 
-// ============================================================
 // E2E: Group filtering
 // Feature: contacts_management.feature @contacts @groups @filter
-// ============================================================
 
 /// @scenario: contacts_management:Filter contacts by group
 #[test]
@@ -406,10 +398,8 @@ fn e2e_group_filter_combined_with_search() {
     );
 }
 
-// ============================================================
 // E2E: Group actions in screen model
 // Feature: contacts_management.feature @contacts @groups
-// ============================================================
 
 /// @scenario: contacts_management:Groups appear as filter actions
 #[test]
@@ -439,10 +429,8 @@ fn e2e_groups_appear_as_screen_actions() {
     );
 }
 
-// ============================================================
 // E2E: Large dataset stress
 // Feature: contacts_management.feature @contacts @scroll
-// ============================================================
 
 /// @scenario: contacts_management:Scroll through large contact list
 #[test]
@@ -474,10 +462,8 @@ fn e2e_search_with_30_contacts() {
     assert_eq!(names[0], "Zara Al-Rashidi");
 }
 
-// ============================================================
 // E2E: Contact detail with seeded fields
 // Feature: contacts_management.feature @contacts @view
-// ============================================================
 
 /// @scenario: contacts_management:View contact detail shows all fields
 #[test]

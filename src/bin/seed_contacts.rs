@@ -31,12 +31,10 @@ fn main() {
 
     let mut vauchi = Vauchi::in_memory().expect("Failed to create Vauchi");
 
-    // Create own identity
     vauchi
         .create_identity("Test User")
         .expect("Failed to create identity");
 
-    // Add own fields
     vauchi
         .add_own_field(ContactField::new(
             FieldType::Email,
@@ -54,7 +52,6 @@ fn main() {
         ))
         .expect("Failed to add own field");
 
-    // Create groups
     let family = vauchi.create_group("Family").expect("create group");
     let friends = vauchi.create_group("Friends").expect("create group");
     let work = vauchi.create_group("Work").expect("create group");
@@ -142,7 +139,6 @@ fn main() {
         }
     }
 
-    // Verify
     let contacts = vauchi.list_contacts().expect("list contacts");
     println!("\nDone! {} contacts seeded and verified.", contacts.len());
 

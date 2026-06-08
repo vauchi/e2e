@@ -222,7 +222,6 @@ impl RelayManager {
             }
         }
 
-        // Try release binary first
         let release_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi-relay");
         if release_path.exists() {
@@ -431,7 +430,6 @@ impl RelayManager {
                     )));
                 }
 
-                // Check main port
                 let main_ok = match client.get(&health_url).send().await {
                     Ok(resp) if resp.status().is_success() => true,
                     Ok(resp) => {
@@ -539,7 +537,6 @@ impl RelayManager {
             return Err(E2eError::relay(format!("Relay {} not found", index)));
         };
 
-        // Stop if running
         if let Some(relay) = self.relays.get_mut(index)
             && let Some(mut process) = relay.process.take()
         {
@@ -626,7 +623,6 @@ impl RelayManager {
 
         spawn_relay_drains(&mut child, index);
 
-        // Wait for health
         self.wait_for_health(port, metrics_port, index, &mut child)
             .await?;
 

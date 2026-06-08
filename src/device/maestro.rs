@@ -371,8 +371,6 @@ impl Device for MaestroDevice {
         &self.relay_url
     }
 
-    // === Identity Management ===
-
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
         self.run_flow("create_identity", &[("NAME", name)]).await?;
         Ok(())
@@ -397,8 +395,6 @@ impl Device for MaestroDevice {
         ))
     }
 
-    // === Exchange ===
-
     async fn generate_qr(&self) -> E2eResult<String> {
         self.run_flow("generate_qr", &[]).await?;
         self.read_qr_data()
@@ -409,8 +405,6 @@ impl Device for MaestroDevice {
             .await?;
         Ok(())
     }
-
-    // === Device Linking ===
 
     async fn start_device_link(&self) -> E2eResult<String> {
         self.run_flow("link_device", &[]).await?;
@@ -444,14 +438,10 @@ impl Device for MaestroDevice {
         ))
     }
 
-    // === Sync ===
-
     async fn sync(&self) -> E2eResult<()> {
         self.run_flow("sync", &[]).await?;
         Ok(())
     }
-
-    // === Contacts ===
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         self.run_flow("list_contacts", &[]).await?;
@@ -472,8 +462,6 @@ impl Device for MaestroDevice {
             }))
         }
     }
-
-    // === Card Management ===
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
         self.run_flow("get_card", &[("CONTACT_NAME", "Your Card")])
@@ -512,8 +500,6 @@ impl Device for MaestroDevice {
         ))
     }
 
-    // === Network Simulation ===
-
     async fn set_network(&self, config: NetworkConfig) -> E2eResult<()> {
         let _ = config;
         Ok(())
@@ -522,8 +508,6 @@ impl Device for MaestroDevice {
     fn network_config(&self) -> NetworkConfig {
         self.network_config.clone()
     }
-
-    // === App Lifecycle ===
 
     async fn background_app(&self) -> E2eResult<()> {
         match self.platform {
@@ -558,8 +542,6 @@ impl Device for MaestroDevice {
         self.run_app_command("launch").await
     }
 
-    // === Proximity Verification ===
-
     async fn start_proximity_verification(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
             "Maestro device: proximity verification not automatable in simulator".into(),
@@ -571,8 +553,6 @@ impl Device for MaestroDevice {
             "Maestro device: proximity verification not automatable in simulator".into(),
         ))
     }
-
-    // === Capabilities ===
 
     fn supports_network_simulation(&self) -> bool {
         false // Network simulation requires manual setup

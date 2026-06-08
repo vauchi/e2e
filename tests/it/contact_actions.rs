@@ -59,10 +59,8 @@ fn exchange_with_fields(
     (alice, bob)
 }
 
-// ============================================================
 // E2E: Phone URI generation through exchange
 // Feature: contact_actions.feature @phone @tel
-// ============================================================
 
 /// @scenario: contact_actions:Tap phone number opens dialer
 #[test]
@@ -110,10 +108,8 @@ fn e2e_phone_secondary_actions_include_call_sms_copy() {
     assert!(matches!(&actions[2], ContactAction::CopyToClipboard));
 }
 
-// ============================================================
 // E2E: Address directions URI
 // Feature: contact_actions.feature @address @directions
-// ============================================================
 
 /// @scenario: contact_actions:Get directions to address
 // @scenario: contact_actions.feature:Get directions to address
@@ -143,10 +139,8 @@ fn e2e_address_field_generates_directions_uri() {
     );
 }
 
-// ============================================================
 // E2E: Security — blocked URI schemes
 // Feature: contact_actions.feature @security
-// ============================================================
 
 /// @scenario: contact_actions:URLs are validated before opening (#45)
 ///
@@ -249,10 +243,8 @@ fn e2e_allowed_schemes_work_after_exchange() {
     }
 }
 
-// ============================================================
 // E2E: Social media Mastodon federation
 // Feature: contact_actions.feature @social @profile-url
-// ============================================================
 
 /// @scenario: contact_actions:Tap social media opens profile (Mastodon federated)
 #[test]

@@ -126,8 +126,6 @@ pub trait Device: Send + Sync {
     /// Get the relay URL this device connects to.
     fn relay_url(&self) -> &str;
 
-    // === Identity Management ===
-
     /// Create a new identity with the given display name.
     async fn create_identity(&self, name: &str) -> E2eResult<()>;
 
@@ -140,15 +138,11 @@ pub trait Device: Send + Sync {
     /// Import identity from a path.
     async fn import_identity(&self, path: &str) -> E2eResult<()>;
 
-    // === Exchange ===
-
     /// Generate a QR code for exchange (returns the QR data string).
     async fn generate_qr(&self) -> E2eResult<String>;
 
     /// Complete an exchange using a QR code from another user.
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()>;
-
-    // === Device Linking ===
 
     /// Start the device linking process (returns QR data for new device).
     async fn start_device_link(&self) -> E2eResult<String>;
@@ -165,20 +159,14 @@ pub trait Device: Send + Sync {
     /// List linked devices.
     async fn list_devices(&self) -> E2eResult<Vec<String>>;
 
-    // === Sync ===
-
     /// Sync with the relay server.
     async fn sync(&self) -> E2eResult<()>;
-
-    // === Contacts ===
 
     /// List all contacts.
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>>;
 
     /// Get a specific contact by name or ID.
     async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>>;
-
-    // === Card Management ===
 
     /// Get the user's contact card.
     async fn get_card(&self) -> E2eResult<ContactCard>;
@@ -194,8 +182,6 @@ pub trait Device: Send + Sync {
 
     /// Update the display name.
     async fn edit_name(&self, name: &str) -> E2eResult<()>;
-
-    // === Visibility Labels ===
 
     /// Create a visibility label.
     async fn create_label(&self, _name: &str) -> E2eResult<()> {
@@ -246,8 +232,6 @@ pub trait Device: Send + Sync {
         ))
     }
 
-    // === Contact Visibility ===
-
     /// Hide a field from a specific contact.
     async fn hide_field_from_contact(&self, _contact: &str, _field: &str) -> E2eResult<()> {
         Err(crate::error::E2eError::DeviceNotSupported(
@@ -262,8 +246,6 @@ pub trait Device: Send + Sync {
         ))
     }
 
-    // === Identity Info ===
-
     /// Get the public identity ID (hex-encoded signing public key).
     ///
     /// Available after `create_identity` is called. Used for recovery claims.
@@ -273,16 +255,12 @@ pub trait Device: Send + Sync {
         ))
     }
 
-    // === Contact Verification ===
-
     /// Mark a contact's fingerprint as verified.
     async fn verify_contact(&self, _contact: &str) -> E2eResult<()> {
         Err(crate::error::E2eError::DeviceNotSupported(
             "Contact verification not supported on this device type".to_string(),
         ))
     }
-
-    // === Recovery ===
 
     /// Create a recovery claim (returns claim data).
     async fn create_recovery_claim(&self, _old_public_key: &str) -> E2eResult<String> {
@@ -312,8 +290,6 @@ pub trait Device: Send + Sync {
         ))
     }
 
-    // === Backup ===
-
     /// Export identity backup (returns backup file path).
     async fn export_backup(&self, _password: &str) -> E2eResult<String> {
         Err(crate::error::E2eError::DeviceNotSupported(
@@ -328,8 +304,6 @@ pub trait Device: Send + Sync {
         ))
     }
 
-    // === Network Simulation ===
-
     /// Set network conditions for this device.
     ///
     /// This is used for testing offline scenarios, flaky networks, etc.
@@ -343,8 +317,6 @@ pub trait Device: Send + Sync {
     fn network_config(&self) -> NetworkConfig {
         NetworkConfig::default()
     }
-
-    // === App Lifecycle (Mobile/Desktop) ===
 
     /// Background the app (move to background state).
     ///
@@ -388,8 +360,6 @@ pub trait Device: Send + Sync {
         Ok(())
     }
 
-    // === Proximity Verification (Mobile) ===
-
     /// Start proximity verification (generates audio challenge).
     ///
     /// Only applicable for mobile devices with audio capability.
@@ -407,8 +377,6 @@ pub trait Device: Send + Sync {
             "Proximity verification not supported on this device type".to_string(),
         ))
     }
-
-    // === Device Capabilities ===
 
     /// Check if this device supports network simulation.
     fn supports_network_simulation(&self) -> bool {

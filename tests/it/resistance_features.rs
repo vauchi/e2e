@@ -24,10 +24,8 @@ fn make_contact(pk_byte: u8, name: &str) -> Contact {
     )
 }
 
-// ============================================================
 // Duress PIN: Setup and Auth Mode Switching
 // Feature: resistance_features.feature @duress
-// ============================================================
 
 /// @scenario: Setup duress PIN with app password
 #[test]
@@ -93,10 +91,8 @@ fn test_authenticate_with_invalid_password_fails() {
     assert!(result.is_err(), "Invalid password must fail authentication");
 }
 
-// ============================================================
 // Duress Alerts: Queue and Configuration
 // Feature: resistance_features.feature @duress
-// ============================================================
 
 /// @scenario: Duress alert is queued when duress PIN is entered
 #[test]
@@ -164,10 +160,8 @@ fn test_disable_duress() {
     assert!(!vauchi.is_duress_enabled().unwrap());
 }
 
-// ============================================================
 // Hidden Contacts: Basic Operations
 // Feature: resistance_features.feature @hidden
-// ============================================================
 
 /// @scenario: Contacts can be hidden
 #[test]
@@ -267,10 +261,8 @@ fn test_unhide_contact() {
     assert_eq!(visible.len(), 1);
 }
 
-// ============================================================
 // Hidden Contacts: Duress Integration
 // Feature: resistance_features.feature @duress @hidden
-// ============================================================
 
 /// @scenario: Duress mode shows only decoy contacts
 #[test]
@@ -311,10 +303,8 @@ fn test_duress_mode_shows_decoy_contacts_only() {
     }
 }
 
-// ============================================================
 // Emergency Broadcast: Setup and Configuration
 // Feature: resistance_features.feature @emergency
-// ============================================================
 
 /// @scenario: Configure emergency broadcast with trusted contacts
 #[test]
@@ -436,10 +426,8 @@ fn test_emergency_broadcast_honors_blocked_status() {
     assert!(result.sent <= 1, "Blocked contacts should be skipped");
 }
 
-// ============================================================
 // Comprehensive: Duress with Hidden and Decoy Contacts
 // Feature: resistance_features.feature @duress @hidden @comprehensive
-// ============================================================
 
 /// @scenario: Full duress flow: real contacts hidden, decoys shown, alert queued
 #[test]

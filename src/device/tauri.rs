@@ -76,7 +76,6 @@ impl TauriDevice {
 
     /// Find the desktop app binary in the workspace.
     fn find_app_binary() -> E2eResult<PathBuf> {
-        // Try release binary first (platform-specific paths)
         #[cfg(target_os = "linux")]
         let release_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../desktop/src-tauri/target/release/vauchi-desktop");
@@ -208,8 +207,6 @@ impl Device for TauriDevice {
         &self.relay_url
     }
 
-    // === Identity Management ===
-
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
         let body = serde_json::json!({ "name": name });
         let response = self.post("/identity", body).await?;
@@ -244,8 +241,6 @@ impl Device for TauriDevice {
         ))
     }
 
-    // === Exchange ===
-
     async fn generate_qr(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
             "Desktop QR generation not yet implemented via test API".into(),
@@ -257,8 +252,6 @@ impl Device for TauriDevice {
             "Desktop exchange not yet implemented via test API".into(),
         ))
     }
-
-    // === Device Linking ===
 
     async fn start_device_link(&self) -> E2eResult<String> {
         Err(E2eError::DeviceNotSupported(
@@ -290,8 +283,6 @@ impl Device for TauriDevice {
         ))
     }
 
-    // === Sync ===
-
     async fn sync(&self) -> E2eResult<()> {
         let response = self.post("/sync", serde_json::json!({})).await?;
 
@@ -303,8 +294,6 @@ impl Device for TauriDevice {
 
         Ok(())
     }
-
-    // === Contacts ===
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         let response = self.get("/contacts").await?;
@@ -333,8 +322,6 @@ impl Device for TauriDevice {
                     .unwrap_or(false)
         }))
     }
-
-    // === Card Management ===
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
         let response = self.get("/card").await?;
@@ -379,8 +366,6 @@ impl Device for TauriDevice {
             "Desktop name editing not yet implemented via test API".into(),
         ))
     }
-
-    // === App Lifecycle ===
 
     async fn kill_app(&self) -> E2eResult<()> {
         let mut process_guard = self.process.lock().await;

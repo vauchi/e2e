@@ -406,7 +406,6 @@ impl User {
         let their_qr = other.generate_qr().await?;
         self.complete_exchange(&their_qr).await?;
 
-        // Both sync
         self.sync_all().await?;
         other.sync_all().await?;
 

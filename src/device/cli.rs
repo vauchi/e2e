@@ -491,8 +491,6 @@ impl Device for CliDevice {
         &self.relay_url
     }
 
-    // === Identity Management ===
-
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
         let output = self.run_command_success(&["init", name]).await?;
         // Capture public ID from init output ("  Public ID: <hex>")
@@ -530,8 +528,6 @@ impl Device for CliDevice {
         Ok(())
     }
 
-    // === Exchange ===
-
     async fn generate_qr(&self) -> E2eResult<String> {
         let output = self.run_command_success(&["exchange", "start"]).await?;
         Self::extract_qr_data(&output)
@@ -542,8 +538,6 @@ impl Device for CliDevice {
             .await?;
         Ok(())
     }
-
-    // === Device Linking ===
 
     async fn start_device_link(&self) -> E2eResult<String> {
         let output = self.run_command_success(&["device", "link"]).await?;
@@ -601,8 +595,6 @@ impl Device for CliDevice {
         Ok(devices)
     }
 
-    // === Sync ===
-
     async fn sync(&self) -> E2eResult<()> {
         // Retry on relay rate-limit (429) with exponential backoff.
         // The test relay enforces per-client token-bucket rate limiting;
@@ -642,8 +634,6 @@ impl Device for CliDevice {
         unreachable!("loop runs MAX_RETRIES+1 times and always returns")
     }
 
-    // === Contacts ===
-
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         let output = self.run_command_success(&["contacts", "list"]).await?;
         Ok(Self::parse_contacts(&output))
@@ -672,8 +662,6 @@ impl Device for CliDevice {
         }
     }
 
-    // === Card Management ===
-
     async fn get_card(&self) -> E2eResult<ContactCard> {
         let output = self.run_command_success(&["card", "show"]).await?;
         Self::parse_card(&output)
@@ -701,8 +689,6 @@ impl Device for CliDevice {
             .await?;
         Ok(())
     }
-
-    // === Visibility Labels ===
 
     async fn create_label(&self, name: &str) -> E2eResult<()> {
         self.run_command_success(&["labels", "create", name])
@@ -785,8 +771,6 @@ impl Device for CliDevice {
         Ok(())
     }
 
-    // === Contact Visibility ===
-
     async fn hide_field_from_contact(&self, contact: &str, field: &str) -> E2eResult<()> {
         self.run_command_success(&["contacts", "hide", contact, field])
             .await?;
@@ -799,15 +783,11 @@ impl Device for CliDevice {
         Ok(())
     }
 
-    // === Contact Verification ===
-
     async fn verify_contact(&self, contact: &str) -> E2eResult<()> {
         self.run_command_success(&["contacts", "verify", contact])
             .await?;
         Ok(())
     }
-
-    // === Recovery ===
 
     async fn create_recovery_claim(&self, old_public_key: &str) -> E2eResult<String> {
         let output = self
@@ -841,8 +821,6 @@ impl Device for CliDevice {
             Ok(None)
         }
     }
-
-    // === Backup ===
 
     async fn export_backup(&self, password: &str) -> E2eResult<String> {
         let backup_path = self.data_dir.path().join("backup.vauchi");
