@@ -177,7 +177,12 @@ fn test_hide_contact() {
     vauchi.hide_contact(&bob_id).unwrap();
 
     // Verify contact is hidden
-    let loaded = vauchi.storage().load_contact(&bob_id).unwrap().unwrap();
+    let loaded = vauchi
+        .storage()
+        .contacts()
+        .load_contact(&bob_id)
+        .unwrap()
+        .unwrap();
     assert!(
         loaded.is_hidden(),
         "Contact must be hidden after hide_contact"
@@ -253,7 +258,12 @@ fn test_unhide_contact() {
     vauchi.unhide_contact(&bob_id).unwrap();
 
     // Verify not hidden
-    let loaded = vauchi.storage().load_contact(&bob_id).unwrap().unwrap();
+    let loaded = vauchi
+        .storage()
+        .contacts()
+        .load_contact(&bob_id)
+        .unwrap()
+        .unwrap();
     assert!(!loaded.is_hidden());
 
     // Verify appears in list_contacts
