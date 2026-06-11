@@ -137,7 +137,9 @@ impl CliDevice {
         }
 
         Err(E2eError::cli_execution(
-            "CLI binary not found. Please run `just build-cli` first.",
+            "CLI binary not found. Run `just build cli` (debug) first — \
+             a release `just build-cli` binary falls back to the bundled \
+             production OHTTP key and fails DIRECT-mode tests with HTTP 400.",
         ))
     }
 
