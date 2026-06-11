@@ -22,17 +22,34 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
 
+/// Names that stress rendering: emoji, RTL, CJK, combining marks,
+/// very long, and whitespace-adversarial.
+const ADVERSARIAL_NAMES: &[&str] = &[
+    "🦄🎉 Emoji Person 🚀",
+    "محمد الرشيد",
+    "山田太郎",
+    "Z̴̢̛a̷l̸g̵o̶ ̷N̸a̵m̶e̷",
+    "Anna-Maria Charlotte Elisabeth von Hohenberg-Wittgenstein zu Sayn",
+    "  Leading Spaces",
+];
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let count: usize = parse_arg(&args, "--count").unwrap_or(50);
     let seed: u64 = parse_arg(&args, "--seed").unwrap_or(42);
+    let own_fields: usize = parse_arg(&args, "--fields").unwrap_or(0);
+    let backup_path: Option<String> = parse_arg(&args, "--backup");
+    let backup_password: String =
+        parse_arg(&args, "--backup-password").unwrap_or_else(|| "test123".to_string());
+    let display_name: String =
+        parse_arg(&args, "--name").unwrap_or_else(|| "Test User".to_string());
 
     println!("Seeding {} fake contacts (seed={})", count, seed);
 
     let mut vauchi = Vauchi::in_memory().expect("Failed to create Vauchi");
 
     vauchi
-        .create_identity("Test User")
+        .create_identity(&display_name)
         .expect("Failed to create identity");
 
     vauchi
@@ -61,10 +78,61 @@ fn main() {
         work.id().to_string(),
     ];
 
+    if own_fields > 0 {
+        let mut added = 0usize;
+        let mut first_error: Option<String> = None;
+        for i in 0..own_fields {
+            let (ft, label, value) = match i % 4 {
+                0 => (
+                    FieldType::Email,
+                    format!("Email {i}"),
+                    format!("me+{i}@vauchi.app"),
+                ),
+                1 => (
+                    FieldType::Phone,
+                    format!("Phone {i}"),
+                    format!("+41-79-{:03}-{:04}", i % 1000, 1000 + i % 9000),
+                ),
+                2 => (
+                    FieldType::Website,
+                    format!("Social {i}"),
+                    format!("https://social{i}.example.com/me"),
+                ),
+                _ => (
+                    FieldType::Address,
+                    format!("Address {i}"),
+                    format!("{i} Test Street, Zurich"),
+                ),
+            };
+            match vauchi.add_own_field(ContactField::new(ft, &label, &value, i as u64)) {
+                Ok(_) => added += 1,
+                Err(e) => {
+                    first_error.get_or_insert_with(|| format!("field {i}: {e}"));
+                }
+            }
+        }
+        println!(
+            "Own fields: {}/{} added{}",
+            added,
+            own_fields,
+            first_error
+                .map(|e| format!(" (first error: {e})"))
+                .unwrap_or_default()
+        );
+    }
+
     let mut rng = StdRng::seed_from_u64(seed);
 
     for i in 0..count {
-        let name: String = Name().fake_with_rng(&mut rng);
+        let name: String = if i > 0 && i % 100 == 0 {
+            format!(
+                "{} {}",
+                ADVERSARIAL_NAMES[(i / 100) % ADVERSARIAL_NAMES.len()],
+                i / 100
+            )
+        } else {
+            Name().fake_with_rng(&mut rng)
+        };
         // Generate a phone number in valid format (digits, dashes, plus only)
         let area: u16 = (200 + (i * 3) % 800) as u16;
         let num1: u16 = (100 + (i * 7) % 900) as u16;
@@ -161,6 +229,21 @@ fn main() {
             .map(|f| format!("{}={}", f.label(), f.value()))
             .collect();
         println!("  {} [{}]", c.display_name(), fields.join(", "));
+    }
+
+    if let Some(path) = backup_path {
+        println!("\nExporting full backup (password: {backup_password})...");
+        let started = std::time::Instant::now();
+        let backup_hex = vauchi
+            .export_full_backup(&backup_password)
+            .expect("export full backup");
+        std::fs::write(&path, backup_hex.as_bytes()).expect("write backup file");
+        println!(
+            "Backup written to {} ({} bytes, {:.1}s)",
+            path,
+            backup_hex.len(),
+            started.elapsed().as_secs_f32()
+        );
     }
 }
 
