@@ -324,13 +324,23 @@ test:integration:
         rm -rf "$BUILD_TMPDIR"
       fi
 
-      echo "Running integration tests..."
-      cargo nextest run --profile ci --run-ignored default -- integration_ 2>&1 | tee integration-results.txt
+      echo "Running integration tests (comprehensive — every non-ignored ::it test)..."
+      # Filter is the single source of truth in ci/integration-test-filter
+      # and must stay comprehensive: the check:test-lane-coverage guard
+      # fails the pipeline if any non-ignored ::it test is not selected
+      # here. Selecting by name prefix (the old `-- integration_`) is what
+      # let 55 tests silently run in no lane
+      # (problem 2026-06-11-e2e-tests-invisible-to-ci).
+      cargo nextest run --profile ci --run-ignored default \
+        -E "$(cat ci/integration-test-filter)" 2>&1 | tee integration-results.txt
       echo "Integration suite complete"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
-  allow_failure: false
+  # TODO(2026-06-11-e2e-tests-invisible-to-ci): advisory while the 55
+  # newly-wired tests prove green across a full main/schedule run; flip
+  # back to `false` after one clean run so integration gates again.
+  allow_failure: true
   artifacts:
     when: always
     reports:
@@ -338,6 +348,22 @@ test:integration:
     paths:
       - integration-results.txt
     expire_in: 1 week
+
+# Coverage guard (PI-05) — gating on MRs and main.
+# Fails if any non-ignored `vauchi-e2e-tests::it` test is selected by no
+# run lane, i.e. it would compile, pass locally, and silently run in no
+# pipeline. Closes goal 2 of problem 2026-06-11-e2e-tests-invisible-to-ci.
+# Compiles the test binary via `nextest list` but runs no test and needs
+# no relay/CLI/ohttp binaries, so it stays fast and infra-free.
+check:test-lane-coverage:
+  extends: [.rust-runner, .timeout-standard]
+  stage: lint
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - sh scripts/check-test-lane-coverage.sh
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules

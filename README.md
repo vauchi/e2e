@@ -159,6 +159,24 @@ just e2e-mobile
 just e2e-all
 ```
 
+### CI lanes & coverage
+
+Two lanes run the `vauchi-e2e-tests::it` integration tests:
+
+- **smoke** (`test:smoke`) — the `smoke_*` subset, on every MR and main.
+  Fast critical-path gate.
+- **integration** (`test:integration`) — **every** non-ignored `::it`
+  test, on main and schedules. The lane filter lives in
+  `ci/integration-test-filter` (single source of truth).
+
+You do **not** need a name prefix for a test to run: the integration
+lane runs all of them. The `check:test-lane-coverage` job fails the
+pipeline if any non-ignored `::it` test would run in no lane (the bug
+that left 55 tests silently unrun — see problem
+`2026-06-11-e2e-tests-invisible-to-ci`). Deliberately-excluded tests go
+in `ci/test-coverage-allowlist.txt` with a reason; truly local-only
+tests use `#[ignore]`.
+
 ## Test Status
 
 | Test | Phase | Status | Notes |
