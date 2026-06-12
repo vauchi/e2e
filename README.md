@@ -83,22 +83,6 @@ cd ios && xcodebuild -scheme Vauchi \
 maestro test --platform ios e2e/maestro/ios/create_identity.yaml
 ```
 
-**iOS Setup (via macOS remote):**
-
-```bash
-# Check macOS connectivity
-dev-tools/scripts/macos-remote.sh status
-
-# List available simulators
-dev-tools/scripts/macos-remote.sh simulator-list
-
-# Boot simulator
-dev-tools/scripts/macos-remote.sh simulator-boot "iPhone 15 Pro"
-
-# Sync project to macOS
-dev-tools/scripts/macos-remote.sh sync
-```
-
 ### Phase 3: TUI Testing (expectrl)
 
 | Requirement | Check Command | Install |
@@ -313,14 +297,11 @@ adb kill-server && adb start-server
 emulator -list-avds
 ```
 
-### iOS Simulator not connecting (remote macOS)
+### iOS Simulator not connecting
 
 ```bash
-# Check macOS connectivity
-dev-tools/scripts/macos-remote.sh status
-
-# Verify simulators
-dev-tools/scripts/macos-remote.sh run "xcrun simctl list devices booted"
+# Verify booted simulators
+xcrun simctl list devices booted
 ```
 
 ### Maestro not finding app
