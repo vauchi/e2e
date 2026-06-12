@@ -337,10 +337,10 @@ test:integration:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
-  # TODO(2026-06-11-e2e-tests-invisible-to-ci): advisory while the 55
-  # newly-wired tests prove green across a full main/schedule run; flip
-  # back to `false` after one clean run so integration gates again.
-  allow_failure: true
+  # Gating: the 55 newly-wired tests proved green on the first full main
+  # run after e2e!134 (pipeline #1753, test:integration success), so the
+  # integration lane gates again (2026-06-11-e2e-tests-invisible-to-ci).
+  allow_failure: false
   artifacts:
     when: always
     reports:
