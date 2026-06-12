@@ -214,63 +214,6 @@ async fn test_android_emulator_exchange() {
 }
 
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
-/// Desktop (Tauri) testing via HTTP test server.
-///
-/// Requirements:
-/// - Desktop app built (`cargo build -p vauchi-desktop --release`)
-/// - xvfb for headless testing on Linux
-///
-/// The TauriDevice is implemented at `e2e/src/device/tauri.rs`
-// @internal
-#[tokio::test]
-#[ignore = "requires Desktop binary and xvfb - run `cargo build -p vauchi-desktop --release` first"]
-async fn test_desktop_exchange() {
-    use vauchi_e2e_tests::device::{Device, TauriDevice};
-
-    // Create a TauriDevice
-    let device = TauriDevice::new("Alice_Desktop", "ws://localhost:8080").expect(
-        "Desktop app binary not found. Run `cargo build -p vauchi-desktop --release` first.",
-    );
-
-    // Launch the app (starts test HTTP server)
-    device
-        .launch_app()
-        .await
-        .expect("Failed to launch desktop app");
-
-    // Create identity
-    device
-        .create_identity("Alice")
-        .await
-        .expect("Failed to create identity in desktop app");
-
-    // Verify identity was created
-    assert!(
-        device.has_identity().await,
-        "Identity should exist after creation"
-    );
-
-    // Get card
-    let card = device
-        .get_card()
-        .await
-        .expect("Failed to get card from desktop app");
-
-    assert_eq!(card.name, "Alice", "Card name should match");
-
-    // List contacts (should be empty)
-    let contacts = device
-        .list_contacts()
-        .await
-        .expect("Failed to list contacts");
-
-    assert!(contacts.is_empty(), "Should have no contacts initially");
-
-    // Clean up
-    device.kill_app().await.expect("Failed to kill desktop app");
-}
-
-// @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// TUI testing via PTY automation.
 ///
 /// Requirements:

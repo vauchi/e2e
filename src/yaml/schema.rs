@@ -90,7 +90,6 @@ pub enum Platform {
     Cli,
     Ios,
     Android,
-    Desktop,
     Tui,
 }
 
@@ -101,7 +100,6 @@ impl std::fmt::Display for Platform {
             Platform::Cli => write!(f, "cli"),
             Platform::Ios => write!(f, "ios"),
             Platform::Android => write!(f, "android"),
-            Platform::Desktop => write!(f, "desktop"),
             Platform::Tui => write!(f, "tui"),
         }
     }

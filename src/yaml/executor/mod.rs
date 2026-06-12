@@ -181,7 +181,6 @@ impl ScenarioExecutor {
                 Platform::Any | Platform::Cli => DeviceType::Cli,
                 Platform::Ios => DeviceType::IosSimulator,
                 Platform::Android => DeviceType::AndroidEmulator,
-                Platform::Desktop => DeviceType::Desktop,
                 Platform::Tui => DeviceType::Tui,
             };
 

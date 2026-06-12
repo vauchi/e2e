@@ -99,19 +99,7 @@ dev-tools/scripts/macos-remote.sh simulator-boot "iPhone 15 Pro"
 dev-tools/scripts/macos-remote.sh sync
 ```
 
-### Phase 3: Desktop Testing (Tauri + WebdriverIO)
-
-| Requirement | Check Command | Install |
-|-------------|---------------|---------|
-| Tauri CLI | `cargo tauri --version` | `cargo install tauri-cli` |
-| Node.js | `node --version` | [nodejs.org](https://nodejs.org) |
-| WebdriverIO | `npx wdio --version` | `npm install @wdio/cli` |
-| Desktop build | `cargo tauri build` | Built from source |
-
-**Note:** Tauri WebDriver testing is only supported on
-Linux/Windows (not macOS).
-
-### Phase 4: TUI Testing (expectrl)
+### Phase 3: TUI Testing (expectrl)
 
 | Requirement | Check Command | Install |
 |-------------|---------------|---------|
@@ -183,7 +171,7 @@ just e2e-mobile
 ### All Platforms
 
 ```bash
-# Full suite (CLI + Desktop + Mobile)
+# Full suite (CLI + Mobile)
 just e2e-all
 ```
 
@@ -201,8 +189,7 @@ just e2e-all
 | Backup & restore | 1 | New | Identity export/import |
 | iOS Simulator | 2 | Placeholder | Maestro flows for device linking, labels |
 | Android Emulator | 2 | Placeholder | Requires Maestro flows |
-| Desktop (Tauri) | 3 | Placeholder | Requires WebdriverIO |
-| TUI | 4 | Placeholder | Requires expectrl |
+| TUI | 3 | Placeholder | Requires expectrl |
 
 ## Architecture
 
@@ -216,7 +203,6 @@ flowchart TB
         subgraph DAL["Device Abstraction Layer"]
             CliDevice["CliDevice<br/>(CLI)"]
             Maestro["Maestro<br/>(Mobile)"]
-            Tauri["Tauri<br/>(Desktop)"]
             TUI["TUI<br/>(Terminal)"]
         end
         DAL -- "OHTTP" --> Gateway
@@ -386,6 +372,5 @@ async fn test_android_exchange() {
 
 - [Planning doc][planning]
 - [Maestro docs](https://maestro.mobile.dev)
-- [Tauri testing](https://v2.tauri.app/develop/tests/webdriver/)
 
 [planning]: ../_private/docs/problems/2026-02-17-maestro-e2e-environment-blockers/README.md

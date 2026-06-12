@@ -7,17 +7,14 @@
 //! Provides a trait-based abstraction over different device types:
 //! - CLI: Command-line based control (fully implemented)
 //! - TUI: Terminal UI control (stub - requires expectrl)
-//! - Tauri: Desktop app control (stub - requires WebdriverIO)
 //! - Maestro: Mobile app control (stub - requires Maestro CLI)
 
 mod cli;
 mod maestro;
-mod tauri;
 mod tui;
 
 pub use cli::CliDevice;
 pub use maestro::{MaestroDevice, MaestroPlatform};
-pub use tauri::TauriDevice;
 pub use tui::TuiDevice;
 
 use async_trait::async_trait;
@@ -65,8 +62,6 @@ pub enum DeviceType {
     IosSimulator,
     /// Android emulator (via Maestro).
     AndroidEmulator,
-    /// Desktop app (via WebdriverIO/Tauri).
-    Desktop,
     /// Terminal UI.
     Tui,
 }
@@ -77,7 +72,6 @@ impl std::fmt::Display for DeviceType {
             DeviceType::Cli => write!(f, "CLI"),
             DeviceType::IosSimulator => write!(f, "iOS"),
             DeviceType::AndroidEmulator => write!(f, "Android"),
-            DeviceType::Desktop => write!(f, "Desktop"),
             DeviceType::Tui => write!(f, "TUI"),
         }
     }
