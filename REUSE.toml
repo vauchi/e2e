@@ -65,3 +65,10 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = ["**/CLAUDE.md"]
 SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# CI lane filter — must stay a bare nextest expression (the integration
+# job and coverage guard `cat` it), so the license lives here.
+[[annotations]]
+path = ["ci/integration-test-filter"]
+SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
+SPDX-License-Identifier = "GPL-3.0-or-later"

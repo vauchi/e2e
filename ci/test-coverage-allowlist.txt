@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Non-ignored ::it integration tests intentionally run by no CI lane.
+#
+# The coverage guard (scripts/check-test-lane-coverage.sh) fails the
+# pipeline if a non-ignored test in the `vauchi-e2e-tests::it` suite is
+# selected by neither the smoke lane nor the integration lane
+# (ci/integration-test-filter). That is almost always a mistake — a test
+# that silently runs nowhere (see problem 2026-06-11-e2e-tests-invisible-to-ci).
+#
+# Only list a test here if it is deliberately excluded from CI for a
+# reason that is NOT "it should be #[ignore]d" (use #[ignore] for that).
+# Format: one `module::test_name` per line; `#` starts a comment.
+#
+# (empty — every non-ignored ::it test currently runs in the integration lane)
