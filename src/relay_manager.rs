@@ -253,10 +253,15 @@ impl RelayManager {
 
         // relay/ has its own Cargo workspace, so its binary lands in
         // relay/target/ instead of the workspace-root target/.
-        let relay_own_path =
+        let relay_own_release =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../relay/target/release/vauchi-relay");
+        if relay_own_release.exists() {
+            return Ok(relay_own_release);
+        }
+        let relay_own_debug =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../relay/target/debug/vauchi-relay");
-        if relay_own_path.exists() {
-            return Ok(relay_own_path);
+        if relay_own_debug.exists() {
+            return Ok(relay_own_debug);
         }
 
         Err(E2eError::relay(

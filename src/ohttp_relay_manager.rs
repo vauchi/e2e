@@ -144,10 +144,15 @@ impl OhttpRelayManager {
 
         // ohttp-relay has its own Cargo workspace (not in the root workspace),
         // so its binary lands in ohttp-relay/target/ instead of target/.
-        let ohttp_own_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        let ohttp_own_release = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../ohttp-relay/target/release/vauchi-ohttp-relay");
+        if ohttp_own_release.exists() {
+            return Ok(ohttp_own_release);
+        }
+        let ohttp_own_debug = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../ohttp-relay/target/debug/vauchi-ohttp-relay");
-        if ohttp_own_path.exists() {
-            return Ok(ohttp_own_path);
+        if ohttp_own_debug.exists() {
+            return Ok(ohttp_own_debug);
         }
 
         Err(E2eError::relay(
