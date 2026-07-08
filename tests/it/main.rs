@@ -15,6 +15,18 @@ fn tracing_init() {
     vauchi_e2e_tests::test_logging::init();
 }
 
+/// Install the rustls crypto provider once at process start.
+///
+/// reqwest's `rustls-tls-webpki-roots-no-provider` feature deliberately does
+/// not pick a crypto provider, so tests must install one explicitly. Using
+/// `aws-lc-rs` keeps the TLS stack consistent with the rest of the workspace
+/// without pulling in the vulnerable `quinn-proto` HTTP/3 dependency that the
+/// `rustls-tls-webpki-roots` feature would introduce.
+#[ctor::ctor]
+fn install_rustls_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;
