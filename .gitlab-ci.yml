@@ -48,6 +48,8 @@ stages:
 
 
 variables:
+  # Pin scripts ref for fetched helper scripts (matches include ref).
+  VAUCHI_SCRIPTS_REF: "main"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
