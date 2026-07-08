@@ -44,6 +44,12 @@ pub fn find_available_port_pair() -> E2eResult<(u16, u16)> {
     Ok((relay_port, metrics_port))
 }
 
+/// Default path for a relay instance's persistent OHTTP key file.
+/// Tied to the relay's main port so `restart_relay` reuses the same file.
+fn default_ohttp_key_file_path(port: u16) -> PathBuf {
+    std::env::temp_dir().join(format!("vauchi-e2e-relay-{port}-ohttp.key"))
+}
+
 /// Timeout for relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -57,6 +63,10 @@ pub struct RelayInstance {
     pub port: u16,
     /// The metrics endpoint port.
     pub metrics_port: u16,
+    /// Path to the persistent OHTTP key file, if one was configured.
+    /// Keeping the same file across restarts lets the CLI's injected
+    /// bundled key remain valid after `restart_relay`.
+    ohttp_key_file_path: Option<PathBuf>,
     /// The child process handle.
     process: Option<Child>,
 }
@@ -158,6 +168,11 @@ pub struct RelayConfig {
     /// window so rejection-path tests can fire deterministically. See
     /// `2026-04-27-version-enforcement-tests-fail`.
     pub version_changed_at_secs: Option<u64>,
+    /// Path to a persistent OHTTP key file. When `None` and OHTTP is
+    /// enabled, the manager generates a per-instance temp file so the
+    /// key survives `restart_relay` and the CLI's injected bundled key
+    /// stays valid.
+    pub ohttp_key_file_path: Option<PathBuf>,
 }
 
 impl Default for RelayConfig {
@@ -178,6 +193,7 @@ impl Default for RelayConfig {
             version_warn: None,
             version_grace_days: None,
             version_changed_at_secs: None,
+            ohttp_key_file_path: None,
         }
     }
 }
@@ -294,6 +310,7 @@ impl RelayManager {
         info!("Spawning relay {} on port {}", index, port);
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
+        let mut ohttp_key_file_path: Option<PathBuf> = None;
         env_vars.insert(
             "RELAY_LISTEN_ADDR".to_string(),
             format!("127.0.0.1:{}", port),
@@ -345,6 +362,20 @@ impl RelayManager {
                     secs.to_string(),
                 );
             }
+            // Persist the OHTTP key across relay restarts. Without this,
+            // `restart_relay` generates a fresh ephemeral keypair and the
+            // CLI's injected bundled key (set by the orchestrator) no
+            // longer matches, causing HTTP 400 on the next sync.
+            let key_file = self
+                .config
+                .ohttp_key_file_path
+                .clone()
+                .unwrap_or_else(|| default_ohttp_key_file_path(port));
+            env_vars.insert(
+                "RELAY_OHTTP_KEY_FILE_PATH".to_string(),
+                key_file.to_string_lossy().to_string(),
+            );
+            ohttp_key_file_path = Some(key_file);
         }
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
@@ -388,6 +419,7 @@ impl RelayManager {
             http_url,
             port,
             metrics_port,
+            ohttp_key_file_path,
             process: Some(child),
         };
 
@@ -530,9 +562,15 @@ impl RelayManager {
 
     /// Restart a specific relay.
     pub async fn restart_relay(&mut self, index: usize) -> E2eResult<()> {
-        // Get the port from existing relay (we need to reuse the same port)
-        let (port, metrics_port) = if let Some(relay) = self.relays.get(index) {
-            (relay.port, relay.metrics_port)
+        // Get the port and existing OHTTP key file from the current relay
+        // instance. Reusing the same key file keeps the CLI's injected
+        // bundled key valid after the restart.
+        let (port, metrics_port, existing_key_file) = if let Some(relay) = self.relays.get(index) {
+            (
+                relay.port,
+                relay.metrics_port,
+                relay.ohttp_key_file_path.clone(),
+            )
         } else {
             return Err(E2eError::relay(format!("Relay {} not found", index)));
         };
@@ -548,6 +586,7 @@ impl RelayManager {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
+        let mut ohttp_key_file_path: Option<PathBuf> = None;
         env_vars.insert(
             "RELAY_LISTEN_ADDR".to_string(),
             format!("127.0.0.1:{}", port),
@@ -595,6 +634,19 @@ impl RelayManager {
                     secs.to_string(),
                 );
             }
+            // Reuse the same OHTTP key file so the CLI's injected bundled
+            // key remains valid after the restart. Fall back to the
+            // configured/default path only if the original instance had
+            // none (should not happen).
+            let key_file = existing_key_file
+                .clone()
+                .or_else(|| self.config.ohttp_key_file_path.clone())
+                .unwrap_or_else(|| default_ohttp_key_file_path(port));
+            env_vars.insert(
+                "RELAY_OHTTP_KEY_FILE_PATH".to_string(),
+                key_file.to_string_lossy().to_string(),
+            );
+            ohttp_key_file_path = Some(key_file);
         }
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
@@ -629,6 +681,7 @@ impl RelayManager {
         // Update the instance
         if let Some(relay) = self.relays.get_mut(index) {
             relay.process = Some(child);
+            relay.ohttp_key_file_path = ohttp_key_file_path;
             info!("Relay {} restarted successfully", index);
         }
 

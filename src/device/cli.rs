@@ -19,6 +19,20 @@ use tracing::{debug, trace};
 use super::{CardField, Contact, ContactCard, Device, DeviceType};
 use crate::error::{E2eError, E2eResult};
 
+/// Raw JSON representation of `vauchi card show --raw`.
+#[derive(Debug, serde::Deserialize)]
+struct RawCard {
+    display_name: String,
+    fields: Vec<RawCardField>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct RawCardField {
+    field_type: String,
+    label: String,
+    value: String,
+}
+
 /// A device controlled via the CLI.
 pub struct CliDevice {
     /// Device name/identifier.
@@ -297,6 +311,7 @@ impl CliDevice {
     ///   icon   Label        Value
     /// ──────────────────────────────────────────────────
     /// ```
+    #[allow(dead_code)] // kept as fallback; `get_card()` uses `--raw` JSON
     fn parse_card(output: &str) -> E2eResult<ContactCard> {
         let mut name = String::new();
         let mut fields = Vec::new();
@@ -357,16 +372,20 @@ impl CliDevice {
                         parts[0],
                         "mail"
                             | "📧"
+                            | "envelope"
                             | "phone"
                             | "📱"
                             | "web"
                             | "🌐"
+                            | "globe"
                             | "home"
                             | "🏠"
+                            | "mappin"
                             | "social"
                             | "👤"
                             | "note"
                             | "📝"
+                            | "tag"
                             | "cake"
                             | "🎂"
                     );
@@ -374,34 +393,43 @@ impl CliDevice {
                 if is_icon_format {
                     let icon = parts[0];
                     let field_type = match icon {
-                        "mail" | "📧" => "email",
+                        "mail" | "📧" | "envelope" => "email",
                         "phone" | "📱" => "phone",
-                        "web" | "🌐" => "website",
-                        "home" | "🏠" => "address",
+                        "web" | "🌐" | "globe" => "website",
+                        "home" | "🏠" | "mappin" => "address",
                         "social" | "👤" => "social",
-                        "note" | "📝" => "custom",
+                        "note" | "📝" | "tag" => "custom",
                         "cake" | "🎂" => "birthday",
                         _ => "custom",
                     };
 
+                    // The CLI renders card fields as:
+                    //   "  {:6} {:12} {}"
+                    // icon is padded to a minimum width of 6, label to 12,
+                    // then a single space, then the (possibly multi-word)
+                    // value. Split on that boundary instead of treating the
+                    // last whitespace-separated token as the value.
                     let after_icon = line
                         .trim_start()
                         .strip_prefix(icon)
                         .unwrap_or(line)
                         .trim_start();
 
-                    let last_part = parts.last().unwrap();
-                    let label = after_icon
-                        .strip_suffix(last_part)
-                        .unwrap_or(after_icon)
-                        .trim();
+                    // Label column is at least 12 chars (left-aligned, space-padded).
+                    // The separator space sits immediately after the 12-char column.
+                    const LABEL_WIDTH: usize = 12;
+                    if after_icon.len() > LABEL_WIDTH {
+                        let label_area = &after_icon[..LABEL_WIDTH];
+                        let label = label_area.trim_end();
+                        let value = after_icon[LABEL_WIDTH..].trim_start();
 
-                    if !label.is_empty() {
-                        fields.push(CardField {
-                            field_type: field_type.to_string(),
-                            label: label.to_string(),
-                            value: last_part.to_string(),
-                        });
+                        if !label.is_empty() && !value.is_empty() {
+                            fields.push(CardField {
+                                field_type: field_type.to_string(),
+                                label: label.to_string(),
+                                value: value.to_string(),
+                            });
+                        }
                     }
                 } else if let Some(colon_pos) = line.find(':') {
                     // Colon-separated format (Label: Value)
@@ -422,6 +450,32 @@ impl CliDevice {
         }
 
         Ok(ContactCard { name, fields })
+    }
+
+    /// Parse a contact card from the `--raw` JSON output.
+    ///
+    /// `--raw` is the preferred parser entry point: it is independent of
+    /// icon tokens, column widths, and terminal styling, so CLI display
+    /// changes cannot silently break field-level assertions.
+    fn parse_card_raw(output: &str) -> E2eResult<ContactCard> {
+        let raw: RawCard = serde_json::from_str(output).map_err(|e| {
+            E2eError::parse_output(format!("Failed to parse 'card show --raw' JSON: {e}"))
+        })?;
+
+        let fields = raw
+            .fields
+            .into_iter()
+            .map(|f| CardField {
+                field_type: f.field_type.to_lowercase(),
+                label: f.label,
+                value: f.value,
+            })
+            .collect();
+
+        Ok(ContactCard {
+            name: raw.display_name,
+            fields,
+        })
     }
 
     /// Extract QR data from CLI output.
@@ -665,8 +719,8 @@ impl Device for CliDevice {
     }
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
-        let output = self.run_command_success(&["card", "show"]).await?;
-        Self::parse_card(&output)
+        let output = self.run_command_success(&["card", "show", "--raw"]).await?;
+        Self::parse_card_raw(&output)
     }
 
     async fn add_field(&self, field_type: &str, label: &str, value: &str) -> E2eResult<()> {
@@ -884,6 +938,164 @@ abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+/=
         assert_eq!(
             qr,
             "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+/="
+        );
+    }
+
+    #[test]
+    fn test_parse_card_empty() {
+        let output = r#"
+──────────────────────────────────────────────────
+  Alice
+──────────────────────────────────────────────────
+  (no fields)
+──────────────────────────────────────────────────
+"#;
+        let card = CliDevice::parse_card(output).unwrap();
+        assert_eq!(card.name, "Alice");
+        assert!(card.fields.is_empty());
+    }
+
+    #[test]
+    fn test_parse_card_formatted_output() {
+        // Regression guard for the human-readable parser: it must tolerate
+        // current icon tokens and multi-word values. Labels >12 chars overflow
+        // CLI's fixed column, so this test uses short labels.
+        let output = r#"
+──────────────────────────────────────────────────
+  Alice
+──────────────────────────────────────────────────
+  envelope Public      alice@public.com
+  phone    Mobile      +15550199
+  globe    Web         https://example.com
+  mappin   Home        123 Main St
+  tag      Note        hello world
+──────────────────────────────────────────────────
+"#;
+        let card = CliDevice::parse_card(output).unwrap();
+        assert_eq!(card.name, "Alice");
+        assert_eq!(card.fields.len(), 5);
+
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "email" && f.value == "alice@public.com")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "phone" && f.value == "+15550199")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "website" && f.value == "https://example.com")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "address" && f.value == "123 Main St")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "custom" && f.value == "hello world")
+        );
+    }
+
+    #[test]
+    fn test_parse_card_raw() {
+        // `get_card()` uses `card show --raw`; this is the load-bearing parser
+        // for field-level assertions. It must handle long labels and multi-word
+        // values without being affected by icon/column changes.
+        let output = r#"{
+  "display_name": "Alice",
+  "fields": [
+    {
+      "field_type": "Email",
+      "label": "Public Email",
+      "value": "alice@public.com"
+    },
+    {
+      "field_type": "Phone",
+      "label": "Private Phone",
+      "value": "+15550199"
+    },
+    {
+      "field_type": "Website",
+      "label": "Web",
+      "value": "https://example.com"
+    },
+    {
+      "field_type": "Address",
+      "label": "Home",
+      "value": "123 Main St"
+    },
+    {
+      "field_type": "Custom",
+      "label": "Note",
+      "value": "hello world"
+    }
+  ]
+}"#;
+        let card = CliDevice::parse_card_raw(output).unwrap();
+        assert_eq!(card.name, "Alice");
+        assert_eq!(card.fields.len(), 5);
+
+        assert!(card.fields.iter().any(|f| f.field_type == "email"
+            && f.label == "Public Email"
+            && f.value == "alice@public.com"));
+        assert!(card.fields.iter().any(|f| f.field_type == "phone"
+            && f.label == "Private Phone"
+            && f.value == "+15550199"));
+        assert!(card.fields.iter().any(|f| f.field_type == "website"
+            && f.label == "Web"
+            && f.value == "https://example.com"));
+        assert!(
+            card.fields.iter().any(|f| f.field_type == "address"
+                && f.label == "Home"
+                && f.value == "123 Main St")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "custom" && f.label == "Note" && f.value == "hello world")
+        );
+    }
+
+    #[test]
+    fn test_parse_card_legacy_icons() {
+        // Older CLI builds still emit legacy icons; the parser must handle both.
+        let output = r#"
+──────────────────────────────────────────────────
+  Alice
+──────────────────────────────────────────────────
+  mail   Work Email   alice@work.com
+  web    Personal     https://example.org
+  home   Home         123 Main St
+  note   Memo         remember this
+──────────────────────────────────────────────────
+"#;
+        let card = CliDevice::parse_card(output).unwrap();
+        assert_eq!(card.fields.len(), 4);
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "email" && f.value == "alice@work.com")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "website" && f.value == "https://example.org")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "address" && f.value == "123 Main St")
+        );
+        assert!(
+            card.fields
+                .iter()
+                .any(|f| f.field_type == "custom" && f.value == "remember this")
         );
     }
 }

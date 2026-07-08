@@ -194,8 +194,9 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
             ..Default::default()
         },
         with_ohttp_relay: true,
-        // No `inject_local_ohttp_key_into_cli`: the client must fetch the
-        // live gateway key through the ohttp-relay (the Option B path).
+        // Explicitly disable bundled-key injection so the client must fetch
+        // the live gateway key through the ohttp-relay (the Option B path).
+        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     };
     let mut orch = Orchestrator::with_config(config);

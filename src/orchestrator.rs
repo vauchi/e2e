@@ -56,14 +56,15 @@ pub struct OrchestratorConfig {
     pub ohttp_relay_config: OhttpRelayConfig,
     /// Inject the spawned local relay's OHTTP gateway key into every
     /// cli subprocess via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
-    /// Required for the F11 outer-hop smoke test against `E2E_BIN_DIR`
-    /// (release cli) — the release binary compiles out the
-    /// `VAUCHI_ALLOW_DIRECT` escape hatch and would otherwise fall back
-    /// to the compiled-in production bundled key, whose pubkey the
+    /// Required for release cli tests — the release binary compiles out
+    /// the `VAUCHI_ALLOW_DIRECT` escape hatch and would otherwise fall
+    /// back to the compiled-in production bundled key, whose pubkey the
     /// ephemeral local relay cannot decrypt.
     ///
-    /// Off by default — only the smoke test that exercises the outer
-    /// hop end-to-end needs it. See problem record
+    /// On by default so ordinary CLI-driven scenarios exercise the real
+    /// OHTTP path against the local relay. Explicitly set to `false` to
+    /// test key bootstrap (the client must fetch the live gateway key
+    /// through the ohttp-relay). See problem record
     /// `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
     pub inject_local_ohttp_key_into_cli: bool,
 }
@@ -76,7 +77,7 @@ impl Default for OrchestratorConfig {
             operation_delay: Duration::from_millis(100),
             with_ohttp_relay: false,
             ohttp_relay_config: OhttpRelayConfig::default(),
-            inject_local_ohttp_key_into_cli: false,
+            inject_local_ohttp_key_into_cli: true,
         }
     }
 }
