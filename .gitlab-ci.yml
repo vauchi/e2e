@@ -23,7 +23,7 @@
 # Shared templates + GitLab Ultimate Templates
 include:
   - project: 'vauchi/scripts'
-    ref: main
+    ref: ci-templates-v2026.07.2
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'
@@ -49,7 +49,7 @@ stages:
 
 variables:
   # Pin scripts ref for fetched helper scripts (matches include ref).
-  VAUCHI_SCRIPTS_REF: "main"
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.2"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
@@ -102,7 +102,7 @@ lint:adr-046:
     - apk add --no-cache bash ripgrep git
     - |
       if [ ! -d ../scripts ]; then
-        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
       else
         git -C ../scripts pull --ff-only 2>/dev/null || true
       fi
@@ -371,6 +371,7 @@ check:test-lane-coverage:
 # Override child analyzer jobs (not parent stubs) to add tags and rules
 
 semgrep-sast:
+  allow_failure: false
   tags: [docker]
   needs:
     - job: lint:format
@@ -382,6 +383,7 @@ semgrep-sast:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
 secret_detection:
+  allow_failure: false
   tags: [docker]
   needs:
     - job: lint:format
