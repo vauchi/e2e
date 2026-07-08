@@ -11,10 +11,12 @@
 
 mod cli;
 mod maestro;
+#[cfg(feature = "tui")]
 mod tui;
 
 pub use cli::CliDevice;
 pub use maestro::{MaestroDevice, MaestroPlatform};
+#[cfg(feature = "tui")]
 pub use tui::TuiDevice;
 
 use async_trait::async_trait;

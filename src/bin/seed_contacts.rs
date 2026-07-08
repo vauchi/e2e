@@ -5,7 +5,7 @@
 //! Seed a Vauchi instance with fake contacts for testing.
 //!
 //! Usage:
-//!   cargo run --bin seed-contacts -- [--count N] [--seed S]
+//!   cargo run --bin seed-contacts --features seed-contacts -- [--count N] [--seed S]
 //!
 //! Generates N fake contacts (default: 50) with realistic names,
 //! phone numbers, emails, and addresses using the fake-rs crate.

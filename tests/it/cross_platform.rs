@@ -224,6 +224,7 @@ async fn test_android_emulator_exchange() {
 // @internal
 #[tokio::test]
 #[ignore = "requires TUI binary - run `cargo build -p vauchi-tui --release` first"]
+#[cfg(feature = "tui")]
 async fn test_tui_exchange() {
     use vauchi_e2e_tests::device::{Device, TuiDevice};
 

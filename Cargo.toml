@@ -10,6 +10,7 @@ description = "End-to-end testing infrastructure for Vauchi"
 license = "AGPL-3.0-or-later"
 
 [features]
+default = []
 # Enable JUnit XML output for CI
 junit = []
 
@@ -17,6 +18,14 @@ junit = []
 # file under `e2e/artifacts/flame/` (or `$VAUCHI_FLAME_OUT`) that can be
 # rendered to SVG via `inferno-flamegraph`. See `just flame-e2e <test>`.
 flame = ["dep:tracing-flame"]
+
+# TUI device automation via expectrl (PTY stack). Off by default to keep the
+# default build graph free of nix 0.26 / bitflags 1.x / regex duplicates.
+tui = ["dep:expectrl"]
+
+# Build the seed-contacts helper bin. Off by default to keep fake/rand and the
+# darling 0.20 subtree out of the default integration-test build.
+seed-contacts = ["dep:fake", "dep:rand"]
 
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
@@ -56,20 +65,20 @@ ctor = "0.2"
 # Profiling (enabled via `flame` feature)
 tracing-flame = { version = "0.2", optional = true }
 
-# PTY automation for TUI testing
-expectrl = "0.7"
+# PTY automation for TUI testing (optional — enable the `tui` feature)
+expectrl = { version = "0.7", optional = true }
 
-# HTTP client for Desktop test server
-reqwest = { version = "0.12", features = ["json"] }
+# HTTP client for Desktop test server (rustls to avoid native-tls/OpenSSL)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider"] }
 
 # Hex encoding (orchestrator-injected OHTTP bundled key for cli subprocesses)
 hex = "0.4"
 
-# Random number generation
-rand = "0.8"
+# Random number generation for seeding contacts (optional — enable `seed-contacts` feature)
+rand = { version = "0.8", optional = true }
 
-# Fake data generation for seeding contacts
-fake = { version = "3", features = ["derive"] }
+# Fake data generation for seeding contacts (optional — enable `seed-contacts` feature)
+fake = { version = "3", features = ["derive"], optional = true }
 
 [dev-dependencies]
 # Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
@@ -88,6 +97,7 @@ sha2 = "0.10"
 [[bin]]
 name = "seed-contacts"
 path = "src/bin/seed_contacts.rs"
+required-features = ["seed-contacts"]
 
 
 # Development profile: fast builds, backtraces work (matches core)
