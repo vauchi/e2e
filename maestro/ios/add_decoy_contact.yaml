@@ -12,23 +12,38 @@ appId: app.vauchi.ios
 
 ---
 
-# Navigate to Settings > Duress PIN
+# Ensure we are on the home screen, then open More > Settings.
+- tapOn:
+    id: "tab.more"
 - tapOn: "Settings"
-- tapOn: "Duress PIN"
+- waitForAnimationToEnd
 
-# Verify duress is enabled and decoy section visible
+# Scroll to Decoy Contacts section
+- scrollUntilVisible:
+    element:
+      text: "Decoy Contacts"
+    direction: DOWN
+
+# Verify decoy section is visible
 - assertVisible: "Decoy Contacts"
 
+# Open the decoy contacts screen
+- tapOn: "Decoy Contacts"
+- waitForAnimationToEnd
+
 # Add a decoy contact
-- tapOn: "Add Decoy Contact"
-- assertVisible: "Add Decoy Contact"
+- tapOn:
+    id: "new_decoy_name"
 - inputText: ${DECOY_NAME}
-- tapOn: "Add"
+- hideKeyboard
+- tapOn:
+    id: "add_decoy"
 
 - waitForAnimationToEnd
 
 # Verify decoy contact appears in list
 - assertVisible: ${DECOY_NAME}
 
-# Go back
-- back
+# Return to the home screen so the next flow starts from a known state.
+- pressKey: back
+- waitForAnimationToEnd

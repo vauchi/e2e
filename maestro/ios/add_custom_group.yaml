@@ -19,26 +19,29 @@ name: Add Custom Group During Onboarding
 #  3. The group appears in the selected list on the same screen.
 #  4. User can repeat without leaving.
 #
-# Fails today; passes post-fix. Sibling to Android's
-# `add_custom_group.yaml`. Gate is `just e2e-maestro-critical`.
+# Sibling to Android's `add_custom_group.yaml`. Gate is `just e2e-maestro-critical`.
 
 - launchApp:
     clearState: true
 
 - waitForAnimationToEnd
 
-# ── Advance to the groups_setup screen ────────────────────────
+# -- Advance to the groups_setup screen -------------------------
 
 - assertVisible: "Create new identity"
 - tapOn: "Create new identity"
 
 - assertVisible: "What's your name?"
+- tapOn:
+    id: "display_name"
 - inputText: "Maestro Test"
-- tapOn: "Continue"
+- hideKeyboard
+- tapOn:
+    id: "continue"
 
 - assertVisible: "Add a custom group"
 
-# ── First custom group ───────────────────────────────────────
+# -- First custom group -----------------------------------------
 
 - tapOn:
     id: "custom_group"
@@ -55,7 +58,7 @@ name: Add Custom Group During Onboarding
 - assertVisible: "MyCustomGroup"
 - assertVisible: "Add a custom group"
 
-# ── Second custom group ──────────────────────────────────────
+# -- Second custom group -----------------------------------------
 
 - tapOn:
     id: "custom_group"

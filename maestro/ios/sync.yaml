@@ -13,6 +13,11 @@ name: Sync with Relay
 # Wait for app to be ready
 - waitForAnimationToEnd
 
+# Make sure we are on the contacts list before pulling to refresh.
+- tapOn:
+    id: "tab.contacts"
+- waitForAnimationToEnd
+
 # Pull to refresh on the main contacts list
 - assertVisible: "Contacts"
 - swipe:
