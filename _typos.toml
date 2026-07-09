@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# typos source code spell checker configuration
+# https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = [
+    "target/",
+    "*.lock",
+]
+
+[default.extend-words]
+# SF Symbol name for the map-pin icon — used in the platform-neutral
+# icon vocabulary on `Field.icon` (2026-05-21-core-ui-icon-on-wire)
+mappin = "mappin"

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // INLINE_TEST_REQUIRED: tests depend on private find_cli_binary() function
 use super::CliDevice;
 
