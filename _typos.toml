@@ -15,3 +15,6 @@ extend-exclude = [
 # SF Symbol name for the map-pin icon — used in the platform-neutral
 # icon vocabulary on `Field.icon` (2026-05-21-core-ui-icon-on-wire)
 mappin = "mappin"
+# iOS simulator unique device identifier — standard Apple term, not a typo.
+UDID = "UDID"
+udid = "udid"
