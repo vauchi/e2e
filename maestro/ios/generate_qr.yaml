@@ -16,15 +16,19 @@ name: Generate QR Code
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to exchange/share screen
-- tapOn: "Share"
+# Navigate to the exchange mode picker.
+# Phase 1.E (2026-05-11) moved QR generation behind the core-driven
+# mode selection screen; Glance is the default hero action.
+- tapOn: "Exchange"
+- assertVisible: "Exchange Mode"
+- tapOn: "Glance"
 
-# Wait for QR generation
+# Wait for the own-QR broadcast to render.
 - waitForAnimationToEnd:
-    timeout: 5000
+    timeout: 10000
 
-# Verify QR code is displayed
-- assertVisible: "Scan this code"
+# The QR label doubles as the status caption while waiting for a peer.
+- assertVisible: "Show this"
 
 # Take screenshot for QR extraction
 - takeScreenshot: /tmp/vauchi_qr_screenshot.png
@@ -35,30 +39,4 @@ name: Generate QR Code
 # QR screenshot from the brief moment before dismissal. Phase 4
 # owns the symmetric-exchange invariant; this flow only checks
 # the hand-off point is reachable.
-- assertVisible: "Scan this code"
-
-# If the app shows the QR data as text (for accessibility)
-- runFlow:
-    when:
-      visible: "Show Code"
-    commands:
-      - tapOn: "Show Code"
-      - copyTextFrom:
-          id: "qr_data_text"
-      - evalScript: |-
-          const fs = require('fs');
-          fs.writeFileSync('/tmp/vauchi_qr_data.txt', maestro.copiedText);
-
-# Alternative: Extract from accessibility label
-- runFlow:
-    when:
-      visible:
-        id: "qr_code_view"
-    commands:
-      - evalScript: |-
-          // QR data should be in accessibility label for testing
-          const element = maestro.findElement({ id: 'qr_code_view' });
-          if (element && element.accessibilityLabel) {
-            const fs = require('fs');
-            fs.writeFileSync('/tmp/vauchi_qr_data.txt', element.accessibilityLabel);
-          }
+- assertVisible: "Show this"

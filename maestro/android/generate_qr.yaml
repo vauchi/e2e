@@ -16,15 +16,20 @@ name: Generate QR Code (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to exchange screen from home
-- tapOn: "Exchange"
+# Navigate to the exchange mode picker.
+# Phase 1.E (2026-05-11) moved QR generation behind the core-driven
+# mode selection screen; Glance is the default hero action.
+- tapOn:
+    id: "tab_exchange"
+- assertVisible: "Exchange Mode"
+- tapOn: "Glance"
 
-# Wait for QR generation
+# Wait for the own-QR broadcast to render.
 - waitForAnimationToEnd:
     timeout: 10000
 
-# Verify QR code section is displayed
-- assertVisible: "Your QR Code"
+# The QR label doubles as the status caption while waiting for a peer.
+- assertVisible: "Show this to exchange"
 
 # Take screenshot for QR extraction
 - takeScreenshot: /tmp/vauchi_qr_screenshot.png
@@ -37,4 +42,4 @@ name: Generate QR Code (Android)
 # of bug. Phase 4's two-device harness owns the symmetric-exchange
 # invariant; this single-device flow only checks the hand-off
 # point is reachable.
-- assertVisible: "Your QR Code"
+- assertVisible: "Show this to exchange"

@@ -16,9 +16,13 @@ appId: app.vauchi
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
-- assertVisible: "Settings"
+# Ensure we are on the home screen, then open Settings via the gear icon.
+- tapOn:
+    id: "tab_my_info"
+- waitForAnimationToEnd
+- tapOn:
+    id: "home.settings"
+- waitForAnimationToEnd
 
 # Scroll to Privacy section and tap Delete Identity
 - scrollUntilVisible:
@@ -47,5 +51,8 @@ appId: app.vauchi
     direction: DOWN
 - assertVisible: "Delete Identity"
 
-# Go back to home
-- back
+# Return to the home screen so the next flow starts from a known state.
+- pressKey: back
+- waitForAnimationToEnd
+- pressKey: back
+- waitForAnimationToEnd

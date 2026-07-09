@@ -11,8 +11,11 @@ appId: app.vauchi
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
+# Ensure we are on the home screen, then open Settings via the gear icon.
+- tapOn:
+    id: "tab_my_info"
+- tapOn:
+    id: "home.settings"
 
 # Scroll to Duress PIN section
 - swipe:
@@ -46,5 +49,8 @@ appId: app.vauchi
 # Verify duress is now enabled
 - assertVisible: "Enabled"
 
-# Go back
+# Return to the home screen so the next flow starts from a known state.
 - pressKey: back
+- waitForAnimationToEnd
+- pressKey: back
+- waitForAnimationToEnd

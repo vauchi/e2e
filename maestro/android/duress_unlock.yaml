@@ -31,7 +31,8 @@ appId: app.vauchi
     timeout: 15000
 
 # Navigate to contacts
-- tapOn: "Contacts"
+- tapOn:
+    id: "tab_contacts"
 
 # Verify decoy contact IS visible
 - assertVisible: ${DECOY_NAME}

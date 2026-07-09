@@ -15,9 +15,13 @@ appId: app.vauchi
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
-- assertVisible: "Settings"
+# Ensure we are on the home screen, then open Settings via the gear icon.
+- tapOn:
+    id: "tab_my_info"
+- waitForAnimationToEnd
+- tapOn:
+    id: "home.settings"
+- waitForAnimationToEnd
 
 # Scroll to Emergency Shred
 - scrollUntilVisible:

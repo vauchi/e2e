@@ -37,11 +37,7 @@ name: Sync with Relay (Android)
 - assertNotVisible: "Connection failed"
 - assertNotVisible: "Error"
 
-# Alternative: Check for sync status in settings
-- runFlow:
-    when:
-      visible: "Settings"
-    commands:
-      - tapOn: "Settings"
-      - assertVisible: "Last synced"
-      - pressKey: back
+# Sync status is surfaced on the My Card caption, not in Settings.
+# The pull-to-refresh above is sufficient to exercise the sync path;
+# staying on the Contacts list without an error modal is the Layer 3
+# post-condition we can assert from a single-device flow.

@@ -12,8 +12,11 @@ appId: app.vauchi
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
+# Ensure we are on the home screen, then open Settings via the gear icon.
+- tapOn:
+    id: "tab_my_info"
+- tapOn:
+    id: "home.settings"
 
 # Scroll to Decoy Contacts section
 - swipe:
@@ -23,17 +26,23 @@ appId: app.vauchi
 # Verify decoy section is visible
 - assertVisible: "Decoy Contacts"
 
+# Open the decoy contacts screen
+- tapOn: "Decoy Contacts"
+- waitForAnimationToEnd
+
 # Add a decoy contact
-- tapOn: "Add Decoy Contact"
-- assertVisible: "Add Decoy Contact"
+- tapOn: "New Decoy Name"
 - inputText: ${DECOY_NAME}
 - hideKeyboard
-- tapOn: "Add"
+- tapOn: "Add Decoy"
 
 - waitForAnimationToEnd
 
 # Verify decoy contact appears in list
 - assertVisible: ${DECOY_NAME}
 
-# Go back
+# Return to the home screen so the next flow starts from a known state.
 - pressKey: back
+- waitForAnimationToEnd
+- pressKey: back
+- waitForAnimationToEnd

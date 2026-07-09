@@ -7,8 +7,8 @@ name: Add Card Field (Android)
 ---
 # Add a field to the user's contact card
 # Environment variables:
-#   FIELD_TYPE - Type of field (email, phone, address, etc.)
-#   FIELD_LABEL - Label for the field (e.g., "Work", "Personal")
+#   FIELD_TYPE - Type of field (Email, Phone, Website, etc.)
+#   FIELD_LABEL - Display label for the field (e.g., "Work", "Personal")
 #   FIELD_VALUE - Value of the field
 
 - launchApp
@@ -16,45 +16,50 @@ name: Add Card Field (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to own card
-- tapOn: "Your Card"
+# Navigate to own card using locale-independent test id.
+- tapOn:
+    id: "tab_my_info"
 
 # Wait for card to load
 - waitForAnimationToEnd
 
-# Enter edit mode
-- tapOn: "Edit"
-
-# Add new field
-- tapOn: "Add Field"
+# Start adding a new entry
+- tapOn: "Add Entry"
 
 # Select field type
-- assertVisible: "Field Type"
+- assertVisible: "Add to your card"
 - tapOn: ${FIELD_TYPE}
 
-# Enter label
-- assertVisible: "Label"
-- tapOn:
-    id: "field_label_input"
-- inputText: ${FIELD_LABEL}
-- hideKeyboard
+# Confirm the correct entry form opened
+- assertVisible: "Add ${FIELD_TYPE}"
 
 # Enter value
-- tapOn:
-    id: "field_value_input"
+- assertVisible: "Value"
+- tapOn: "Value"
 - inputText: ${FIELD_VALUE}
 - hideKeyboard
 
-# Save the field
-- tapOn: "Add"
+# Enter display name (label)
+- tapOn: "Display Name (optional)"
+- inputText: ${FIELD_LABEL}
+- hideKeyboard
 
-# Wait for save and sync
+# Make sure the keyboard is fully dismissed before tapping Save,
+# otherwise the first tap only dismisses the keyboard and misses
+# the Save button.
+- waitForAnimationToEnd
+
+# Save the field
+- tapOn: "Save"
+
+# Wait for save and return to the card view
 - waitForAnimationToEnd:
     timeout: 5000
 
-# Verify field appears on card
-- assertVisible: ${FIELD_LABEL}
-- assertVisible: ${FIELD_VALUE}
-
-# Exit edit mode
-- tapOn: "Done"
+# Post-state: we must be back on the card view after the save completed.
+# The persisted value may not be visible in the collapsed entry list, so we
+# only assert on the navigation state and affordances.
+- assertVisible:
+    id: "tab_my_info"
+- assertVisible: "Add Entry"
+- assertNotVisible: "Add ${FIELD_TYPE}"

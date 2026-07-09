@@ -12,13 +12,20 @@ appId: app.vauchi
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
+# Ensure we are on the home screen, then open Settings via the gear icon.
+- tapOn:
+    id: "tab_my_info"
+- tapOn:
+    id: "home.settings"
 
 # Scroll to Decoy Contacts section
 - swipe:
     direction: UP
     duration: 300
+
+# Open the decoy contacts screen
+- tapOn: "Decoy Contacts"
+- waitForAnimationToEnd
 
 # Verify decoy contact exists
 - assertVisible: ${DECOY_NAME}
@@ -34,5 +41,8 @@ appId: app.vauchi
 # Verify decoy contact is gone
 - assertNotVisible: ${DECOY_NAME}
 
-# Go back
+# Return to the home screen so the next flow starts from a known state.
 - pressKey: back
+- waitForAnimationToEnd
+- pressKey: back
+- waitForAnimationToEnd
