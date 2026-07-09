@@ -95,6 +95,9 @@ tower = "0.5"
 # Key fingerprint verification
 sha2 = "0.10"
 
+# Bind-time socket options for port-allocation tests (SO_REUSEADDR)
+socket2 = { version = "0.5", features = ["all"] }
+
 [[bin]]
 name = "seed-contacts"
 path = "src/bin/seed_contacts.rs"

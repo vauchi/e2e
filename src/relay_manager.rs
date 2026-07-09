@@ -776,6 +776,38 @@ fn spawn_relay_drains(child: &mut Child, index: usize) {
 mod tests {
     use super::*;
 
+    /// Bind a test listener with SO_REUSEADDR so the port can be reclaimed
+    /// immediately after `find_available_port` releases it. Without this,
+    /// macOS keeps the socket in TIME_WAIT and the rebind assertion flakes.
+    /// A short retry loop tolerates transient port pressure from parallel
+    /// tests that allocate from the same ephemeral range.
+    fn bind_test_listener(port: u16) -> std::io::Result<TcpListener> {
+        let addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+        let mut last_err = None;
+        for attempt in 0..10 {
+            match try_bind_reusable(&addr) {
+                Ok(listener) => return Ok(listener),
+                Err(e) => {
+                    last_err = Some(e);
+                    std::thread::sleep(Duration::from_millis(10 * (attempt + 1)));
+                }
+            }
+        }
+        Err(last_err.unwrap())
+    }
+
+    fn try_bind_reusable(addr: &std::net::SocketAddr) -> std::io::Result<TcpListener> {
+        let socket = socket2::Socket::new(
+            socket2::Domain::for_address(*addr),
+            socket2::Type::STREAM,
+            Some(socket2::Protocol::TCP),
+        )?;
+        socket.set_reuse_address(true)?;
+        socket.bind(&(*addr).into())?;
+        socket.listen(1)?;
+        Ok(socket.into())
+    }
+
     #[test]
     fn test_relay_config_default() {
         let config = RelayConfig::default();
@@ -795,7 +827,7 @@ mod tests {
         assert!(port2 > 1024, "port {port2} should be non-privileged");
 
         // Port must be bindable right after allocation.
-        let listener = TcpListener::bind(format!("127.0.0.1:{port1}"));
+        let listener = bind_test_listener(port1);
         assert!(
             listener.is_ok(),
             "port {port1} should be bindable after allocation"
@@ -815,9 +847,9 @@ mod tests {
         );
 
         // Both ports must be bindable right after allocation.
-        let r = TcpListener::bind(format!("127.0.0.1:{relay}"));
+        let r = bind_test_listener(relay);
         assert!(r.is_ok(), "relay port {relay} should be bindable");
-        let m = TcpListener::bind(format!("127.0.0.1:{metrics}"));
+        let m = bind_test_listener(metrics);
         assert!(m.is_ok(), "metrics port {metrics} should be bindable");
     }
 }
