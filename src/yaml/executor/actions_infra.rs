@@ -15,7 +15,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let internet = self
             .get_param_bool(&step.params, "internet")
             .unwrap_or(true);
@@ -79,5 +79,23 @@ impl ScenarioExecutor {
         let interpolated = self.interpolate_var(&message);
         println!("LOG: {}", interpolated);
         Ok(None)
+    }
+
+    /// Stub for network-partition actions used by manual-only edge scenarios.
+    ///
+    /// These actions require OS-level traffic control between relay
+    /// processes, which the current test harness does not implement. They
+    /// are kept parseable so the YAML loader can read the scenarios, and
+    /// skipped at execution time when the scenario is marked `manual_only`.
+    /// If a non-manual scenario tries to use them, we fail loudly instead of
+    /// silently returning success.
+    pub(super) async fn action_network_partition_stub(
+        &mut self,
+        step: &ActionStep,
+    ) -> E2eResult<Option<String>> {
+        Err(E2eError::InvalidStep(format!(
+            "Network-partition action {:?} is not yet implemented in the automated harness",
+            step.action
+        )))
     }
 }

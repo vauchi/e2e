@@ -212,6 +212,75 @@ impl ScenarioExecutor {
                 Ok(())
             }
 
+            Assertion::HasField => {
+                let field_type = self.get_param_string(&step.params, "field_type")?;
+                let label = self.get_param_string(&step.params, "label")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+
+                    let card = if let Some(idx) = device_idx {
+                        user.get_card_on_device(idx).await?
+                    } else {
+                        user.get_card().await?
+                    };
+                    let has_field = card
+                        .fields
+                        .iter()
+                        .any(|f| f.field_type == field_type && f.label == label);
+
+                    if !has_field {
+                        return Err(E2eError::AssertionFailed(format!(
+                            "{}'s card does not have field {}:{}",
+                            actor, field_type, label
+                        )));
+                    }
+                }
+                Ok(())
+            }
+
+            Assertion::MissingField => {
+                let field_type = self.get_param_string(&step.params, "field_type")?;
+                let label = self.get_param_string(&step.params, "label")?;
+
+                for actor in actors {
+                    let (user_name, device_idx) = ActorRef::parse(actor);
+                    let user = self.get_user(user_name)?;
+                    let user = user.read().await;
+
+                    let card = if let Some(idx) = device_idx {
+                        user.get_card_on_device(idx).await?
+                    } else {
+                        user.get_card().await?
+                    };
+                    let has_field = card
+                        .fields
+                        .iter()
+                        .any(|f| f.field_type == field_type && f.label == label);
+
+                    if has_field {
+                        return Err(E2eError::AssertionFailed(format!(
+                            "{}'s card unexpectedly has field {}:{}",
+                            actor, field_type, label
+                        )));
+                    }
+                }
+                Ok(())
+            }
+
+            Assertion::ContactFieldExists => {
+                // Currently only used by manual-only partition scenarios.
+                // Implementing contact-card inspection requires extending the
+                // Device trait with a `get_contact_card` method; for now we
+                // treat this as a known limitation rather than a silent pass.
+                Err(E2eError::InvalidStep(
+                    "contact_field_exists assertion is not yet implemented in the automated harness"
+                        .to_string(),
+                ))
+            }
+
             Assertion::LabelCount => {
                 let expected = self.get_param_usize(&step.params, "count")?;
 

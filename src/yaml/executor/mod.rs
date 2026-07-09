@@ -241,6 +241,7 @@ impl ScenarioExecutor {
                 Step::Wait(wait_step) => self.execute_wait(wait_step).await,
                 Step::Parallel(parallel_step) => self.execute_parallel(parallel_step).await,
                 Step::If(conditional_step) => self.execute_conditional(conditional_step).await,
+                Step::Loop(loop_step) => self.execute_loop(loop_step).await,
             }
         })
     }
@@ -353,6 +354,11 @@ impl ScenarioExecutor {
             Action::ExportBackup => self.action_export_backup(step).await,
             Action::ImportBackup => self.action_import_backup(step).await,
             Action::SetNetwork => self.action_set_network(step).await,
+            Action::PartitionNetwork
+            | Action::HealPartition
+            | Action::PartialHeal
+            | Action::SetRelayPreference
+            | Action::ClearRelayPreference => self.action_network_partition_stub(step).await,
             Action::StopRelay => self.action_stop_relay(step).await,
             Action::RestartRelay => self.action_restart_relay(step).await,
             Action::Wait => self.action_wait(step).await,
@@ -449,6 +455,38 @@ impl ScenarioExecutor {
                 break;
             }
         }
+
+        Ok(StepResult {
+            description,
+            passed: all_passed,
+            duration: start.elapsed(),
+            error: None,
+            output: None,
+        })
+    }
+
+    /// Execute a loop step.
+    async fn execute_loop(&mut self, step: &super::schema::LoopStep) -> E2eResult<StepResult> {
+        let start = Instant::now();
+        let description = format!("Loop ({} iterations)", step.count);
+
+        let mut all_passed = true;
+        for i in 0..step.count {
+            // Expose the current iteration index so step parameters can
+            // interpolate it as ${loop_index}.
+            self.outputs.insert("loop_index".to_string(), i.to_string());
+            for s in &step.steps {
+                let result = self.execute_step(s).await?;
+                if !result.passed {
+                    all_passed = false;
+                    break;
+                }
+            }
+            if !all_passed {
+                break;
+            }
+        }
+        self.outputs.remove("loop_index");
 
         Ok(StepResult {
             description,

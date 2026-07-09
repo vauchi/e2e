@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let name = self.get_param_string(&step.params, "name")?;
         for actor in actors {
             let (user_name, device_idx) = ActorRef::parse(actor);

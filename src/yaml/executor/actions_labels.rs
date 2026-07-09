@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let name = self.get_param_string(&step.params, "name")?;
 
         for actor in actors {
@@ -33,7 +33,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let name = self.get_param_string(&step.params, "name")?;
 
         for actor in actors {
@@ -53,7 +53,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
         let contact = self.get_param_string(&step.params, "contact")?;
 
@@ -78,7 +78,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
         let contact = self.get_param_string(&step.params, "contact")?;
 
@@ -103,7 +103,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
         let field = self.get_param_string(&step.params, "field")?;
 
@@ -128,7 +128,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
         let field = self.get_param_string(&step.params, "field")?;
 
@@ -153,7 +153,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let contact = self.get_param_string(&step.params, "contact")?;
         let field = self.get_param_string(&step.params, "field")?;
 
@@ -178,7 +178,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let contact = self.get_param_string(&step.params, "contact")?;
         let field = self.get_param_string(&step.params, "field")?;
 

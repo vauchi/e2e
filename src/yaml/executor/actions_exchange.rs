@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let actor = actors
             .first()
             .ok_or_else(|| E2eError::InvalidStep("generate_qr requires an actor".to_string()))?;
@@ -37,7 +37,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let qr_param = self.get_param_string(&step.params, "qr")?;
         let qr = self.interpolate_var(&qr_param);
 
@@ -59,7 +59,7 @@ impl ScenarioExecutor {
     }
 
     pub(super) async fn action_exchange(&mut self, step: &ActionStep) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         if actors.len() != 2 {
             return Err(E2eError::InvalidStep(
                 "exchange requires exactly 2 actors".to_string(),
@@ -82,7 +82,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         if actors.len() != 2 {
             return Err(E2eError::InvalidStep(
                 "mutual_exchange requires exactly 2 actors".to_string(),

@@ -177,6 +177,9 @@ pub enum Step {
 
     /// Conditional execution.
     If(ConditionalStep),
+
+    /// Loop a block of steps a fixed number of times.
+    Loop(LoopStep),
 }
 
 /// An action to perform.
@@ -186,7 +189,11 @@ pub struct ActionStep {
     pub action: Action,
 
     /// The actor(s) performing the action.
-    pub actor: ActorRef,
+    ///
+    /// System-level actions (e.g. network partition manipulation) may omit
+    /// this field.
+    #[serde(default)]
+    pub actor: Option<ActorRef>,
 
     /// Parameters for the action.
     #[serde(default)]
@@ -207,6 +214,16 @@ pub struct ActionStep {
     /// Step-specific timeout.
     #[serde(default, with = "humantime_serde::option")]
     pub timeout: Option<Duration>,
+}
+
+impl ActionStep {
+    /// Return the actor references, failing if no actor was supplied.
+    pub fn actor_refs(&self) -> crate::error::E2eResult<Vec<&str>> {
+        self.actor
+            .as_ref()
+            .map(|a| a.actors())
+            .ok_or_else(|| crate::error::E2eError::InvalidStep("Missing actor".to_string()))
+    }
 }
 
 /// Available actions.
@@ -250,6 +267,13 @@ pub enum Action {
 
     // Network simulation
     SetNetwork,
+
+    // Relay partition simulation (manual-only scenarios for now).
+    PartitionNetwork,
+    HealPartition,
+    PartialHeal,
+    SetRelayPreference,
+    ClearRelayPreference,
 
     // App lifecycle
     BackgroundApp,
@@ -369,6 +393,9 @@ pub enum Assertion {
     IdentityLoaded,
     CardHasField,
     CardFieldEquals,
+    HasField,
+    MissingField,
+    ContactFieldExists,
     CardsConverged,
     SessionRestored,
     ProximityVerified,
@@ -422,6 +449,16 @@ pub struct ConditionalStep {
     /// Steps to run if condition is false.
     #[serde(default)]
     pub otherwise: Vec<Step>,
+}
+
+/// Loop a block of steps a fixed number of times.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoopStep {
+    /// Number of iterations.
+    pub count: usize,
+
+    /// Steps to execute on each iteration.
+    pub steps: Vec<Step>,
 }
 
 /// Result of executing a scenario.

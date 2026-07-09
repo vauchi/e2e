@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let password = self.get_param_string(&step.params, "password")?;
 
         let actor = actors
@@ -34,7 +34,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let path = self.get_param_string(&step.params, "path")?;
         let path = self.interpolate_var(&path);
         let password = self.get_param_string(&step.params, "password")?;

@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let old_public_key = self.get_param_string(&step.params, "old_public_key")?;
         let old_public_key = self.interpolate_var(&old_public_key);
 
@@ -39,7 +39,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let claim = self.get_param_string(&step.params, "claim")?;
         let claim = self.interpolate_var(&claim);
 
@@ -61,7 +61,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let voucher = self.get_param_string(&step.params, "voucher")?;
         let voucher = self.interpolate_var(&voucher);
 
@@ -82,7 +82,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let _proof = self.get_param_string(&step.params, "proof")?;
 
         // Verify by passing to the recovery verify command

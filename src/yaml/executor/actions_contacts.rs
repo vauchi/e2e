@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let actor = actors
             .first()
             .ok_or_else(|| E2eError::InvalidStep("list_contacts requires an actor".to_string()))?;
@@ -28,7 +28,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let name = self.get_param_string(&step.params, "name")?;
         let actor = actors
             .first()
@@ -44,7 +44,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let contact = self.get_param_string(&step.params, "contact")?;
 
         for actor in actors {

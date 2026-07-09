@@ -14,6 +14,7 @@ description: |
 feature: "relay_network.feature"
 tags: ["edge", "network", "partition", "relay", "recovery"]
 timeout: 300s
+manual_only: true
 
 participants:
   alice:

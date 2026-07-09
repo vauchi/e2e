@@ -13,7 +13,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let field_type = self.get_param_string(&step.params, "field_type")?;
         let label = self.get_param_string(&step.params, "label")?;
         let value = self.get_param_string(&step.params, "value")?;
@@ -31,7 +31,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let field = self.get_param_string(&step.params, "field")?;
         let value = self.get_param_string(&step.params, "value")?;
 
@@ -45,7 +45,7 @@ impl ScenarioExecutor {
     }
 
     pub(super) async fn action_get_card(&mut self, step: &ActionStep) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let actor = actors
             .first()
             .ok_or_else(|| E2eError::InvalidStep("get_card requires an actor".to_string()))?;
@@ -60,7 +60,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
         let value = self.get_param_string(&step.params, "value")?;
 
@@ -77,7 +77,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let label = self.get_param_string(&step.params, "label")?;
 
         for actor in actors {
@@ -93,7 +93,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let name = self.get_param_string(&step.params, "name")?;
 
         for actor in actors {

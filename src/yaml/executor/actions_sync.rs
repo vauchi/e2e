@@ -10,7 +10,7 @@ use crate::yaml::schema::{ActionStep, ActorRef};
 
 impl ScenarioExecutor {
     pub(super) async fn action_sync(&mut self, step: &ActionStep) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         for actor in actors {
             let (user_name, device_idx) = ActorRef::parse(actor);
             let user = self.get_user(user_name)?;
@@ -29,7 +29,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         let device_idx = self.get_param_usize(&step.params, "device")?;
         for actor in actors {
             let (user_name, _) = ActorRef::parse(actor);
@@ -44,7 +44,7 @@ impl ScenarioExecutor {
         &mut self,
         step: &ActionStep,
     ) -> E2eResult<Option<String>> {
-        let actors = step.actor.actors();
+        let actors = step.actor_refs()?;
         for actor in actors {
             let (user_name, _) = ActorRef::parse(actor);
             let user = self.get_user(user_name)?;
