@@ -19,6 +19,12 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+/// Serialise Maestro-driven device tests. Maestro's single-process XCTest
+/// driver on macOS and the `adb`/emulator bridge on the host do not tolerate
+/// concurrent flows reliably, so the iOS and Android simulator tests take this
+/// lock for the duration of their create_identity flow.
+static MAESTRO_SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Smoke test: Basic CLI exchange between two users.
 /// Tags: smoke, exchange
@@ -145,72 +151,132 @@ async fn integration_mixed_devices() {
 }
 
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
-/// Placeholder for future iOS simulator testing (Phase 2).
+/// Smoke test for iOS simulator automation via Maestro.
 ///
 /// Requirements:
 /// - Maestro CLI installed (`curl -Ls "https://get.maestro.mobile.dev" | bash`)
-/// - iOS Simulator running (via `xcrun simctl boot "iPhone 15 Pro"`)
+/// - iOS Simulator running and booted (the test auto-detects its UDID)
 /// - Maestro YAML flows in `e2e/maestro/ios/`
-/// - App built for simulator
+/// - App built and installed for simulator
 ///
-/// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
+/// Skips gracefully when no booted simulator is available so the full
+/// `--include-ignored` suite stays green on machines without an iOS simulator.
+///
+/// The MaestroDevice implementation is at `e2e/src/device/maestro.rs`
 // @internal
 #[tokio::test]
-#[ignore = "requires Maestro CLI and iOS simulator - Phase 2"]
 async fn test_ios_simulator_exchange() {
     use vauchi_e2e_tests::device::MaestroDevice;
 
-    // Try to create an iOS MaestroDevice
-    match MaestroDevice::ios("Alice_iOS", "iPhone 15 Pro", "ws://localhost:8080") {
-        Ok(device) => {
-            // Device created but Maestro flows not implemented
-            match device.create_identity("Alice").await {
-                Err(e) => panic!("iOS Maestro automation not implemented: {}", e),
-                Ok(_) => {
-                    panic!("Unexpected success - iOS automation should not be implemented yet")
-                }
-            }
-        }
-        Err(e) => {
-            // Expected: Maestro CLI not installed
-            panic!("Maestro CLI required: {}", e);
-        }
-    }
+    // Auto-detect a booted iOS simulator UDID. Maestro's `--device` flag
+    // accepts either a device name or a UDID; the UDID is stable when
+    // multiple simulators share the same name.
+    let udid = std::process::Command::new("xcrun")
+        .args(["simctl", "list", "devices", "booted"])
+        .stdout(std::process::Stdio::piped())
+        .output()
+        .ok()
+        .and_then(|o| {
+            let out = String::from_utf8_lossy(&o.stdout);
+            out.lines().find_map(|line| {
+                // Lines look like: "    iPhone 17 Pro (79993A0D-...) (Booted)"
+                line.split('(')
+                    .nth(1)
+                    .and_then(|s| s.split(')').next())
+                    .filter(|s| s.contains('-'))
+                    .map(|s| s.to_string())
+            })
+        });
+
+    let udid = match udid {
+        Some(u) => u,
+        None => return,
+    };
+
+    let _guard = MAESTRO_SERIAL.lock().await;
+
+    let device = MaestroDevice::ios("Alice_iOS", &udid, "ws://localhost:8080")
+        .expect("Maestro CLI must be installed to run iOS simulator tests");
+
+    device
+        .create_identity("Alice")
+        .await
+        .expect("iOS simulator create_identity flow should succeed");
 }
 
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
-/// Placeholder for future Android emulator testing (Phase 2).
+/// Smoke test for Android emulator automation via Maestro.
 ///
 /// Requirements:
 /// - Maestro CLI installed
-/// - Android emulator running (via `emulator -avd Pixel_7`)
-/// - ADB in PATH
+/// - Android emulator running and visible to `adb devices -l`
 /// - Maestro YAML flows in `e2e/maestro/android/`
 /// - APK built and installed
 ///
-/// The MaestroDevice stub is available at `e2e/src/device/maestro.rs`
+/// Skips gracefully when no emulator is connected so the full
+/// `--include-ignored` suite stays green on machines without an Android emulator.
+/// Physical devices are intentionally ignored because this test exercises the
+/// emulator harness only.
+///
+/// The MaestroDevice implementation is at `e2e/src/device/maestro.rs`
 // @internal
 #[tokio::test]
-#[ignore = "requires Maestro CLI and Android emulator - Phase 2"]
 async fn test_android_emulator_exchange() {
     use vauchi_e2e_tests::device::MaestroDevice;
 
-    // Try to create an Android MaestroDevice
-    match MaestroDevice::android("Bob_Android", "Pixel_7", "ws://localhost:8080") {
-        Ok(device) => {
-            // Device created but Maestro flows not implemented
-            match device.create_identity("Bob").await {
-                Err(e) => panic!("Android Maestro automation not implemented: {}", e),
-                Ok(_) => {
-                    panic!("Unexpected success - Android automation should not be implemented yet")
+    // Skip gracefully when no Android emulator is connected. This keeps the
+    // full `--include-ignored` suite green on developer machines that only
+    // have an iOS simulator, while still exercising the harness when an
+    // emulator is present. Physical devices attached for other DT work are
+    // ignored here because this smoke test is scoped to the emulator path.
+    let adb_output = std::process::Command::new("adb")
+        .args(["devices", "-l"])
+        .stdout(std::process::Stdio::piped())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string());
+
+    let detected_emulator = adb_output.and_then(|out| {
+        out.lines().skip(1).find_map(|line| {
+            // Lines look like:
+            // "<device_id>\tdevice usb:... product:<name> model:<name> device:<name> ..."
+            // Emulators expose product names such as sdk_gphone64_arm64.
+            let mut parts = line.split_whitespace();
+            let id = parts.next()?;
+            let state = parts.next()?;
+            if state != "device" {
+                return None;
+            }
+            let mut product = "";
+            for part in parts {
+                if let Some(value) = part.strip_prefix("product:") {
+                    product = value;
                 }
             }
-        }
-        Err(e) => {
-            // Expected: Maestro CLI not installed
-            panic!("Maestro CLI required: {}", e);
-        }
-    }
+            let is_emulator = product.contains("gphone") || product.contains("emulator");
+            if is_emulator {
+                Some(id.to_string())
+            } else {
+                None
+            }
+        })
+    });
+
+    let device_name = match detected_emulator {
+        Some(name) => name,
+        None => return,
+    };
+
+    let _guard = MAESTRO_SERIAL.lock().await;
+
+    let device = MaestroDevice::android("Bob_Android", &device_name, "ws://localhost:8080")
+        .expect("Maestro CLI must be installed to run Android emulator tests");
+
+    device
+        .create_identity("Bob")
+        .await
+        .expect("Android emulator create_identity flow should succeed");
 }
 
 // @scenario: contact_exchange:Two users exchange contact cards via QR code

@@ -259,9 +259,10 @@ impl MaestroDevice {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
             return Err(E2eError::device(format!(
-                "Maestro flow '{}' failed: {}",
-                flow_name, stderr
+                "Maestro flow '{}' failed:\nstdout:\n{}\nstderr:\n{}",
+                flow_name, stdout, stderr
             )));
         }
 
