@@ -114,13 +114,17 @@ fn test_duress_alert_queued_on_duress_auth() {
     let mode = alice.authenticate("6789").unwrap();
     assert_eq!(mode, AuthMode::Duress);
 
-    // Alert should be queued
-    let pending = alice.pending_duress_alerts();
-    assert!(
-        !pending.is_empty(),
-        "Duress alert must be queued when duress PIN is entered"
+    // ADR-032: duress alerts are covert card-update sends to configured
+    // trusted contacts — there is no detectable local "duress event". With
+    // no recipients configured, there is nothing to disguise-send, so no
+    // covert traffic is queued. (The positive path — an alert queued to a
+    // ratcheted trusted contact — is owned by core's safety-alert and
+    // duress-unlock wiring tests.)
+    assert_eq!(
+        alice.pending_update_count().unwrap(),
+        0,
+        "no recipients configured -> no covert duress traffic queued"
     );
-    assert_eq!(pending.len(), 1);
 }
 
 /// @scenario: Duress settings can be configured and retrieved
@@ -496,7 +500,14 @@ fn test_duress_full_workflow() {
     assert!(hidden_ids.contains(&bob_id.as_str()));
     assert!(hidden_ids.contains(&charlie_id.as_str()));
 
-    // Verify: alert queued
-    let pending = alice.pending_duress_alerts();
-    assert_eq!(pending.len(), 1);
+    // ADR-032: covert duress alerts require an established ratchet with the
+    // trusted contact. Bob and Charlie were added without an in-person
+    // exchange, so no ratchet exists and the covert send is skipped
+    // (fail-safe) — nothing is queued. The positive queuing path is owned by
+    // core's safety-alert and duress-unlock wiring tests.
+    assert_eq!(
+        alice.pending_update_count().unwrap(),
+        0,
+        "duress alert skips trusted contacts without an established ratchet"
+    );
 }
