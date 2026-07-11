@@ -9,6 +9,24 @@
 [semgrep]
   description = "Semgrep with Rust community + vauchi security rules"
 
+  # Disable println/eprintln-in-lib: this is a test-automation harness.
+  # Its lib exists only to support its own bins and tests and ships no
+  # production artifact, so the rules' "may leak in production" rationale
+  # does not apply; the println!/eprintln! calls are intentional CLI and
+  # test-diagnostic output. Same treatment as the cli crate.
+  # See: https://gitlab.com/groups/vauchi/-/security/vulnerabilities?severity=MEDIUM
+  [[semgrep.ruleset]]
+    disable = true
+    [semgrep.ruleset.identifier]
+      type = "semgrep_id"
+      value = "vauchi-no-println-in-lib"
+
+  [[semgrep.ruleset]]
+    disable = true
+    [semgrep.ruleset.identifier]
+      type = "semgrep_id"
+      value = "vauchi-no-eprintln-in-lib"
+
   [[semgrep.passthrough]]
     type = "url"
     value = "https://semgrep.dev/c/p/rust"
