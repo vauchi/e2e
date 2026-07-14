@@ -457,7 +457,9 @@ async fn test_exchange_network_failure() {
         .await
         .expect("Failed to create identities");
 
-    // Alice generates QR code
+    // Both sides start while the relay is available. Bob must retain the
+    // ephemeral represented by his QR even though this one-sided error-path
+    // test completes only his side of the mutual exchange.
     let alice = orch.user("Alice").unwrap();
     let qr_data = {
         let alice_guard = alice.read().await;
@@ -466,6 +468,14 @@ async fn test_exchange_network_failure() {
             .await
             .expect("Failed to generate QR")
     };
+    let bob = orch.user("Bob").unwrap();
+    {
+        let bob_guard = bob.read().await;
+        bob_guard
+            .generate_qr()
+            .await
+            .expect("Failed to generate Bob's QR");
+    }
 
     // Stop the relay to simulate network failure
     orch.stop_relay(0).await.expect("Failed to stop relay");
@@ -473,7 +483,6 @@ async fn test_exchange_network_failure() {
     // Bob attempts to complete exchange
     // Note: With mutual QR exchange, the exchange creates a contact locally
     // without needing a relay. The relay is only needed for subsequent sync.
-    let bob = orch.user("Bob").unwrap();
     let exchange_result = {
         let bob_guard = bob.read().await;
         bob_guard.complete_exchange(&qr_data).await
@@ -484,7 +493,7 @@ async fn test_exchange_network_failure() {
     // So the exchange should succeed even without a relay.
     assert!(
         exchange_result.is_ok(),
-        "Mutual QR exchange should succeed offline"
+        "Mutual QR exchange should succeed offline: {exchange_result:?}"
     );
 
     // Restart relay to check state
