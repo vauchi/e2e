@@ -28,10 +28,7 @@ use vauchi_e2e_tests::prelude::*;
 // @internal
 #[tokio::test]
 async fn integration_relay_failover() {
-    let config = OrchestratorConfig {
-        relay_count: 2,
-        ..Default::default()
-    };
+    let config = OrchestratorConfig::multi_relay_transport_isolation(2);
 
     let mut orch = Orchestrator::with_config(config);
     orch.start().await.expect("Failed to start orchestrator");
@@ -91,10 +88,7 @@ async fn integration_relay_failover() {
 // @internal
 #[tokio::test]
 async fn integration_updates_during_outage() {
-    let config = OrchestratorConfig {
-        relay_count: 2,
-        ..Default::default()
-    };
+    let config = OrchestratorConfig::multi_relay_transport_isolation(2);
 
     let mut orch = Orchestrator::with_config(config);
     orch.start().await.expect("Failed to start orchestrator");
@@ -183,10 +177,7 @@ async fn integration_updates_during_outage() {
 // @internal
 #[tokio::test]
 async fn integration_no_relays() {
-    let config = OrchestratorConfig {
-        relay_count: 2,
-        ..Default::default()
-    };
+    let config = OrchestratorConfig::multi_relay_transport_isolation(2);
 
     let mut orch = Orchestrator::with_config(config);
     orch.start().await.expect("Failed to start orchestrator");

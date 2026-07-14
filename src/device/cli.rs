@@ -19,6 +19,18 @@ use tracing::{debug, trace};
 use super::{CardField, Contact, ContactCard, Device, DeviceType};
 use crate::error::{E2eError, E2eResult};
 
+const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
+
+fn configure_command_environment(command: &mut Command, extra_env: &HashMap<String, String>) {
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+
+    // The E2E harness must remain fail closed even when the parent shell or a
+    // caller tries to inject the retired development escape hatch.
+    command.env_remove(ALLOW_DIRECT_ENV);
+}
+
 /// Raw JSON representation of `vauchi card show --raw`.
 #[derive(Debug, serde::Deserialize)]
 struct RawCard {
@@ -107,19 +119,10 @@ impl CliDevice {
             }
         }
 
-        // Prefer the debug binary for local dev runs.
-        //
-        // Why debug over release: `cli/src/commands/common.rs` gates the
-        // `VAUCHI_ALLOW_DIRECT` env var on `#[cfg(debug_assertions)]`.
-        // The orchestrator sets that env var so the CLI fetches the
-        // ephemeral OHTTP key from the just-spawned test relay; in a
-        // release build the gate compiles out, the CLI falls back to
-        // the bundled production OHTTP key, and HPKE Open fails on the
-        // test relay's ephemeral key with HTTP 400. Preferring debug
-        // here makes the env var actually work for local `just test`.
-        // Production-style coverage (release CLI vs production relay
-        // key) is provided by the SHA-cached `E2E_BIN_DIR` path used in
-        // CI, which sits ahead of this fallback.
+        // Prefer the debug binary for local development runs. Production-like
+        // coverage uses the SHA-cached `E2E_BIN_DIR` path above. Both builds
+        // receive the local ephemeral OHTTP key through the explicit bundled
+        // key override, so neither requires a direct transport mode.
         //
         // The cli/ crate is its own Cargo workspace, so a bare `cargo
         // build` in cli/ lands at `cli/target/debug/vauchi`. The
@@ -138,12 +141,8 @@ impl CliDevice {
             return Ok(debug_path);
         }
 
-        // Release fallback retained for OVERRIDE-mode tests: when the
-        // orchestrator injects `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`
-        // (release-allowed escape hatch in cli/src/commands/common.rs),
-        // a release binary can still encap to the orchestrator-spawned
-        // relay's key. DIRECT-mode tests (no override) need a debug
-        // binary above.
+        // Release fallback retained for tests that inject the ephemeral local
+        // OHTTP key through `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
         let release_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
         if release_path.exists() {
@@ -152,8 +151,7 @@ impl CliDevice {
 
         Err(E2eError::cli_execution(
             "CLI binary not found. Run `just build cli` (debug) first — \
-             a release `just build-cli` binary falls back to the bundled \
-             production OHTTP key and fails DIRECT-mode tests with HTTP 400.",
+             the orchestrator supplies the local OHTTP key to either build.",
         ))
     }
 
@@ -167,23 +165,7 @@ impl CliDevice {
             .args(args)
             .stdin(std::process::Stdio::null());
 
-        // Force the cli through the bundled-key path when the orchestrator
-        // injects an OHTTP override. With `VAUCHI_ALLOW_DIRECT=1`, the
-        // debug cli's `resolve_ohttp_key` does a direct fetch and shadows
-        // the bundle, exercising a different code path than the release
-        // binary takes — and that path 404s in CI for the F11 outer-hop
-        // smoke. Suppress the direct-fetch hatch when an override is
-        // present so debug + release run the same resolve order.
-        let suppress_allow_direct = self
-            .extra_env
-            .contains_key("VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX");
-        if !suppress_allow_direct {
-            cmd.env("VAUCHI_ALLOW_DIRECT", "1");
-        }
-
-        for (k, v) in &self.extra_env {
-            cmd.env(k, v);
-        }
+        configure_command_environment(&mut cmd, &self.extra_env);
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",

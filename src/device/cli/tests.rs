@@ -2,8 +2,34 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// INLINE_TEST_REQUIRED: tests depend on private find_cli_binary() function
-use super::CliDevice;
+// INLINE_TEST_REQUIRED: tests depend on private CLI command helpers
+use std::collections::HashMap;
+
+use tokio::process::Command;
+
+use super::{CliDevice, configure_command_environment};
+
+// @internal
+#[test]
+fn command_environment_removes_direct_transport_escape_hatch() {
+    let mut command = Command::new("vauchi");
+    let mut extra_env = HashMap::new();
+    extra_env.insert("SAFE_TEST_VALUE".to_string(), "present".to_string());
+    extra_env.insert("VAUCHI_ALLOW_DIRECT".to_string(), "1".to_string());
+
+    configure_command_environment(&mut command, &extra_env);
+
+    let environment: HashMap<_, _> = command.as_std().get_envs().collect();
+    assert_eq!(
+        environment.get(std::ffi::OsStr::new("SAFE_TEST_VALUE")),
+        Some(&Some(std::ffi::OsStr::new("present")))
+    );
+    assert_eq!(
+        environment.get(std::ffi::OsStr::new("VAUCHI_ALLOW_DIRECT")),
+        Some(&None),
+        "E2E subprocesses must remove the direct-transport escape hatch even when inherited or injected"
+    );
+}
 
 // @internal
 #[test]

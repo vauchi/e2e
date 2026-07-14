@@ -11,9 +11,8 @@
 //! actually wires the spawned ohttp-relay into the path the CLI
 //! uses, and that a basic exchange completes end-to-end through it.
 //!
-//! Default remains opt-out (`with_ohttp_relay = false`) — broader
-//! migration of existing scenarios is Phase 2 (separate MR after a
-//! soak period confirms no regressions).
+//! The outer privacy hop is the default. Transport-isolation tests must opt
+//! out explicitly instead of allowing ordinary scenarios to bypass it.
 
 use std::time::Duration;
 
@@ -143,13 +142,11 @@ async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     tokio::time::sleep(Duration::from_millis(200)).await;
 }
 
-/// Phase 1 negative: when `with_ohttp_relay` is *not* set, the CLI URL
-/// must equal the direct relay HTTP URL (no silent outer-hop spawn).
-/// Pins backward compatibility — existing tests that don't opt in
-/// must keep talking directly to the gateway.
-// @internal
+/// Default configuration must spawn the outer hop and route the CLI through
+/// it. This prevents broad scenarios from silently testing a weaker topology.
+// @scenario: ohttp_outer_hop :: default orchestrator routes through the outer ohttp-relay
 #[tokio::test]
-async fn smoke_orchestrator_default_skips_ohttp_relay() {
+async fn smoke_orchestrator_default_uses_ohttp_relay() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -160,13 +157,13 @@ async fn smoke_orchestrator_default_skips_ohttp_relay() {
         .primary_relay_http_url()
         .expect("direct relay HTTP URL should be available");
 
-    assert_eq!(
+    assert_ne!(
         cli_url, direct_url,
-        "default OrchestratorConfig must NOT spawn an ohttp-relay; CLI URL must equal direct relay URL"
+        "default OrchestratorConfig must not route the CLI directly to the application relay"
     );
     assert!(
-        orch.ohttp_relay_url().is_none(),
-        "default OrchestratorConfig must NOT spawn an ohttp-relay; ohttp_relay_url() must be None"
+        orch.ohttp_relay_url().is_some(),
+        "default OrchestratorConfig must spawn an ohttp-relay"
     );
 
     orch.stop().await.expect("Failed to stop orchestrator");

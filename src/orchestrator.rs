@@ -75,9 +75,24 @@ impl Default for OrchestratorConfig {
             relay_config: RelayConfig::default(),
             relay_count: 1,
             operation_delay: Duration::from_millis(100),
-            with_ohttp_relay: false,
+            with_ohttp_relay: true,
             ohttp_relay_config: OhttpRelayConfig::default(),
             inject_local_ohttp_key_into_cli: true,
+        }
+    }
+}
+
+impl OrchestratorConfig {
+    /// Configure a multi-relay transport-isolation scenario.
+    ///
+    /// The outer OHTTP manager currently maps to one application relay, so
+    /// tests whose subject is application-relay failover must opt into this
+    /// narrower direct topology explicitly. Ordinary scenarios use OHTTP.
+    pub fn multi_relay_transport_isolation(relay_count: usize) -> Self {
+        Self {
+            relay_count,
+            with_ohttp_relay: false,
+            ..Self::default()
         }
     }
 }
@@ -521,6 +536,17 @@ mod tests {
     fn test_orchestrator_config_default() {
         let config = OrchestratorConfig::default();
         assert_eq!(config.relay_count, 1);
+        assert!(
+            config.with_ohttp_relay,
+            "ordinary E2E scenarios must exercise the outer OHTTP hop by default"
+        );
+    }
+
+    #[test]
+    fn multi_relay_transport_isolation_is_an_explicit_direct_mode() {
+        let config = OrchestratorConfig::multi_relay_transport_isolation(2);
+        assert_eq!(config.relay_count, 2);
+        assert!(!config.with_ohttp_relay);
     }
 
     #[test]
