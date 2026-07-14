@@ -249,14 +249,16 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
     }
     {
         let bob = bob.read().await;
-        let contacts = bob
-            .list_contacts()
+        let alice_card = bob
+            .get_contact_card("Alice")
             .await
-            .expect("Failed to list Bob's contacts");
-        assert!(
-            !contacts.is_empty(),
-            "Bob should have Alice as a contact after split-ohttp card-update delivery"
-        );
+            .expect("Failed to read Alice's synced card")
+            .expect("Alice should be present after split-ohttp delivery");
+        assert_eq!(alice_card.name, "Alice");
+        assert_eq!(alice_card.fields.len(), 1);
+        assert_eq!(alice_card.fields[0].field_type, "Email");
+        assert_eq!(alice_card.fields[0].label, "Email");
+        assert_eq!(alice_card.fields[0].value, "alice@example.com");
     }
 
     orch.stop().await.expect("Failed to stop orchestrator");
