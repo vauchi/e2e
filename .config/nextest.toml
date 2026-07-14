@@ -2,14 +2,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Serialize tests that spawn relay processes to prevent port races.
-# Each ohttp/smoke test spawns relay + ohttp-relay pairs; parallel
-# execution causes TOCTOU port conflicts on CI runners.
+# OHTTP-default orchestrators spawn relay and proxy processes; limiting
+# their aggregate concurrency prevents CI CPU starvation and port races.
 [test-groups.relay-tests]
-max-threads = 1
+max-threads = 4
 
 [[profile.default.overrides]]
-filter = "test(/ohttp_integration::/) | test(/cross_platform::/)"
+filter = "binary(=it)"
 test-group = "relay-tests"
 
 [[profile.default.overrides]]
@@ -21,7 +20,7 @@ threads-required = "num-test-threads"
 path = "junit.xml"
 
 [[profile.ci.overrides]]
-filter = "test(/ohttp_integration::/) | test(/cross_platform::/)"
+filter = "binary(=it)"
 test-group = "relay-tests"
 
 [[profile.ci.overrides]]
