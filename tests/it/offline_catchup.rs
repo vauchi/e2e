@@ -57,8 +57,8 @@ async fn integration_offline_catchup() {
         let bob = bob.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
-        bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         let qr_b = bob.generate_qr().await.expect("Failed to generate QR");
+        bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         alice
             .complete_exchange(&qr_b)
             .await
@@ -75,11 +75,11 @@ async fn integration_offline_catchup() {
         let carol = carol.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
+        let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
         carol
             .complete_exchange(&qr_a)
             .await
             .expect("Exchange failed");
-        let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
         alice
             .complete_exchange(&qr_c)
             .await
@@ -96,10 +96,10 @@ async fn integration_offline_catchup() {
         let dave = dave.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
+        let qr_d = dave.generate_qr().await.expect("Failed to generate QR");
         dave.complete_exchange(&qr_a)
             .await
             .expect("Exchange failed");
-        let qr_d = dave.generate_qr().await.expect("Failed to generate QR");
         alice
             .complete_exchange(&qr_d)
             .await
@@ -284,8 +284,8 @@ async fn integration_extended_offline() {
         let bob = bob.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
-        bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         let qr_b = bob.generate_qr().await.expect("Failed to generate QR");
+        bob.complete_exchange(&qr_a).await.expect("Exchange failed");
         alice
             .complete_exchange(&qr_b)
             .await
@@ -302,11 +302,11 @@ async fn integration_extended_offline() {
         let carol = carol.read().await;
 
         let qr_a = alice.generate_qr().await.expect("Failed to generate QR");
+        let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
         carol
             .complete_exchange(&qr_a)
             .await
             .expect("Exchange failed");
-        let qr_c = carol.generate_qr().await.expect("Failed to generate QR");
         alice
             .complete_exchange(&qr_c)
             .await
