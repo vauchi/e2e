@@ -61,6 +61,31 @@ Contacts (2):
     assert!(!contacts[1].verified);
 }
 
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+#[test]
+fn device_list_parser_returns_only_numbered_device_rows() {
+    let output = r#"
+ℹ Current device: Alice_0 (index 0)
+  Device ID: 0102030405060708
+
+Linked devices:
+──────────────────────────────────────────────────
+  1. Alice_0 [active] (this device)
+     ID: 0102030405060708...
+  2. Alice_1 [active]
+     ID: 1112131415161718...
+  3. Alice_2 [active]
+     ID: 2122232425262728...
+──────────────────────────────────────────────────
+Total: 3
+"#;
+
+    assert_eq!(
+        CliDevice::parse_devices(output),
+        vec!["Alice_0", "Alice_1", "Alice_2"]
+    );
+}
+
 // @internal
 #[test]
 fn test_extract_qr_data() {
