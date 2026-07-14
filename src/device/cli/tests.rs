@@ -106,6 +106,22 @@ Total: 3
 
 // @internal
 #[test]
+fn label_parser_ignores_missing_localization_diagnostics() {
+    let output = r#"
+Missing: cli.labels.list.header
+╭───┬─────────┬──────────╮
+│ # │ Name    │ Contacts │
+├───┼─────────┼──────────┤
+│ 1 │ Work    │ 1        │
+│ 2 │ Friends │ 1        │
+╰───┴─────────┴──────────╯
+"#;
+
+    assert_eq!(CliDevice::parse_labels(output), vec!["Work", "Friends"]);
+}
+
+// @internal
+#[test]
 fn test_extract_qr_data() {
     let output = r#"
 Your exchange QR code:

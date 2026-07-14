@@ -301,6 +301,48 @@ impl CliDevice {
             .collect()
     }
 
+    fn parse_labels(output: &str) -> Vec<String> {
+        let mut labels = Vec::new();
+        for line in output.lines() {
+            let line = line.trim();
+            if line.is_empty()
+                || line.starts_with("Visibility")
+                || line.starts_with("Label")
+                || line.starts_with("No labels")
+                || line.starts_with("Contacts:")
+                || line.starts_with("Missing:")
+                || line.starts_with("ℹ")
+                || line.starts_with('─')
+                || line.starts_with('╭')
+                || line.starts_with('├')
+                || line.starts_with('╰')
+            {
+                continue;
+            }
+
+            if line.starts_with('│') {
+                let parts: Vec<&str> = line
+                    .split('│')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if parts.len() >= 2 && parts[0].parse::<usize>().is_ok() {
+                    labels.push(parts[1].to_string());
+                }
+            } else {
+                let name = if let Some(paren_pos) = line.find('(') {
+                    line[..paren_pos].trim().to_string()
+                } else {
+                    line.to_string()
+                };
+                if !name.is_empty() && !name.starts_with("Name") {
+                    labels.push(name);
+                }
+            }
+        }
+        labels
+    }
+
     /// Parse a contact card from CLI output.
     ///
     /// The card output format is:
@@ -769,47 +811,7 @@ impl Device for CliDevice {
 
     async fn list_labels(&self) -> E2eResult<Vec<String>> {
         let output = self.run_command_success(&["labels", "list"]).await?;
-        let mut labels = Vec::new();
-        for line in output.lines() {
-            let line = line.trim();
-            // Skip empty lines, headers, sub-info, and decorations
-            if line.is_empty()
-                || line.starts_with("Visibility")
-                || line.starts_with("Label")
-                || line.starts_with("No labels")
-                || line.starts_with("Contacts:")
-                || line.starts_with("ℹ")
-                || line.starts_with('─')
-                || line.starts_with('╭')
-                || line.starts_with('├')
-                || line.starts_with('╰')
-            {
-                continue;
-            }
-
-            if line.starts_with('│') {
-                // Table format: │ # │ Name │ ... │
-                let parts: Vec<&str> = line
-                    .split('│')
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-                if parts.len() >= 2 && parts[0].parse::<usize>().is_ok() {
-                    labels.push(parts[1].to_string());
-                }
-            } else {
-                // Plain format: "Friends (48312305)" — extract name before parenthetical ID
-                let name = if let Some(paren_pos) = line.find('(') {
-                    line[..paren_pos].trim().to_string()
-                } else {
-                    line.to_string()
-                };
-                if !name.is_empty() && !name.starts_with("Name") {
-                    labels.push(name);
-                }
-            }
-        }
-        Ok(labels)
+        Ok(Self::parse_labels(&output))
     }
 
     async fn add_contact_to_label(&self, label: &str, contact: &str) -> E2eResult<()> {
