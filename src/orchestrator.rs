@@ -542,6 +542,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn multi_relay_transport_isolation_is_an_explicit_direct_mode() {
         let config = OrchestratorConfig::multi_relay_transport_isolation(2);
