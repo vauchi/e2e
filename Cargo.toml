@@ -82,6 +82,8 @@ rand = { version = "0.8", optional = true }
 fake = { version = "3", features = ["derive"], optional = true }
 
 [dev-dependencies]
+toml = "0.9"
+
 # Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
 vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 
