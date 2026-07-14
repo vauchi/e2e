@@ -3,10 +3,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct NextestConfig {
+    #[serde(rename = "test-groups")]
+    test_groups: HashMap<String, TestGroup>,
     profile: Profiles,
+}
+
+#[derive(Deserialize)]
+struct TestGroup {
+    #[serde(rename = "max-threads")]
+    max_threads: usize,
 }
 
 #[derive(Deserialize)]
@@ -25,6 +34,8 @@ struct Override {
     filter: String,
     #[serde(rename = "threads-required")]
     threads_required: Option<String>,
+    #[serde(rename = "test-group")]
+    test_group: Option<String>,
 }
 
 fn assert_heavy_scenarios_are_globally_isolated(profile: &Profile) {
@@ -43,6 +54,18 @@ fn assert_heavy_scenarios_are_globally_isolated(profile: &Profile) {
     );
 }
 
+fn assert_integration_tests_are_rate_limited(profile: &Profile) {
+    let rate_limit = profile
+        .overrides
+        .iter()
+        .find(|candidate| candidate.filter == "binary(=it)");
+
+    assert_eq!(
+        rate_limit.and_then(|candidate| candidate.test_group.as_deref()),
+        Some("relay-tests")
+    );
+}
+
 // @internal
 #[test]
 fn nextest_globally_isolates_resource_heavy_scenarios() {
@@ -51,4 +74,7 @@ fn nextest_globally_isolates_resource_heavy_scenarios() {
 
     assert_heavy_scenarios_are_globally_isolated(&config.profile.default);
     assert_heavy_scenarios_are_globally_isolated(&config.profile.ci);
+    assert_integration_tests_are_rate_limited(&config.profile.default);
+    assert_integration_tests_are_rate_limited(&config.profile.ci);
+    assert_eq!(config.test_groups["relay-tests"].max_threads, 4);
 }
