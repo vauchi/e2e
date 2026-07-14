@@ -236,6 +236,13 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
             .add_field("email", "Email", "alice@example.com")
             .await
             .expect("Failed to add Alice's email field");
+        let device = alice.device(0).expect("Alice's primary device exists");
+        device
+            .read()
+            .await
+            .unhide_field_to_contact("Bob", "Email")
+            .await
+            .expect("Failed to show Alice's email to Bob");
         alice
             .sync_all()
             .await
