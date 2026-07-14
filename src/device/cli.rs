@@ -228,6 +228,7 @@ impl CliDevice {
             if line.is_empty()
                 || line.starts_with("Contacts")
                 || line.starts_with("No contacts")
+                || line.starts_with("Missing:")
                 || line.starts_with("ℹ")
                 || line.starts_with("vauchi")
                 // Skip Unicode box-drawing borders

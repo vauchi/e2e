@@ -61,6 +61,24 @@ Contacts (2):
     assert!(!contacts[1].verified);
 }
 
+// @internal
+#[test]
+fn contact_parser_ignores_missing_localization_diagnostics() {
+    let output = r#"
+Missing: cli.contacts.list.header
+╭───┬──────┬─────────────┬──────────────╮
+│ # │ Name │ ID          │ Status       │
+├───┼──────┼─────────────┼──────────────┤
+│ 1 │ Bob  │ def456...   │ not verified │
+╰───┴──────┴─────────────┴──────────────╯
+"#;
+
+    let contacts = CliDevice::parse_contacts(output);
+
+    assert_eq!(contacts.len(), 1);
+    assert_eq!(contacts[0].name, "Bob");
+}
+
 // @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
 #[test]
 fn device_list_parser_returns_only_numbered_device_rows() {

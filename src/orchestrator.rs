@@ -497,10 +497,16 @@ impl Orchestrator {
         let contacts = user.list_contacts().await?;
 
         if contacts.len() != expected {
+            let contact_names = contacts
+                .iter()
+                .map(|contact| contact.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(E2eError::assertion(format!(
-                "User '{}' primary device has {} contacts, expected {}",
+                "User '{}' primary device has {} contacts [{}], expected {}",
                 user_name,
                 contacts.len(),
+                contact_names,
                 expected
             )));
         }
