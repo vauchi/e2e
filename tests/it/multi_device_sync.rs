@@ -277,13 +277,8 @@ async fn integration_sequential_card_edits() {
 /// Integration test: Card edits from separate linked devices converge after sync.
 /// Tags: integration, sync, concurrent, device-sync
 /// Feature: sync_updates.feature
-///
-/// Known limitation: inter-device card sync is not yet implemented.
-/// Each linked device maintains its own card independently. Changes made
-/// on Device A do not propagate to Device B during sync. See #38.
 // @internal
 #[tokio::test]
-#[ignore = "inter-device card sync not yet implemented (#38)"]
 async fn integration_cross_device_card_convergence() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
