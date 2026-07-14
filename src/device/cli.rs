@@ -288,6 +288,18 @@ impl CliDevice {
         contacts
     }
 
+    fn parse_devices(output: &str) -> Vec<String> {
+        output
+            .lines()
+            .filter_map(|line| {
+                let (ordinal, device) = line.trim().split_once(". ")?;
+                ordinal.parse::<usize>().ok()?;
+                let name = device.split_once(" [").map_or(device, |(name, _)| name);
+                (!name.is_empty()).then(|| name.to_string())
+            })
+            .collect()
+    }
+
     /// Parse a contact card from CLI output.
     ///
     /// The card output format is:
@@ -628,26 +640,7 @@ impl Device for CliDevice {
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
         let output = self.run_command_success(&["device", "list"]).await?;
-
-        let mut devices = Vec::new();
-        for line in output.lines() {
-            let line = line.trim();
-            // Parse device list output
-            if !line.is_empty()
-                && !line.starts_with("Device")
-                && !line.starts_with("─")
-                && !line.starts_with("=")
-            {
-                // Extract device name from the line
-                if let Some(first_space) = line.find(char::is_whitespace) {
-                    devices.push(line[..first_space].to_string());
-                } else {
-                    devices.push(line.to_string());
-                }
-            }
-        }
-
-        Ok(devices)
+        Ok(Self::parse_devices(&output))
     }
 
     async fn sync(&self) -> E2eResult<()> {
