@@ -382,8 +382,35 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
         .await
         .expect("Failed to link all six devices");
 
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("All devices should synchronize linked-device topology");
+    }
+
     let alice = orch.user("Alice").expect("Alice should exist");
     let bob = orch.user("Bob").expect("Bob should exist");
+
+    for (name, user) in [("Alice", &alice), ("Bob", &bob)] {
+        let user = user.read().await;
+        for linked_index in 0..3 {
+            let device = user
+                .device(linked_index)
+                .expect("linked device should exist");
+            let listed = device
+                .read()
+                .await
+                .list_devices()
+                .await
+                .expect("linked device should list owner topology");
+            assert_eq!(
+                listed.len(),
+                3,
+                "{name} device {} must know all three linked devices, got {listed:?}",
+                linked_index + 1
+            );
+        }
+    }
 
     {
         let alice = alice.read().await;
@@ -404,19 +431,32 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
             .await
             .expect("Alice device should complete exchange");
 
+        for _ in 0..2 {
+            alice
+                .sync_all()
+                .await
+                .expect("Alice devices should synchronize the exchange");
+            bob.sync_all()
+                .await
+                .expect("Bob devices should synchronize the exchange");
+        }
+
         let device = alice
             .device(device_index)
             .expect("Alice exchange device should exist")
             .clone();
+        let device = device.read().await;
         device
-            .read()
-            .await
             .add_field("phone", "ReleasePhone", phone)
             .await
             .expect("Alice exchange device should publish phone update");
+        device
+            .unhide_field_to_contact("Bob", "ReleasePhone")
+            .await
+            .expect("Alice should permit Bob to receive the phone update");
     }
 
-    let mut converged = false;
+    let mut missing_cards = Vec::new();
     for _ in 0..8 {
         {
             let alice = alice.read().await;
@@ -427,16 +467,16 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
             bob.sync_all().await.expect("Bob sync should succeed");
         }
 
-        if all_six_cards_have_phone(&alice, &bob, phone).await {
-            converged = true;
+        missing_cards = missing_six_device_phone_cards(&alice, &bob, phone).await;
+        if missing_cards.is_empty() {
             break;
         }
         sleep(Duration::from_millis(250)).await;
     }
 
     assert!(
-        converged,
-        "A{} ↔ B{} exchange did not converge phone {phone} on all six devices",
+        missing_cards.is_empty(),
+        "A{} ↔ B{} exchange did not converge phone {phone}; missing exact value on {missing_cards:?}",
         device_index + 1,
         device_index + 1
     );
@@ -444,22 +484,21 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-async fn all_six_cards_have_phone(
+async fn missing_six_device_phone_cards(
     alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
     bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
     phone: &str,
-) -> bool {
+) -> Vec<String> {
+    let mut missing = Vec::new();
     let alice = alice.read().await;
     for device_index in 0..3 {
-        let Ok(card) = alice.get_card_on_device(device_index).await else {
-            return false;
-        };
-        if !card
-            .fields
-            .iter()
-            .any(|field| field.label == "ReleasePhone" && field.value == phone)
-        {
-            return false;
+        match alice.get_card_on_device(device_index).await {
+            Ok(card)
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == "ReleasePhone" && field.value == phone) => {}
+            _ => missing.push(format!("A{} owner card", device_index + 1)),
         }
     }
     drop(alice);
@@ -467,18 +506,17 @@ async fn all_six_cards_have_phone(
     let bob = bob.read().await;
     for device_index in 0..3 {
         let Some(device) = bob.device(device_index) else {
-            return false;
+            missing.push(format!("B{} device", device_index + 1));
+            continue;
         };
-        let Ok(Some(card)) = device.read().await.get_contact_card("Alice").await else {
-            return false;
-        };
-        if !card
-            .fields
-            .iter()
-            .any(|field| field.label == "ReleasePhone" && field.value == phone)
-        {
-            return false;
+        match device.read().await.get_contact_card("Alice").await {
+            Ok(Some(card))
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == "ReleasePhone" && field.value == phone) => {}
+            _ => missing.push(format!("B{} Alice contact", device_index + 1)),
         }
     }
-    true
+    missing
 }
