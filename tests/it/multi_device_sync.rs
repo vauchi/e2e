@@ -15,9 +15,6 @@
 //! - `smoke_*`: Fast tests for every push (< 5 min total)
 //! - `integration_*`: Comprehensive tests for main branch
 
-use std::time::Duration;
-
-use tokio::time::sleep;
 use vauchi_e2e_tests::prelude::*;
 
 // @scenario: sync_updates:Card update received from contact
@@ -62,9 +59,6 @@ async fn smoke_card_update() {
             .expect("Failed to add field");
     }
 
-    // Give time for propagation
-    sleep(Duration::from_millis(500)).await;
-
     // Step 2: Sync all of Alice's devices
     {
         let alice = alice.read().await;
@@ -74,24 +68,14 @@ async fn smoke_card_update() {
     // Verify Alice's card is updated on the device where the edit happened.
     // Inter-device card sync is not yet implemented (#38); secondary devices
     // do not receive edits made on the primary, so we assert the primary only.
-    // Poll briefly because the local card can take a moment to settle after
-    // sync under CI load.
     {
         let alice = alice.read().await;
-        let mut found = false;
-        for _ in 0..20 {
-            let card = alice
-                .get_card_on_device(0)
-                .await
-                .expect("Failed to get Alice's primary card");
-            if card.fields.iter().any(|f| f.value == "alice@example.com") {
-                found = true;
-                break;
-            }
-            sleep(Duration::from_millis(250)).await;
-        }
+        let card = alice
+            .get_card_on_device(0)
+            .await
+            .expect("Failed to get Alice's primary card");
         assert!(
-            found,
+            card.fields.iter().any(|f| f.value == "alice@example.com"),
             "Alice's primary device should have the updated email"
         );
     }
@@ -123,9 +107,6 @@ async fn smoke_card_update() {
             .await
             .expect("Failed to add Bob's field");
     }
-
-    // Give time for propagation
-    sleep(Duration::from_millis(500)).await;
 
     // Bob syncs all devices
     {
@@ -466,7 +447,6 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
         if missing_cards.is_empty() {
             break;
         }
-        sleep(Duration::from_millis(250)).await;
     }
 
     assert!(
