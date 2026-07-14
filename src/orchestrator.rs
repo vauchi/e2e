@@ -438,21 +438,20 @@ impl Orchestrator {
 
         info!("Mutual exchange: {} <-> {}", user_a_name, user_b_name);
 
-        // User A generates QR, User B completes
+        // Both sides must start first so each `complete` resumes the exact
+        // ephemeral session represented by the QR the peer scanned.
         let qr_a = {
             let user = user_a.read().await;
+            user.generate_qr().await?
+        };
+        let qr_b = {
+            let user = user_b.read().await;
             user.generate_qr().await?
         };
         {
             let user = user_b.read().await;
             user.complete_exchange(&qr_a).await?;
         }
-
-        // User B generates QR, User A completes
-        let qr_b = {
-            let user = user_b.read().await;
-            user.generate_qr().await?
-        };
         {
             let user = user_a.read().await;
             user.complete_exchange(&qr_b).await?;

@@ -164,6 +164,13 @@ pub trait Device: Send + Sync {
     /// Get a specific contact by name or ID.
     async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>>;
 
+    /// Get the current card for a specific contact.
+    async fn get_contact_card(&self, _name_or_id: &str) -> E2eResult<Option<ContactCard>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact cards not supported on this device type".to_string(),
+        ))
+    }
+
     /// Get the user's contact card.
     async fn get_card(&self) -> E2eResult<ContactCard>;
 

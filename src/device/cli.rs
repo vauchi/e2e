@@ -45,6 +45,11 @@ struct RawCardField {
     value: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct RawContact {
+    card: RawCard,
+}
+
 /// A device controlled via the CLI.
 pub struct CliDevice {
     /// Device name/identifier.
@@ -444,6 +449,18 @@ impl CliDevice {
             E2eError::parse_output(format!("Failed to parse 'card show --raw' JSON: {e}"))
         })?;
 
+        Ok(Self::contact_card_from_raw(raw))
+    }
+
+    fn parse_contact_card_raw(output: &str) -> E2eResult<ContactCard> {
+        let raw: RawContact = serde_json::from_str(output).map_err(|e| {
+            E2eError::parse_output(format!("Failed to parse 'contacts show --raw' JSON: {e}"))
+        })?;
+
+        Ok(Self::contact_card_from_raw(raw.card))
+    }
+
+    fn contact_card_from_raw(raw: RawCard) -> ContactCard {
         let fields = raw
             .fields
             .into_iter()
@@ -454,10 +471,10 @@ impl CliDevice {
             })
             .collect();
 
-        Ok(ContactCard {
+        ContactCard {
             name: raw.display_name,
             fields,
-        })
+        }
     }
 
     /// Extract QR data from CLI output.
@@ -698,6 +715,22 @@ impl Device for CliDevice {
         } else {
             Ok(None)
         }
+    }
+
+    async fn get_contact_card(&self, name_or_id: &str) -> E2eResult<Option<ContactCard>> {
+        let output = self
+            .run_command(&["--raw", "contacts", "show", name_or_id])
+            .await?;
+        if !output.status.success() {
+            return Ok(None);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !stdout.trim_start().starts_with('{') {
+            return Ok(None);
+        }
+
+        Self::parse_contact_card_raw(&stdout).map(Some)
     }
 
     async fn get_card(&self) -> E2eResult<ContactCard> {

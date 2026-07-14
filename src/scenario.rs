@@ -333,8 +333,8 @@ pub mod helpers {
 
                 // Mutual exchange: both sides generate QR and complete
                 let qr_a = user_a_guard.generate_qr().await?;
-                user_b_guard.complete_exchange(&qr_a).await?;
                 let qr_b = user_b_guard.generate_qr().await?;
+                user_b_guard.complete_exchange(&qr_a).await?;
                 user_a_guard.complete_exchange(&qr_b).await?;
             }
         }
@@ -374,6 +374,8 @@ pub mod helpers {
     }
 }
 
+// INLINE_TEST_REQUIRED: exercises private scenario parsing helpers without
+// widening the production API solely for integration-test access.
 #[cfg(test)]
 mod tests {
     use super::*;
