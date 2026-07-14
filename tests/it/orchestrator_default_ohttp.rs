@@ -256,7 +256,7 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
             .expect("Alice should be present after split-ohttp delivery");
         assert_eq!(alice_card.name, "Alice");
         assert_eq!(alice_card.fields.len(), 1);
-        assert_eq!(alice_card.fields[0].field_type, "Email");
+        assert_eq!(alice_card.fields[0].field_type, "email");
         assert_eq!(alice_card.fields[0].label, "Email");
         assert_eq!(alice_card.fields[0].value, "alice@example.com");
     }
