@@ -338,3 +338,147 @@ async fn integration_cross_device_card_convergence() {
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
+
+// @scenario: release_privacy_multidevice_certification.feature:Every active device can exchange and update
+/// Release certification: every linked device role can exchange and publish an
+/// update that converges exactly on both users' three-device topologies.
+// @internal
+#[tokio::test]
+async fn integration_six_device_exchange_and_update_convergence() {
+    for (device_index, phone) in [
+        (0, "+12025550101"),
+        (1, "+12025550102"),
+        (2, "+12025550103"),
+    ] {
+        certify_six_device_role(device_index, phone).await;
+    }
+}
+
+async fn certify_six_device_role(device_index: usize, phone: &str) {
+    let mut orch = Orchestrator::new();
+    orch.start().await.expect("Failed to start orchestrator");
+
+    let cli_url = orch
+        .primary_cli_relay_url()
+        .expect("CLI relay URL should be available");
+    let direct_url = orch
+        .primary_relay_http_url()
+        .expect("application relay URL should be available");
+    assert_ne!(
+        cli_url, direct_url,
+        "certification traffic must traverse the distinct OHTTP relay"
+    );
+    assert!(
+        orch.ohttp_relay_url().is_some(),
+        "certification requires an outer OHTTP relay"
+    );
+
+    orch.add_user("Alice", 3).expect("Failed to add Alice");
+    orch.add_user("Bob", 3).expect("Failed to add Bob");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(device_index)
+            .await
+            .expect("Alice device should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(device_index)
+            .await
+            .expect("Bob device should start exchange");
+        bob.complete_exchange_on_device(device_index, &alice_qr)
+            .await
+            .expect("Bob device should complete exchange");
+        alice
+            .complete_exchange_on_device(device_index, &bob_qr)
+            .await
+            .expect("Alice device should complete exchange");
+
+        let device = alice
+            .device(device_index)
+            .expect("Alice exchange device should exist")
+            .clone();
+        device
+            .read()
+            .await
+            .add_field("phone", "ReleasePhone", phone)
+            .await
+            .expect("Alice exchange device should publish phone update");
+    }
+
+    let mut converged = false;
+    for _ in 0..8 {
+        {
+            let alice = alice.read().await;
+            alice.sync_all().await.expect("Alice sync should succeed");
+        }
+        {
+            let bob = bob.read().await;
+            bob.sync_all().await.expect("Bob sync should succeed");
+        }
+
+        if all_six_cards_have_phone(&alice, &bob, phone).await {
+            converged = true;
+            break;
+        }
+        sleep(Duration::from_millis(250)).await;
+    }
+
+    assert!(
+        converged,
+        "A{} ↔ B{} exchange did not converge phone {phone} on all six devices",
+        device_index + 1,
+        device_index + 1
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+async fn all_six_cards_have_phone(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    phone: &str,
+) -> bool {
+    let alice = alice.read().await;
+    for device_index in 0..3 {
+        let Ok(card) = alice.get_card_on_device(device_index).await else {
+            return false;
+        };
+        if !card
+            .fields
+            .iter()
+            .any(|field| field.label == "ReleasePhone" && field.value == phone)
+        {
+            return false;
+        }
+    }
+    drop(alice);
+
+    let bob = bob.read().await;
+    for device_index in 0..3 {
+        let Some(device) = bob.device(device_index) else {
+            return false;
+        };
+        let Ok(Some(card)) = device.read().await.get_contact_card("Alice").await else {
+            return false;
+        };
+        if !card
+            .fields
+            .iter()
+            .any(|field| field.label == "ReleasePhone" && field.value == phone)
+        {
+            return false;
+        }
+    }
+    true
+}
