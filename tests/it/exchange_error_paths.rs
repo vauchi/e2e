@@ -58,7 +58,9 @@ async fn test_exchange_expired_qr() {
         .await
         .expect("Failed to create identities");
 
-    // Alice generates QR code
+    // Both sides start while the relay is available. Bob must retain the
+    // ephemeral represented by his QR even though this one-sided error-path
+    // test completes only his side of the mutual exchange.
     let alice = orch.user("Alice").unwrap();
     let qr_data = {
         let alice_guard = alice.read().await;
@@ -67,6 +69,14 @@ async fn test_exchange_expired_qr() {
             .await
             .expect("Failed to generate QR")
     };
+    let bob = orch.user("Bob").unwrap();
+    {
+        let bob_guard = bob.read().await;
+        bob_guard
+            .generate_qr()
+            .await
+            .expect("Failed to generate Bob's QR");
+    }
 
     // Wait for QR to expire. QR_EXPIRY_SECONDS = 300s is hardcoded in
     // core/vauchi-core/src/exchange/qr.rs — client-side validation.
@@ -74,7 +84,6 @@ async fn test_exchange_expired_qr() {
     orch.wait(Duration::from_secs(300 + 5)).await;
 
     // Bob attempts to complete exchange with expired QR
-    let bob = orch.user("Bob").unwrap();
     let exchange_result = {
         let bob_guard = bob.read().await;
         bob_guard.complete_exchange(&qr_data).await
