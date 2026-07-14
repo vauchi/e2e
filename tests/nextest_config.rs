@@ -46,6 +46,9 @@ fn assert_heavy_scenarios_are_globally_isolated(profile: &Profile) {
             && candidate
                 .filter
                 .contains("onboarding_flow::test_time_to_value_under_2_minutes")
+            && candidate.filter.contains(
+                "multi_device_sync::integration_six_device_exchange_and_update_convergence",
+            )
     });
 
     assert_eq!(
