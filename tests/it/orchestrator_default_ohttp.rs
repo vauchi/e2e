@@ -243,17 +243,14 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
             .unhide_field_to_contact("Bob", "Email")
             .await
             .expect("Failed to show Alice's email to Bob");
-        alice
-            .sync_all()
-            .await
-            .expect("Alice sync via split ohttp failed (the relay-502 path)");
     }
-    {
-        let bob = bob.read().await;
-        bob.sync_all()
+
+    for _ in 0..2 {
+        orch.sync_all()
             .await
-            .expect("Bob sync via split ohttp failed");
+            .expect("Two-user sync round via split ohttp failed");
     }
+
     {
         let bob = bob.read().await;
         let alice_card = bob
