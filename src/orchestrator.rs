@@ -39,9 +39,10 @@ pub struct OrchestratorConfig {
     /// Delay between operations (for observability).
     pub operation_delay: Duration,
     /// Spawn an `OhttpRelayManager` (the outer privacy hop) alongside
-    /// the relay, and route CLI traffic through it. When `false`, the CLI uses
-    /// the relay's legacy WebSocket transport for explicit transport-isolation
-    /// scenarios.
+    /// the relay, and route CLI traffic through it. When `false`, explicit
+    /// transport-isolation scenarios identify the application via the main
+    /// listener's HTTP origin and use the same relay's separate HTTP gateway
+    /// origin for OHTTP.
     ///
     /// Production runs every request through an outer ohttp-relay per
     /// ADR-037 (gateway and forwarding-relay must be distinct
@@ -252,18 +253,32 @@ impl Orchestrator {
     /// With the default OHTTP topology, `--relay` identifies the application
     /// relay and `VAUCHI_OHTTP_RELAY_URL` separately identifies the outer hop.
     /// Explicit transport-isolation scenarios without an outer hop use the
-    /// relay's legacy WebSocket URL instead.
+    /// main listener's HTTP origin instead.
     pub fn primary_cli_relay_url(&self) -> E2eResult<String> {
         if self.ohttp_relay_url().is_some() {
             self.primary_relay_http_url()
         } else {
-            self.primary_relay_url()
+            let relay_url = self.primary_relay_url()?;
+            relay_url
+                .strip_prefix("ws://")
+                .map(|rest| format!("http://{rest}"))
+                .or_else(|| {
+                    relay_url
+                        .strip_prefix("wss://")
+                        .map(|rest| format!("https://{rest}"))
+                })
+                .ok_or_else(|| E2eError::relay("relay URL must use ws:// or wss://"))
         }
     }
 
     /// Get the spawned ohttp-relay URL, if `with_ohttp_relay` is active.
     pub fn ohttp_relay_url(&self) -> Option<String> {
         self.ohttp_relay_manager.as_ref().and_then(|m| m.url())
+    }
+
+    fn cli_ohttp_route_url(&self) -> E2eResult<String> {
+        self.ohttp_relay_url()
+            .map_or_else(|| self.primary_relay_http_url(), Ok)
     }
 
     /// Get all relay URLs.
@@ -295,9 +310,10 @@ impl Orchestrator {
         info!("Adding user '{}' with {} device(s)", name, device_count);
 
         let mut extra_env = HashMap::new();
-        if let Some(ohttp_url) = self.ohttp_relay_url() {
-            extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
-        }
+        extra_env.insert(
+            CLI_OHTTP_RELAY_URL_ENV.to_string(),
+            self.cli_ohttp_route_url()?,
+        );
         if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
             extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
         }
