@@ -44,10 +44,22 @@ pub fn find_available_port_pair() -> E2eResult<(u16, u16)> {
     Ok((relay_port, metrics_port))
 }
 
-/// Default path for a relay instance's persistent OHTTP key file.
-/// Tied to the relay's main port so `restart_relay` reuses the same file.
-fn default_ohttp_key_file_path(port: u16) -> PathBuf {
-    std::env::temp_dir().join(format!("vauchi-e2e-relay-{port}-ohttp.key"))
+struct OhttpKeyWorkspace {
+    directory: tempfile::TempDir,
+}
+
+impl OhttpKeyWorkspace {
+    fn new() -> E2eResult<Self> {
+        let directory = tempfile::Builder::new()
+            .prefix("vauchi-e2e-relay-")
+            .tempdir()
+            .map_err(|e| E2eError::relay(format!("Failed to create OHTTP key workspace: {e}")))?;
+        Ok(Self { directory })
+    }
+
+    fn key_path(&self, port: u16) -> PathBuf {
+        self.directory.path().join(format!("{port}-ohttp.key"))
+    }
 }
 
 /// Timeout for relay startup.
@@ -203,6 +215,7 @@ pub struct RelayManager {
     config: RelayConfig,
     relays: Vec<RelayInstance>,
     binary_path: PathBuf,
+    ohttp_key_workspace: OhttpKeyWorkspace,
 }
 
 impl RelayManager {
@@ -220,11 +233,13 @@ impl RelayManager {
         };
 
         info!("Using relay binary at: {}", binary_path.display());
+        let ohttp_key_workspace = OhttpKeyWorkspace::new()?;
 
         Ok(Self {
             config,
             relays: Vec::new(),
             binary_path,
+            ohttp_key_workspace,
         })
     }
 
@@ -375,7 +390,7 @@ impl RelayManager {
                 .config
                 .ohttp_key_file_path
                 .clone()
-                .unwrap_or_else(|| default_ohttp_key_file_path(port));
+                .unwrap_or_else(|| self.ohttp_key_workspace.key_path(port));
             env_vars.insert(
                 "RELAY_OHTTP_KEY_FILE_PATH".to_string(),
                 key_file.to_string_lossy().to_string(),
@@ -646,7 +661,7 @@ impl RelayManager {
             let key_file = existing_key_file
                 .clone()
                 .or_else(|| self.config.ohttp_key_file_path.clone())
-                .unwrap_or_else(|| default_ohttp_key_file_path(port));
+                .unwrap_or_else(|| self.ohttp_key_workspace.key_path(port));
             env_vars.insert(
                 "RELAY_OHTTP_KEY_FILE_PATH".to_string(),
                 key_file.to_string_lossy().to_string(),
