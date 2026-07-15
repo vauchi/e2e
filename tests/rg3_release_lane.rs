@@ -45,3 +45,15 @@ fn rg3_release_lane_is_blocking_and_runs_the_exact_split_ohttp_journey() {
     assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
     assert!(job.contains(RG3_TEST));
 }
+
+// @internal
+#[test]
+fn native_binary_producer_and_consumers_share_linux_runner() {
+    for job_name in ["test:smoke", "test:release-rg3", "test:integration"] {
+        let job = top_level_job(job_name);
+        assert!(
+            job.contains("extends: [.linux-runner,"),
+            "{job_name} must run on the Linux platform used for native E2E artifacts"
+        );
+    }
+}
