@@ -471,7 +471,8 @@ test:maestro-ios:
     - |
       if ! command -v maestro &>/dev/null; then
         echo "Error: Maestro CLI not found on this runner."
-        echo "Install: curl -Ls 'https://get.maestro.mobile.dev' | bash"
+        echo "Install a reviewed, pinned release from the official Maestro releases."
+        echo "https://github.com/mobile-dev-inc/Maestro/releases"
         exit 1
       fi
       echo "Maestro version: $(maestro --version 2>&1 | head -1)"

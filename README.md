@@ -40,7 +40,7 @@ just e2e-run test_cli_to_cli_exchange
 
 | Requirement | Check Command | Install |
 |-------------|---------------|---------|
-| Maestro CLI | `maestro --version` | `curl -Ls "https://get.maestro.mobile.dev" \| bash` |
+| Maestro CLI | `maestro --version` | [Reviewed, pinned release][maestro-releases] |
 | Android SDK | `echo $ANDROID_HOME` | [Android Studio](https://developer.android.com/studio) |
 | Android emulator | `emulator -list-avds` | Android Studio AVD Manager |
 | Xcode (iOS, macOS only) | `xcodebuild -version` | Mac App Store |
@@ -373,3 +373,4 @@ async fn test_android_exchange() {
 - [Maestro docs](https://maestro.mobile.dev)
 
 [planning]: ../_private/docs/problems/2026-02-17-maestro-e2e-environment-blockers/README.md
+[maestro-releases]: https://github.com/mobile-dev-inc/Maestro/releases

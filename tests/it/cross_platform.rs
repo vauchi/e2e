@@ -154,7 +154,8 @@ async fn integration_mixed_devices() {
 /// Smoke test for iOS simulator automation via Maestro.
 ///
 /// Requirements:
-/// - Maestro CLI installed (`curl -Ls "https://get.maestro.mobile.dev" | bash`)
+/// - A reviewed, pinned Maestro CLI release installed from the official
+///   `mobile-dev-inc/Maestro` GitHub releases
 /// - iOS Simulator running and booted (the test auto-detects its UDID)
 /// - Maestro YAML flows in `e2e/maestro/ios/`
 /// - App built and installed for simulator

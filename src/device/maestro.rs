@@ -14,13 +14,10 @@
 //!
 //! ## Installation
 //!
-//! ```bash
-//! # macOS/Linux
-//! curl -Ls "https://get.maestro.mobile.dev" | bash
-//!
-//! # Verify installation
-//! maestro --version
-//! ```
+//! Select a specific release from the
+//! [official releases](https://github.com/mobile-dev-inc/Maestro/releases),
+//! verify the signed release and inspect the archive, then add its `bin`
+//! directory to `PATH`. Confirm the reviewed version with `maestro --version`.
 //!
 //! ## Requirements
 //!
@@ -85,6 +82,8 @@ use tokio::process::Command;
 
 use super::{Contact, ContactCard, Device, DeviceType, NetworkConfig};
 use crate::error::{E2eError, E2eResult};
+
+const MAESTRO_INSTALL_HELP: &str = "Install a reviewed, pinned release from https://github.com/mobile-dev-inc/Maestro/releases and verify it with maestro --version";
 
 /// Platform for Maestro device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,9 +240,9 @@ impl MaestroDevice {
             .status()
         {
             Ok(status) if status.success() => Ok(()),
-            _ => Err(E2eError::DeviceNotSupported(
-                "Maestro CLI not found. Install with: curl -Ls 'https://get.maestro.mobile.dev' | bash".into()
-            ))
+            _ => Err(E2eError::DeviceNotSupported(format!(
+                "Maestro CLI not found. {MAESTRO_INSTALL_HELP}"
+            ))),
         }
     }
 

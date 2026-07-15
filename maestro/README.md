@@ -7,11 +7,10 @@ This directory contains Maestro YAML flows for automated mobile testing.
 
 ## Setup
 
-1. Install Maestro CLI:
-
-   ```bash
-   curl -Ls "https://get.maestro.mobile.dev" | bash
-   ```
+1. Select a specific Maestro CLI version from the
+   [official releases](https://github.com/mobile-dev-inc/Maestro/releases).
+   Verify the signed release, inspect the downloaded archive before installing
+   it, and confirm the reviewed version with `maestro --version`.
 
 2. For iOS:
 
