@@ -12,7 +12,7 @@ filter = "binary(=it)"
 test-group = "relay-tests"
 
 [[profile.default.overrides]]
-filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
+filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/cross_platform::integration_mixed_devices/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
 threads-required = "num-test-threads"
 
 [profile.ci.junit]
@@ -24,5 +24,5 @@ filter = "binary(=it)"
 test-group = "relay-tests"
 
 [[profile.ci.overrides]]
-filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
+filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/cross_platform::integration_mixed_devices/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
 threads-required = "num-test-threads"
