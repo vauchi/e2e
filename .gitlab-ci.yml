@@ -159,7 +159,7 @@ security:deny:
 # Target: < 5 minutes total (< 1 min if binaries cached).
 
 test:smoke:
-  extends: [.rust-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-standard]
   stage: test
   needs:
     - job: lint:format
@@ -267,7 +267,7 @@ test:smoke:
 # intentionally narrower than test:integration so release evidence can point
 # to one stable, blocking contract on merge requests, main, and schedules.
 test:release-rg3:
-  extends: [.rust-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-standard]
   stage: test
   needs:
     - job: test:smoke
@@ -299,7 +299,7 @@ test:release-rg3:
 # Blocking comprehensive coverage; the named RG-3 lane above provides the
 # stable release-certification result for its exact split-OHTTP journey.
 test:integration:
-  extends: [.rust-runner, .timeout-long]
+  extends: [.linux-runner, .timeout-long]
   stage: test
   needs:
     - job: test:smoke
