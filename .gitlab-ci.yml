@@ -294,6 +294,38 @@ test:release-rg3:
       - rg3-release-results.txt
     expire_in: 1 week
 
+# RG-4/RG-5 release certification — six-device convergence with exchange and
+# update initiated from every linked-device role of both users. Blocking
+# named lane mirroring test:release-rg3 so release evidence points to one
+# stable contract on merge requests, main, and schedules.
+test:release-rg4-rg5:
+  extends: [.linux-runner, .timeout-standard]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-relay"
+      test -x "$E2E_BIN_DIR/vauchi"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)' \
+        2>&1 | tee rg4-rg5-release-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - rg4-rg5-release-results.txt
+    expire_in: 1 week
+
 # Integration tests — full E2E suite on main and schedule.
 # Gets relay+CLI binaries from test:smoke artifacts; cache is fallback for scheduled runs.
 # Blocking comprehensive coverage; the named RG-3 lane above provides the
