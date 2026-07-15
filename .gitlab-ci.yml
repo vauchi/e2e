@@ -26,6 +26,7 @@ include:
     ref: ci-templates-v2026.07.2
     file:
       - '/ci-templates/rust-base.yml'
+      - '/ci-templates/allow-direct-guard.yml'
       - '/ci-templates/security.yml'
       - '/ci-templates/mr-rules.yml'
       - '/ci-templates/downstream.yml'
@@ -48,8 +49,8 @@ stages:
 
 
 variables:
-  # Pin scripts ref for fetched helper scripts (matches include ref).
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.2"
+  # Pin fetched helper scripts independently from the structural templates.
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.4"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
