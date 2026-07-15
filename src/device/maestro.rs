@@ -645,6 +645,16 @@ mod tests {
     }
 
     #[test]
+    fn test_maestro_install_help_requires_reviewed_pinned_release() {
+        assert_eq!(
+            MAESTRO_INSTALL_HELP,
+            "Install a reviewed, pinned release from https://github.com/mobile-dev-inc/Maestro/releases and verify it with maestro --version"
+        );
+        assert!(!MAESTRO_INSTALL_HELP.contains("| bash"));
+        assert!(!MAESTRO_INSTALL_HELP.contains("| sh"));
+    }
+
+    #[test]
     fn test_maestro_platform_flag_ios_returns_ios() {
         // Check if Maestro is actually installed (needed to construct device)
         let maestro_installed = std::process::Command::new("maestro")
