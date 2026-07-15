@@ -109,15 +109,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-polyfill"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cf2bce30dfe09ef0bfaef228b9d414faaf7e563035494d7fe092dba54b300f4"
-dependencies = [
- "critical-section",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,12 +454,6 @@ checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
 dependencies = [
  "cfg-if",
 ]
-
-[[package]]
-name = "critical-section"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
 name = "crypto-common"
@@ -995,15 +980,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hash32"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c35f58762feb77d74ebe43bdbc3210f09be9fe6742234d573bacc26ed92b67"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1051,20 +1027,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
  "hashbrown 0.14.5",
-]
-
-[[package]]
-name = "heapless"
-version = "0.7.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdc6457c0eb62c71aac4bc17216026d8410337c4126773b9c5daba343f17964f"
-dependencies = [
- "atomic-polyfill",
- "hash32",
- "rustc_version",
- "serde",
- "spin",
- "stable_deref_trait",
 ]
 
 [[package]]
@@ -1232,7 +1194,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -1892,7 +1854,6 @@ dependencies = [
  "cobs",
  "embedded-io 0.4.0",
  "embedded-io 0.6.1",
- "heapless",
  "serde",
 ]
 
@@ -2536,15 +2497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spin"
-version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-dependencies = [
- "lock_api",
-]
-
-[[package]]
 name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3068,8 +3020,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.55.2"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#36f0b0c669f9396a51d909a916eac2f82f65c781"
+version = "0.55.3"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#5bb2e9e4762e7f021a6c9e699e3aa5c592e10f43"
 dependencies = [
  "base64",
  "hex",
@@ -3088,8 +3040,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.55.2"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#36f0b0c669f9396a51d909a916eac2f82f65c781"
+version = "0.55.3"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#5bb2e9e4762e7f021a6c9e699e3aa5c592e10f43"
 dependencies = [
  "argon2",
  "base64",
@@ -3120,6 +3072,7 @@ dependencies = [
  "tracing",
  "unicode-normalization",
  "ureq",
+ "url",
  "uuid",
  "vauchi-protocol",
  "webpki-roots",
@@ -3164,8 +3117,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.55.2"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#36f0b0c669f9396a51d909a916eac2f82f65c781"
+version = "0.55.3"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#5bb2e9e4762e7f021a6c9e699e3aa5c592e10f43"
 dependencies = [
  "serde",
  "serde_json",
