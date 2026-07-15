@@ -816,6 +816,44 @@ mod tests {
         assert_eq!(config.storage_backend, "memory");
     }
 
+    #[test]
+    fn test_ohttp_key_workspace_same_port_paths_are_isolated() {
+        let first = OhttpKeyWorkspace::new().expect("create first OHTTP key workspace");
+        let second = OhttpKeyWorkspace::new().expect("create second OHTTP key workspace");
+
+        let first_path = first.key_path(19443);
+        let second_path = second.key_path(19443);
+
+        assert_ne!(first_path, second_path);
+        assert!(first_path.starts_with(first.directory.path()));
+        assert!(second_path.starts_with(second.directory.path()));
+    }
+
+    #[test]
+    fn test_ohttp_key_workspace_key_survives_restart_path_lookup() {
+        let workspace = OhttpKeyWorkspace::new().expect("create OHTTP key workspace");
+
+        let before_restart = workspace.key_path(19443);
+        std::fs::write(&before_restart, b"test HPKE seed").expect("write test OHTTP key");
+        let after_restart = workspace.key_path(19443);
+
+        assert_eq!(after_restart, before_restart);
+        assert_eq!(std::fs::read(after_restart).unwrap(), b"test HPKE seed");
+    }
+
+    #[test]
+    fn test_ohttp_key_workspace_drop_removes_key() {
+        let key_path = {
+            let workspace = OhttpKeyWorkspace::new().expect("create OHTTP key workspace");
+            let path = workspace.key_path(19443);
+            std::fs::write(&path, b"test HPKE seed").expect("write test OHTTP key");
+            assert!(path.exists());
+            path
+        };
+
+        assert!(!key_path.exists());
+    }
+
     // @internal
     #[test]
     fn test_find_available_port() {
