@@ -573,6 +573,19 @@ impl Device for MaestroDevice {
 mod tests {
     use super::*;
 
+    fn test_device(workspace: MaestroWorkspace) -> MaestroDevice {
+        MaestroDevice {
+            name: "test".to_string(),
+            platform: MaestroPlatform::Ios,
+            device_name: "test-device".to_string(),
+            app_id: "app.vauchi.ios".to_string(),
+            relay_url: "ws://localhost:8080".to_string(),
+            flows_dir: PathBuf::new(),
+            network_config: NetworkConfig::default(),
+            workspace,
+        }
+    }
+
     #[test]
     fn test_maestro_platform_display() {
         assert_eq!(format!("{}", MaestroPlatform::Ios), "iOS");
@@ -660,6 +673,65 @@ mod tests {
                 result.is_err(),
                 "Expected Err when Maestro is not installed"
             );
+        }
+    }
+
+    #[test]
+    fn test_maestro_workspaces_isolate_same_output() {
+        let alice = MaestroWorkspace::new().expect("create Alice workspace");
+        let bob = MaestroWorkspace::new().expect("create Bob workspace");
+
+        let alice_contacts = alice.output_path(MaestroOutput::Contacts);
+        let bob_contacts = bob.output_path(MaestroOutput::Contacts);
+
+        assert_ne!(alice_contacts, bob_contacts);
+        assert!(alice_contacts.starts_with(alice.directory.path()));
+        assert!(bob_contacts.starts_with(bob.directory.path()));
+    }
+
+    #[test]
+    fn test_maestro_prepare_output_removes_poisoned_result() {
+        let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
+        let output_path = workspace.output_path(MaestroOutput::Card);
+        std::fs::write(&output_path, br#"{"name":"Mallory"}"#).expect("write poisoned result");
+
+        let prepared_path = workspace
+            .prepare_output(MaestroOutput::Card)
+            .expect("prepare Maestro output");
+
+        assert_eq!(prepared_path, output_path);
+        assert!(!prepared_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_maestro_generate_qr_without_payload_producer_fails_closed() {
+        let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
+        let device = test_device(workspace);
+
+        let error = device.generate_qr().await.unwrap_err();
+
+        match error {
+            E2eError::DeviceNotSupported(message) => assert_eq!(
+                message,
+                "Maestro device: QR payload extraction is not supported"
+            ),
+            other => panic!("expected DeviceNotSupported, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_maestro_start_device_link_without_payload_producer_fails_closed() {
+        let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
+        let device = test_device(workspace);
+
+        let error = device.start_device_link().await.unwrap_err();
+
+        match error {
+            E2eError::DeviceNotSupported(message) => assert_eq!(
+                message,
+                "Maestro device: device-link payload extraction is not supported"
+            ),
+            other => panic!("expected DeviceNotSupported, got {other:?}"),
         }
     }
 }
