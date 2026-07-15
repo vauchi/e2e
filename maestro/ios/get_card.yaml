@@ -9,7 +9,7 @@ name: Get Contact Card
 # Environment variables:
 #   CONTACT_NAME - Name of the contact to view (required)
 #
-# Output: Card data is written to /tmp/vauchi_card.json
+# Output: Card data is written to ${MAESTRO_OUTPUT_PATH}
 # Format: { "name": "...", "fields": [{"type": "...", "label": "...", "value": "..."}] }
 
 - launchApp
@@ -60,7 +60,7 @@ name: Get Contact Card
     }
 
     const fs = require('fs');
-    fs.writeFileSync('/tmp/vauchi_card.json', JSON.stringify(card, null, 2));
+    fs.writeFileSync(MAESTRO_OUTPUT_PATH, JSON.stringify(card, null, 2));
 
 # Alternative: Use accessibility tree
 - runFlow:
@@ -75,7 +75,7 @@ name: Get Contact Card
           // If the app exports card data via accessibility
           if (accessibilityValue) {
             const fs = require('fs');
-            fs.writeFileSync('/tmp/vauchi_card.json', accessibilityValue);
+            fs.writeFileSync(MAESTRO_OUTPUT_PATH, accessibilityValue);
           }
 
 # Go back to contacts list

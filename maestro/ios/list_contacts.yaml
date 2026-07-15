@@ -6,7 +6,7 @@ appId: app.vauchi.ios
 name: List Contacts
 ---
 # List all contacts and output their names
-# Output: Contact names are written to /tmp/vauchi_contacts.txt
+# Output: Contact names are written to ${MAESTRO_OUTPUT_PATH}
 #
 # Format: One contact name per line
 
@@ -55,7 +55,7 @@ name: List Contacts
     }
 
     const fs = require('fs');
-    fs.writeFileSync('/tmp/vauchi_contacts.txt', contacts.join('\n'));
+    fs.writeFileSync(MAESTRO_OUTPUT_PATH, contacts.join('\n'));
 
 # Also try using accessibility identifiers
 - runFlow:
@@ -69,4 +69,4 @@ name: List Contacts
           const names = children.map(c => c.accessibilityLabel || c.text).filter(Boolean);
 
           const fs = require('fs');
-          fs.writeFileSync('/tmp/vauchi_contacts.txt', names.join('\n'));
+          fs.writeFileSync(MAESTRO_OUTPUT_PATH, names.join('\n'));

@@ -104,6 +104,53 @@ impl std::fmt::Display for MaestroPlatform {
     }
 }
 
+#[derive(Clone, Copy)]
+enum MaestroOutput {
+    Contacts,
+    Card,
+}
+
+impl MaestroOutput {
+    fn file_name(self) -> &'static str {
+        match self {
+            Self::Contacts => "contacts.txt",
+            Self::Card => "card.json",
+        }
+    }
+}
+
+struct MaestroWorkspace {
+    directory: tempfile::TempDir,
+}
+
+impl MaestroWorkspace {
+    fn new() -> E2eResult<Self> {
+        let directory = tempfile::Builder::new()
+            .prefix("vauchi-maestro-")
+            .tempdir()
+            .map_err(|e| E2eError::device(format!("Failed to create Maestro workspace: {e}")))?;
+        Ok(Self { directory })
+    }
+
+    fn output_path(&self, output: MaestroOutput) -> PathBuf {
+        self.directory.path().join(output.file_name())
+    }
+
+    fn prepare_output(&self, output: MaestroOutput) -> E2eResult<PathBuf> {
+        let path = self.output_path(output);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(E2eError::device(format!(
+                    "Failed to clear stale Maestro output: {error}"
+                )));
+            }
+        }
+        Ok(path)
+    }
+}
+
 /// A mobile device controlled via Maestro.
 ///
 /// Uses Maestro CLI to execute YAML flows that control the mobile app.
@@ -122,6 +169,8 @@ pub struct MaestroDevice {
     flows_dir: PathBuf,
     /// Current network configuration.
     network_config: NetworkConfig,
+    /// Per-device output workspace.
+    workspace: MaestroWorkspace,
 }
 
 impl MaestroDevice {
@@ -168,6 +217,7 @@ impl MaestroDevice {
 
         // Determine flows directory
         let flows_dir = Self::find_flows_dir(platform)?;
+        let workspace = MaestroWorkspace::new()?;
 
         Ok(Self {
             name: name.into(),
@@ -177,6 +227,7 @@ impl MaestroDevice {
             relay_url: relay_url.into(),
             flows_dir,
             network_config: NetworkConfig::default(),
+            workspace,
         })
     }
 
@@ -269,28 +320,23 @@ impl MaestroDevice {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    /// Read QR data written by the generate_qr flow.
-    fn read_qr_data(&self) -> E2eResult<String> {
-        std::fs::read_to_string("/tmp/vauchi_qr_data.txt")
-            .map(|s| s.trim().to_string())
-            .map_err(|e| {
-                E2eError::device(format!(
-                    "Failed to read QR data from /tmp/vauchi_qr_data.txt: {}",
-                    e
-                ))
-            })
+    async fn run_output_flow(
+        &self,
+        flow_name: &str,
+        env_vars: &[(&str, &str)],
+        output: MaestroOutput,
+    ) -> E2eResult<String> {
+        let output_path = self.workspace.prepare_output(output)?;
+        let output_path = output_path.to_string_lossy().into_owned();
+        let mut flow_env = env_vars.to_vec();
+        flow_env.push(("MAESTRO_OUTPUT_PATH", output_path.as_str()));
+        self.run_flow(flow_name, &flow_env).await?;
+        std::fs::read_to_string(self.workspace.output_path(output))
+            .map_err(|e| E2eError::device(format!("Failed to read fresh Maestro output: {e}")))
     }
 
-    /// Read contacts list written by the list_contacts flow.
-    fn read_contacts_file(&self) -> E2eResult<Vec<Contact>> {
-        let content = std::fs::read_to_string("/tmp/vauchi_contacts.txt").map_err(|e| {
-            E2eError::device(format!(
-                "Failed to read contacts from /tmp/vauchi_contacts.txt: {}",
-                e
-            ))
-        })?;
-
-        Ok(content
+    fn parse_contacts(content: &str) -> Vec<Contact> {
+        content
             .lines()
             .filter(|line| !line.trim().is_empty())
             .map(|name| Contact {
@@ -298,19 +344,11 @@ impl MaestroDevice {
                 id: None,
                 verified: false,
             })
-            .collect())
+            .collect()
     }
 
-    /// Read card data written by the get_card flow.
-    fn read_card_file(&self) -> E2eResult<ContactCard> {
-        let content = std::fs::read_to_string("/tmp/vauchi_card.json").map_err(|e| {
-            E2eError::device(format!(
-                "Failed to read card from /tmp/vauchi_card.json: {}",
-                e
-            ))
-        })?;
-
-        serde_json::from_str(&content)
+    fn parse_card(content: &str) -> E2eResult<ContactCard> {
+        serde_json::from_str(content)
             .map_err(|e| E2eError::device(format!("Failed to parse card JSON: {}", e)))
     }
 
@@ -378,10 +416,13 @@ impl Device for MaestroDevice {
     }
 
     async fn has_identity(&self) -> bool {
-        // Try getting the card — if it works, identity exists
-        self.run_flow("get_card", &[("CONTACT_NAME", "Your Card")])
-            .await
-            .is_ok()
+        self.run_output_flow(
+            "get_card",
+            &[("CONTACT_NAME", "Your Card")],
+            MaestroOutput::Card,
+        )
+        .await
+        .is_ok()
     }
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
@@ -397,8 +438,9 @@ impl Device for MaestroDevice {
     }
 
     async fn generate_qr(&self) -> E2eResult<String> {
-        self.run_flow("generate_qr", &[]).await?;
-        self.read_qr_data()
+        Err(E2eError::DeviceNotSupported(
+            "Maestro device: QR payload extraction is not supported".into(),
+        ))
     }
 
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
@@ -408,11 +450,9 @@ impl Device for MaestroDevice {
     }
 
     async fn start_device_link(&self) -> E2eResult<String> {
-        self.run_flow("link_device", &[]).await?;
-        // Link data is written by the flow; read it from the temp file
-        std::fs::read_to_string("/tmp/vauchi_link_data.txt")
-            .map(|s| s.trim().to_string())
-            .map_err(|e| E2eError::device(format!("Failed to read link data: {}", e)))
+        Err(E2eError::DeviceNotSupported(
+            "Maestro device: device-link payload extraction is not supported".into(),
+        ))
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
@@ -445,14 +485,21 @@ impl Device for MaestroDevice {
     }
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
-        self.run_flow("list_contacts", &[]).await?;
-        self.read_contacts_file()
+        let content = self
+            .run_output_flow("list_contacts", &[], MaestroOutput::Contacts)
+            .await?;
+        Ok(Self::parse_contacts(&content))
     }
 
     async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>> {
-        self.run_flow("get_card", &[("CONTACT_NAME", name_or_id)])
+        let content = self
+            .run_output_flow(
+                "get_card",
+                &[("CONTACT_NAME", name_or_id)],
+                MaestroOutput::Card,
+            )
             .await?;
-        let card = self.read_card_file()?;
+        let card = Self::parse_card(&content)?;
         if card.name.is_empty() {
             Ok(None)
         } else {
@@ -465,9 +512,14 @@ impl Device for MaestroDevice {
     }
 
     async fn get_card(&self) -> E2eResult<ContactCard> {
-        self.run_flow("get_card", &[("CONTACT_NAME", "Your Card")])
+        let content = self
+            .run_output_flow(
+                "get_card",
+                &[("CONTACT_NAME", "Your Card")],
+                MaestroOutput::Card,
+            )
             .await?;
-        self.read_card_file()
+        Self::parse_card(&content)
     }
 
     async fn add_field(&self, field_type: &str, label: &str, value: &str) -> E2eResult<()> {

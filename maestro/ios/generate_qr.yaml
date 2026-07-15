@@ -6,7 +6,7 @@ appId: app.vauchi.ios
 name: Generate QR Code
 ---
 # Generate an exchange payload for contact exchange.
-# Output: a screenshot is written to /tmp/vauchi_exchange_link.png
+# Output: presentation-only screenshot in Maestro's run artifacts
 #
 # The flow navigates to the exchange screen and captures the shareable
 # link because on the iOS simulator BLE-dependent modes (Magic/Glance)
@@ -39,7 +39,7 @@ name: Generate QR Code
 - assertVisible: "Send this link to exchange contacts"
 
 # Take screenshot for exchange-data extraction.
-- takeScreenshot: /tmp/vauchi_exchange_link.png
+- takeScreenshot: vauchi_exchange_link
 
 # Post-state assertion — the exchange screen must stay active after the
 # payload is rendered; a regression that auto-dismisses would have still

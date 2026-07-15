@@ -6,7 +6,7 @@ appId: app.vauchi
 name: List Contacts (Android)
 ---
 # List all contacts and output their names
-# Output: Contact names are written to /tmp/vauchi_contacts.txt
+# Output: Contact names are written to ${MAESTRO_OUTPUT_PATH}
 #
 # Format: One contact name per line
 
@@ -55,7 +55,7 @@ name: List Contacts (Android)
     }
 
     const fs = require('fs');
-    fs.writeFileSync('/tmp/vauchi_contacts.txt', contacts.join('\n'));
+    fs.writeFileSync(MAESTRO_OUTPUT_PATH, contacts.join('\n'));
 
 # Also try using resource IDs
 - runFlow:
@@ -69,4 +69,4 @@ name: List Contacts (Android)
           const names = children.map(c => c.contentDescription || c.text).filter(Boolean);
 
           const fs = require('fs');
-          fs.writeFileSync('/tmp/vauchi_contacts.txt', names.join('\n'));
+          fs.writeFileSync(MAESTRO_OUTPUT_PATH, names.join('\n'));
