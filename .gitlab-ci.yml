@@ -262,9 +262,42 @@ test:smoke:
     expire_in: 1 week
   timeout: 20 minutes
 
+# RG-3 release certification — exact two-user exchange and update propagation
+# through distinct outer OHTTP and application-relay hops. This named lane is
+# intentionally narrower than test:integration so release evidence can point
+# to one stable, blocking contract on merge requests, main, and schedules.
+test:release-rg3:
+  extends: [.rust-runner, .timeout-standard]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-relay"
+      test -x "$E2E_BIN_DIR/vauchi"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(/orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay/)' \
+        2>&1 | tee rg3-release-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - rg3-release-results.txt
+    expire_in: 1 week
+
 # Integration tests — full E2E suite on main and schedule.
 # Gets relay+CLI binaries from test:smoke artifacts; cache is fallback for scheduled runs.
-# Advisory (allow_failure) until tests stabilize.
+# Blocking comprehensive coverage; the named RG-3 lane above provides the
+# stable release-certification result for its exact split-OHTTP journey.
 test:integration:
   extends: [.rust-runner, .timeout-long]
   stage: test
