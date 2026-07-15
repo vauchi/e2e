@@ -5,6 +5,8 @@
 const CI_CONFIG: &str = include_str!("../.gitlab-ci.yml");
 const RG3_TEST: &str =
     "orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay";
+const RG4_RG5_TEST: &str =
+    "multi_device_sync::integration_six_device_exchange_and_update_convergence";
 
 fn top_level_job(name: &str) -> &str {
     let marker = format!("{name}:\n");
@@ -48,8 +50,26 @@ fn rg3_release_lane_is_blocking_and_runs_the_exact_split_ohttp_journey() {
 
 // @internal
 #[test]
+fn rg4_rg5_release_lane_is_blocking_and_runs_the_six_device_journey() {
+    let job = top_level_job("test:release-rg4-rg5");
+
+    assert!(job.contains("allow_failure: false"));
+    assert!(job.contains("job: test:smoke"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"merge_request_event\""));
+    assert!(job.contains("$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+    assert!(job.contains(RG4_RG5_TEST));
+}
+
+// @internal
+#[test]
 fn native_binary_producer_and_consumers_share_linux_runner() {
-    for job_name in ["test:smoke", "test:release-rg3", "test:integration"] {
+    for job_name in [
+        "test:smoke",
+        "test:release-rg3",
+        "test:release-rg4-rg5",
+        "test:integration",
+    ] {
         let job = top_level_job(job_name);
         assert!(
             job.contains("extends: [.linux-runner,"),
