@@ -27,6 +27,7 @@ use crate::user::{User, UserBuilder};
 /// key the local relay can decrypt. See problem record
 /// `_private/docs/problems/2026-05-04-f13-cli-bundled-key-injection-for-e2e/`.
 const CLI_BUNDLED_OHTTP_KEY_HEX_ENV: &str = "VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX";
+const CLI_OHTTP_RELAY_URL_ENV: &str = "VAUCHI_OHTTP_RELAY_URL";
 
 /// Configuration for the orchestrator.
 #[derive(Debug, Clone)]
@@ -38,10 +39,9 @@ pub struct OrchestratorConfig {
     /// Delay between operations (for observability).
     pub operation_delay: Duration,
     /// Spawn an `OhttpRelayManager` (the outer privacy hop) alongside
-    /// the relay, and route CLI traffic through it. When `false` (default
-    /// today), the CLI talks directly to the relay's OHTTP gateway —
-    /// the OHTTP envelope is still encrypted, but the gateway operator
-    /// sees the client IP.
+    /// the relay, and route CLI traffic through it. When `false`, the CLI uses
+    /// the relay's legacy WebSocket transport for explicit transport-isolation
+    /// scenarios.
     ///
     /// Production runs every request through an outer ohttp-relay per
     /// ADR-037 (gateway and forwarding-relay must be distinct
@@ -249,23 +249,16 @@ impl Orchestrator {
 
     /// Get the URL the CLI should use as its `--relay`.
     ///
-    /// When `OrchestratorConfig::with_ohttp_relay` is `true`, returns
-    /// the spawned ohttp-relay's URL — the CLI then talks
-    /// (client → ohttp-relay → relay-gateway), matching the
-    /// production-like ADR-037 path. Otherwise returns the direct
-    /// relay HTTP URL — the CLI's OHTTP envelope still encrypts
-    /// payloads, but the gateway operator sees the client IP.
-    ///
-    /// New code should prefer this over `primary_relay_http_url()`
-    /// — it transparently routes through the outer hop when one is
-    /// configured.
+    /// With the default OHTTP topology, `--relay` identifies the application
+    /// relay and `VAUCHI_OHTTP_RELAY_URL` separately identifies the outer hop.
+    /// Explicit transport-isolation scenarios without an outer hop use the
+    /// relay's legacy WebSocket URL instead.
     pub fn primary_cli_relay_url(&self) -> E2eResult<String> {
-        if let Some(ohttp_mgr) = self.ohttp_relay_manager.as_ref()
-            && let Some(url) = ohttp_mgr.url()
-        {
-            return Ok(url);
+        if self.ohttp_relay_url().is_some() {
+            self.primary_relay_http_url()
+        } else {
+            self.primary_relay_url()
         }
-        self.primary_relay_http_url()
     }
 
     /// Get the spawned ohttp-relay URL, if `with_ohttp_relay` is active.
@@ -297,14 +290,14 @@ impl Orchestrator {
         device_count: usize,
     ) -> E2eResult<Arc<RwLock<User>>> {
         let name = name.into();
-        // CLI uses HTTP transport — when `with_ohttp_relay` is on, this
-        // returns the outer hop's URL (CLI → ohttp-relay → gateway);
-        // otherwise the direct relay HTTP URL (CLI → gateway).
         let relay_url = self.primary_cli_relay_url()?;
 
         info!("Adding user '{}' with {} device(s)", name, device_count);
 
         let mut extra_env = HashMap::new();
+        if let Some(ohttp_url) = self.ohttp_relay_url() {
+            extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
+        }
         if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
             extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
         }
@@ -326,8 +319,7 @@ impl Orchestrator {
     ///
     /// This mirrors production (`relay.vauchi.app` + a separate
     /// `ohttp.vauchi.app`) so the client's OHTTP key bootstrap + routing are
-    /// exercised end-to-end — the exact split that `add_user` (which points
-    /// `--relay` straight at the ohttp-relay) does not cover. Deliberately
+    /// exercised end-to-end. Unlike ordinary `add_user`, this deliberately
     /// injects **no** bundled-key override: the client must fetch the live
     /// gateway key through the ohttp-relay. Requires `with_ohttp_relay = true`.
     /// Regression guard for `2026-05-25-relay-ohttp-forward-hop-502`.
@@ -348,7 +340,7 @@ impl Orchestrator {
         );
 
         let mut extra_env = HashMap::new();
-        extra_env.insert("VAUCHI_OHTTP_RELAY_URL".to_string(), ohttp_url);
+        extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
 
         let user = UserBuilder::new(&name, relay_url)
             .with_devices(device_count)
