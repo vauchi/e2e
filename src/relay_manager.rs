@@ -831,6 +831,7 @@ mod tests {
         assert_eq!(config.storage_backend, "memory");
     }
 
+    // @internal
     #[test]
     fn test_ohttp_key_workspace_same_port_paths_are_isolated() {
         let first = OhttpKeyWorkspace::new().expect("create first OHTTP key workspace");
@@ -844,6 +845,7 @@ mod tests {
         assert!(second_path.starts_with(second.directory.path()));
     }
 
+    // @internal
     #[test]
     fn test_ohttp_key_workspace_key_survives_restart_path_lookup() {
         let workspace = OhttpKeyWorkspace::new().expect("create OHTTP key workspace");
@@ -856,6 +858,7 @@ mod tests {
         assert_eq!(std::fs::read(after_restart).unwrap(), b"test HPKE seed");
     }
 
+    // @internal
     #[test]
     fn test_ohttp_key_workspace_drop_removes_key() {
         let key_path = {

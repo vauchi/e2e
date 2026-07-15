@@ -643,6 +643,7 @@ mod tests {
         assert_eq!(format!("{}", MaestroPlatform::Android), "Android");
     }
 
+    // @internal
     #[test]
     fn test_maestro_install_help_requires_reviewed_pinned_release() {
         assert_eq!(
@@ -737,6 +738,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn test_maestro_workspaces_isolate_same_output() {
         let alice = MaestroWorkspace::new().expect("create Alice workspace");
@@ -750,6 +752,7 @@ mod tests {
         assert!(bob_contacts.starts_with(bob.directory.path()));
     }
 
+    // @internal
     #[test]
     fn test_maestro_prepare_output_removes_poisoned_result() {
         let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
@@ -764,6 +767,7 @@ mod tests {
         assert!(!prepared_path.exists());
     }
 
+    // @internal
     #[tokio::test]
     async fn test_maestro_generate_qr_without_payload_producer_fails_closed() {
         let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
@@ -780,6 +784,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[tokio::test]
     async fn test_maestro_start_device_link_without_payload_producer_fails_closed() {
         let workspace = MaestroWorkspace::new().expect("create Maestro workspace");
