@@ -340,13 +340,16 @@ async fn certify_six_device_role(device_index: usize, phone: &str) {
     let direct_url = orch
         .primary_relay_http_url()
         .expect("application relay URL should be available");
-    assert_ne!(
+    let outer_url = orch
+        .ohttp_relay_url()
+        .expect("certification requires an outer OHTTP relay");
+    assert_eq!(
         cli_url, direct_url,
-        "certification traffic must traverse the distinct OHTTP relay"
+        "certification must identify the application relay separately"
     );
-    assert!(
-        orch.ohttp_relay_url().is_some(),
-        "certification requires an outer OHTTP relay"
+    assert_ne!(
+        cli_url, outer_url,
+        "certification traffic must traverse a distinct OHTTP origin"
     );
 
     orch.add_user("Alice", 3).expect("Failed to add Alice");

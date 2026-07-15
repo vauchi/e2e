@@ -82,12 +82,9 @@ async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
     let mut orch = Orchestrator::with_config(config);
     orch.start().await.expect("Failed to start orchestrator");
 
-    // The CLI URL the orchestrator hands out should be the outer-hop
-    // ohttp-relay URL, NOT the direct relay HTTP URL — this is the
-    // load-bearing assertion: if the wiring regresses (e.g. the new
-    // accessor falls back to the direct URL silently) we want this
-    // test to fail loudly rather than the broader scenarios silently
-    // bypass the outer hop.
+    // CLI `--relay` identifies the application relay. The outer OHTTP hop is a
+    // separate origin injected through `VAUCHI_OHTTP_RELAY_URL`. Collapsing
+    // those two roles is invalid even if both processes are reachable.
     let cli_url = orch
         .primary_cli_relay_url()
         .expect("CLI relay URL should be available");
@@ -99,13 +96,12 @@ async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
         .expect("ohttp-relay URL should be Some when with_ohttp_relay is on");
 
     assert_eq!(
-        cli_url, outer_url,
-        "CLI URL must be the ohttp-relay URL when with_ohttp_relay is on, \
-         not {direct_url} — otherwise broader scenarios silently bypass the outer hop"
+        cli_url, direct_url,
+        "CLI `--relay` must identify the data relay"
     );
     assert_ne!(
-        cli_url, direct_url,
-        "CLI URL must differ from direct relay URL when outer hop is active"
+        cli_url, outer_url,
+        "the OHTTP hop must use a distinct origin"
     );
 
     // End-to-end: a basic 2-user exchange must complete via the outer
@@ -157,13 +153,17 @@ async fn smoke_orchestrator_default_uses_ohttp_relay() {
         .primary_relay_http_url()
         .expect("direct relay HTTP URL should be available");
 
-    assert_ne!(
+    let outer_url = orch
+        .ohttp_relay_url()
+        .expect("default OrchestratorConfig must spawn an ohttp-relay");
+
+    assert_eq!(
         cli_url, direct_url,
-        "default OrchestratorConfig must not route the CLI directly to the application relay"
+        "CLI `--relay` must identify the data relay"
     );
-    assert!(
-        orch.ohttp_relay_url().is_some(),
-        "default OrchestratorConfig must spawn an ohttp-relay"
+    assert_ne!(
+        cli_url, outer_url,
+        "the OHTTP hop must use a distinct origin"
     );
 
     orch.stop().await.expect("Failed to stop orchestrator");
