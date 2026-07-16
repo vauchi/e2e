@@ -226,7 +226,10 @@ fn device_link_chain_makes_zero_requests_to_either_hop() {
 
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
 /// Panic shred completes local erasure against hostile endpoints and
-/// dials neither hop when there is nothing to notify.
+/// dials the application relay never. The outer relay may see only the
+/// designed purge leg as an opaque OHTTP-encapsulated POST — any other
+/// request line (direct API path, key fetch against the wrong origin,
+/// plaintext action) is a fail-open regression.
 // @internal
 #[test]
 fn panic_shred_completes_local_erasure_without_network() {
@@ -273,9 +276,14 @@ fn panic_shred_completes_local_erasure_without_network() {
         "panic shred must not dial the application relay: {:?}",
         app.recorded()
     );
+    // The shred's purge leg is allowed to contact the outer hop — but
+    // only as an opaque OHTTP-encapsulated POST. Every other request
+    // line is a leak.
+    let outer_dials = outer.recorded();
     assert!(
-        outer.recorded().is_empty(),
-        "panic shred must not dial the OHTTP outer relay: {:?}",
-        outer.recorded()
+        outer_dials
+            .iter()
+            .all(|line| line.starts_with("POST /v2/ohttp ")),
+        "panic shred may contact the outer relay only via the encapsulated OHTTP path: {outer_dials:?}"
     );
 }
