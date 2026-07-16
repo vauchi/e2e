@@ -287,3 +287,191 @@ fn panic_shred_completes_local_erasure_without_network() {
         "panic shred may contact the outer relay only via the encapsulated OHTTP path: {outer_dials:?}"
     );
 }
+
+// ── Shred fan-out oracles (with staged contacts) ───────────────────
+
+use crate::ohttp_helpers::spawn_ohttp_stack;
+
+/// Initialize a named identity against explicit endpoints.
+fn init_named_identity(data_dir: &Path, name: &str, relay: &str, ohttp: &str) {
+    let outcome = run_cli(
+        &["init", name, "--relay", relay, "--ohttp-relay", ohttp],
+        &[],
+        data_dir,
+    );
+    assert!(
+        outcome.success,
+        "init {name} should succeed: {}",
+        outcome.stderr
+    );
+}
+
+/// First long base64-ish token in CLI output (QR payload line).
+fn qr_token(output: &str) -> String {
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.len() >= 40
+            && !trimmed.contains(['█', '▀', '▄'])
+            && trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+        {
+            return trimmed.to_string();
+        }
+    }
+    panic!("no QR token in output: {output}");
+}
+
+fn exchange_start(data_dir: &Path, relay: &str, ohttp: &str) -> String {
+    let outcome = run_cli(
+        &[
+            "exchange",
+            "start",
+            "--relay",
+            relay,
+            "--ohttp-relay",
+            ohttp,
+        ],
+        &[],
+        data_dir,
+    );
+    assert!(
+        outcome.success,
+        "exchange start should succeed: {}",
+        outcome.stderr
+    );
+    qr_token(&outcome.stdout)
+}
+
+fn exchange_complete(data_dir: &Path, qr: &str, relay: &str, ohttp: &str) {
+    let outcome = run_cli(
+        &[
+            "exchange",
+            "complete",
+            qr,
+            "--relay",
+            relay,
+            "--ohttp-relay",
+            ohttp,
+        ],
+        &[],
+        data_dir,
+    );
+    assert!(
+        outcome.success,
+        "exchange complete should succeed: {}",
+        outcome.stderr
+    );
+}
+
+fn sync_cli(data_dir: &Path, relay: &str, ohttp: &str) -> CliOutcome {
+    let outcome = run_cli(
+        &["sync", "--relay", relay, "--ohttp-relay", ohttp],
+        &[],
+        data_dir,
+    );
+    assert!(outcome.success, "sync should succeed: {}", outcome.stderr);
+    outcome
+}
+
+fn contacts_list(data_dir: &Path, relay: &str, ohttp: &str) -> String {
+    let outcome = run_cli(
+        &["contacts", "list", "--relay", relay, "--ohttp-relay", ohttp],
+        &[],
+        data_dir,
+    );
+    assert!(
+        outcome.success,
+        "contacts list should succeed: {}",
+        outcome.stderr
+    );
+    outcome.stdout
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
+/// Panic shred WITH a staged contact: the per-contact revocation
+/// delivery and the relay purge must traverse the OHTTP outer hop
+/// only. The application-relay endpoint the CLI is configured with is
+/// a hostile recorder — any direct dial (connect, purge, delivery)
+/// trips the oracle. Bob must observe the revocation: his sync
+/// processes the delivered blob and Alice disappears from his
+/// contacts.
+#[tokio::test]
+async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
+    let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
+    let app = HostileServer::start(KeyMode::Garbage);
+
+    let alice = tempfile::tempdir().expect("alice data dir");
+    let bob = tempfile::tempdir().expect("bob data dir");
+    init_named_identity(alice.path(), "Alice", &app.url(), &ohttp_url);
+    init_named_identity(bob.path(), "Bob", &app.url(), &ohttp_url);
+
+    // Stage the contact through the OHTTP path: both sides start, both
+    // complete, both sync — exactly the harness's mutual-exchange flow.
+    let alice_qr = exchange_start(alice.path(), &app.url(), &ohttp_url);
+    let bob_qr = exchange_start(bob.path(), &app.url(), &ohttp_url);
+    exchange_complete(bob.path(), &alice_qr, &app.url(), &ohttp_url);
+    exchange_complete(alice.path(), &bob_qr, &app.url(), &ohttp_url);
+    sync_cli(alice.path(), &app.url(), &ohttp_url);
+    sync_cli(bob.path(), &app.url(), &ohttp_url);
+    assert!(
+        contacts_list(alice.path(), &app.url(), &ohttp_url).contains("Bob"),
+        "Alice should have Bob staged as a contact"
+    );
+
+    // Alice panic-shreds. The fan-out (relay purge + Bob's revocation
+    // delivery) must go through the outer hop; the report must show
+    // both legs delivered.
+    let outcome = run_cli_pty(
+        &[
+            "gdpr",
+            "panic-shred",
+            "--relay",
+            &app.url(),
+            "--ohttp-relay",
+            &ohttp_url,
+        ],
+        "PANIC\n",
+        alice.path(),
+    );
+    assert!(
+        !outcome.timed_out,
+        "panic shred must complete bounded, not hang; stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Shred Report"),
+        "panic shred should report completion, got stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Relay purge sent:       true"),
+        "relay purge must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Contacts notified:      1"),
+        "Bob's revocation delivery must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout
+    );
+
+    // Bob syncs: the delivered revocation crypto-shreds Alice's CEK and
+    // removes her contact row.
+    sync_cli(bob.path(), &app.url(), &ohttp_url);
+    let bob_contacts = contacts_list(bob.path(), &app.url(), &ohttp_url);
+    assert!(
+        !bob_contacts.contains("Alice"),
+        "Bob must observe Alice's revocation (contact removed), got: {bob_contacts}"
+    );
+
+    // Privacy leg: nothing may have dialed the application-relay
+    // endpoint the devices were configured with.
+    assert!(
+        app.recorded().is_empty(),
+        "no action may dial the application relay directly: {:?}",
+        app.recorded()
+    );
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
