@@ -262,10 +262,11 @@ test:smoke:
       - smoke-results.txt
       - .smoke-bin/
     expire_in: 1 week
-  # 11 tests at -j 1 take ~19.5 min under 2-4x runner contention before
-  # the yaml scenario leg; 45 minutes keeps the same fail signal with
-  # headroom instead of killing the shell mid-test.
-  timeout: 45 minutes
+  # A cold CLI build plus the sequential network scenarios consumed 45
+  # minutes in pipeline 2682050160 even though all 11 tests passed. One hour
+  # preserves a finite watchdog while allowing artifacts to reach the named
+  # release lanes.
+  timeout: 1 hour
 
 # RG-3 release certification — exact two-user exchange and update propagation
 # through distinct outer OHTTP and application-relay hops. This named lane is
