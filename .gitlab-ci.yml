@@ -251,7 +251,10 @@ test:smoke:
       rm -rf "$BUILD_TMPDIR"
 
       echo "Running smoke tests..."
-      cargo nextest run --profile ci --run-ignored default -j 1 -- smoke_ 2>&1 | tee smoke-results.txt
+      # Relay-backed tests are capped at four workers by
+      # .config/nextest.toml; match that tested capacity instead of
+      # serializing every smoke scenario.
+      cargo nextest run --profile ci --run-ignored default -j 4 -- smoke_ 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
   artifacts:
