@@ -326,6 +326,36 @@ test:release-rg4-rg5:
       - rg4-rg5-release-results.txt
     expire_in: 1 week
 
+# RG-8 release certification — OHTTP fail-closed adversarial matrix: origin
+# boundary probes (plaintext/TLS-only/ws/escape-hatch/same-origin) and hostile
+# bootstrap poisoning must all fail closed against the release CLI. Blocking
+# named lane mirroring test:release-rg4-rg5.
+test:release-rg8:
+  extends: [.linux-runner, .timeout-standard]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(/ohttp_fail_closed_matrix/)' \
+        2>&1 | tee rg8-release-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - rg8-release-results.txt
+    expire_in: 1 week
+
 # Integration tests — full E2E suite on main and schedule.
 # Gets relay+CLI binaries from test:smoke artifacts; cache is fallback for scheduled runs.
 # Blocking comprehensive coverage; the named RG-3 lane above provides the
