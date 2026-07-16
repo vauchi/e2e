@@ -396,6 +396,7 @@ fn contacts_list(data_dir: &Path, relay: &str, ohttp: &str) -> String {
 /// trips the oracle. Bob must observe the revocation: his sync
 /// processes the delivered blob and Alice disappears from his
 /// contacts.
+// @internal
 #[tokio::test]
 async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
