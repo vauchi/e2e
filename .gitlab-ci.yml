@@ -193,7 +193,9 @@ test:smoke:
       RELAY_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" main | cut -f1)
       CLI_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" main | cut -f1)
       CORE_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" main | cut -f1)
-      CLI_BUILD_PROFILE="e2e-test-clock-v1"
+      # v1 was found to label a non-feature CLI artifact as test-clock
+      # capable. Bump the identity to rebuild it with the command below.
+      CLI_BUILD_PROFILE="e2e-test-clock-v2"
 
       CACHED_CORE=""
       [ -f .smoke-bin/core.sha ] && CACHED_CORE=$(cat .smoke-bin/core.sha)
