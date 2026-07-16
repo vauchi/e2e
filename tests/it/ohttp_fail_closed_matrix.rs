@@ -40,7 +40,10 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 pub(crate) const DISTINCT_ORIGIN_ERROR: &str = "distinct valid origin";
-pub(crate) const CLI_TIMEOUT: Duration = Duration::from_secs(30);
+// Runner contention slows CLI invocations 2-6x (argon2 init worst);
+// 180s matches the VAUCHI_E2E_CLI_TIMEOUT_SECS default budget while
+// still catching a genuine fail-open hang in minutes.
+pub(crate) const CLI_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// (label, relay CLI args, extra env) for an origin-boundary probe case.
 pub(crate) type OriginCase = (
