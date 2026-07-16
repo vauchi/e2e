@@ -10,7 +10,7 @@ name: "CLI Contact Exchange"
 description: "Basic contact exchange between two CLI users"
 feature: "contact_exchange.feature"
 tags: ["smoke", "exchange", "cli"]
-timeout: 60s
+timeout: 180s
 
 participants:
   alice:

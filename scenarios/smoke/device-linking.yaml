@@ -12,7 +12,7 @@ description: |
   scan on secondary device, complete handshake, verify contacts sync.
 feature: "device_management.feature"
 tags: ["smoke", "device-linking"]
-timeout: 90s
+timeout: 270s
 
 participants:
   alice:

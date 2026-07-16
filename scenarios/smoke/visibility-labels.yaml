@@ -12,7 +12,7 @@ description: |
   and control which fields are visible to contacts in each label.
 feature: "visibility_labels.feature"
 tags: ["smoke", "visibility", "labels"]
-timeout: 90s
+timeout: 270s
 
 participants:
   alice:

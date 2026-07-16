@@ -10,7 +10,7 @@ name: "Basic Card Sync"
 description: "Card update propagates from one user to another"
 feature: "sync_updates.feature"
 tags: ["smoke", "sync"]
-timeout: 60s
+timeout: 180s
 
 participants:
   alice:

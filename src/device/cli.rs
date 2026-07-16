@@ -66,6 +66,14 @@ pub struct CliDevice {
     /// Used by the orchestrator to inject test-only overrides like
     /// `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX` (F13 step 5).
     extra_env: HashMap<String, String>,
+    /// Budget for a single CLI invocation. Parsed once at construction
+    /// from `VAUCHI_E2E_CLI_TIMEOUT_SECS`, default 180s: the previous
+    /// hardcoded 60s was fitted to median quiet-runner runtime and flaked
+    /// under 2-4x runner contention (problem
+    /// 2026-05-04-e2e-smoke-cli-timeout-flake, option A). Kept above the
+    /// relay's 60s idle cutoff so the two values are not correlated
+    /// during debugging.
+    command_timeout: std::time::Duration,
 }
 
 impl CliDevice {
@@ -83,6 +91,7 @@ impl CliDevice {
             cli_path,
             public_id: Mutex::new(None),
             extra_env: HashMap::new(),
+            command_timeout: Self::command_timeout_from_env(),
         })
     }
 
@@ -101,7 +110,22 @@ impl CliDevice {
             cli_path,
             public_id: Mutex::new(None),
             extra_env: HashMap::new(),
+            command_timeout: Self::command_timeout_from_env(),
         })
+    }
+
+    /// Resolve the per-command budget from `VAUCHI_E2E_CLI_TIMEOUT_SECS`.
+    fn command_timeout_from_env() -> std::time::Duration {
+        Self::resolve_command_timeout(std::env::var("VAUCHI_E2E_CLI_TIMEOUT_SECS").ok().as_deref())
+    }
+
+    /// Parse a timeout override in seconds; anything missing or
+    /// unparsable falls back to the 180s contention-resilient default.
+    fn resolve_command_timeout(value: Option<&str>) -> std::time::Duration {
+        let secs = value
+            .and_then(|raw| raw.trim().parse::<u64>().ok())
+            .unwrap_or(180);
+        std::time::Duration::from_secs(secs)
     }
 
     /// Set extra environment variables to pass to every spawned
@@ -181,9 +205,15 @@ impl CliDevice {
         );
 
         let cmd_desc = format!("vauchi {}", args.join(" "));
-        let output = tokio::time::timeout(std::time::Duration::from_secs(60), cmd.output())
+        let budget = self.command_timeout;
+        let output = tokio::time::timeout(budget, cmd.output())
             .await
-            .map_err(|_| E2eError::timeout(format!("CLI command timed out after 60s: {cmd_desc}")))?
+            .map_err(|_| {
+                E2eError::timeout(format!(
+                    "CLI command timed out after {}s: {cmd_desc}",
+                    budget.as_secs()
+                ))
+            })?
             .map_err(|e| E2eError::cli_execution(format!("Failed to run CLI command: {}", e)))?;
 
         trace!("CLI stdout: {}", String::from_utf8_lossy(&output.stdout));

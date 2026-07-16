@@ -15,7 +15,7 @@ description: |
   4. Verify contacts are preserved after restore
 feature: "identity_management.feature"
 tags: ["smoke", "backup", "restore"]
-timeout: 90s
+timeout: 270s
 
 participants:
   alice:

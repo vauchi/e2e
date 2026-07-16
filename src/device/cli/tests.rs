@@ -299,3 +299,67 @@ fn test_parse_card_legacy_icons() {
             .any(|f| f.field_type == "custom" && f.value == "remember this")
     );
 }
+
+// @internal
+#[test]
+fn command_timeout_resolution_defaults_to_contention_headroom() {
+    assert_eq!(
+        CliDevice::resolve_command_timeout(None),
+        std::time::Duration::from_secs(180),
+        "default CLI command budget must clear the relay 60s idle cutoff \
+         with p99 runner-contention headroom (problem \
+         2026-05-04-e2e-smoke-cli-timeout-flake, option A)"
+    );
+}
+
+// @internal
+#[test]
+fn command_timeout_resolution_honours_env_override() {
+    assert_eq!(
+        CliDevice::resolve_command_timeout(Some("2")),
+        std::time::Duration::from_secs(2)
+    );
+    assert_eq!(
+        CliDevice::resolve_command_timeout(Some("not-a-number")),
+        std::time::Duration::from_secs(180),
+        "unparsable override must fall back to the default, not panic"
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn command_timeout_fires_with_command_description() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sleeper = dir.path().join("sleeper.sh");
+    std::fs::write(&sleeper, "#!/bin/sh\nsleep 5\n").expect("write sleeper");
+    let mut perms = std::fs::metadata(&sleeper).expect("metadata").permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&sleeper, perms).expect("chmod sleeper");
+
+    let data_dir = tempfile::tempdir().expect("data dir");
+    let device = CliDevice {
+        name: "timeout-probe".to_string(),
+        data_dir,
+        relay_url: "https://127.0.0.1:1".to_string(),
+        cli_path: sleeper,
+        public_id: std::sync::Mutex::new(None),
+        extra_env: HashMap::new(),
+        command_timeout: std::time::Duration::from_secs(1),
+    };
+
+    let error = device
+        .run_command(&["card", "show"])
+        .await
+        .expect_err("a 5s command must exceed the 1s budget");
+    let message = error.to_string();
+    assert!(
+        message.contains("card show"),
+        "timeout error must keep the command description for triage: {message}"
+    );
+    assert!(
+        message.contains("1s"),
+        "timeout error must state the configured budget: {message}"
+    );
+}
