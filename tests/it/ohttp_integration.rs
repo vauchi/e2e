@@ -136,6 +136,88 @@ async fn integration_ohttp_send_and_fetch() {
     relay_mgr.stop_all().await;
 }
 
+// @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
+/// The application relay's process output and Prometheus metrics must not
+/// expose an OHTTP-protected update payload or its recipient routing ID.
+///
+/// This is one observer surface in the RG-6 certification matrix. Storage,
+/// configuration, legitimate secrets, traces, and crash output are covered by
+/// separate observers before the release gate can close.
+// @internal
+#[tokio::test]
+async fn integration_ohttp_relay_observations_exclude_update_content() {
+    const PLAINTEXT_MARKER: &str = "sensitive-observer-marker";
+    const ENCODED_MARKER: &str = "c2Vuc2l0aXZlLW9ic2VydmVyLW1hcmtlcg==";
+
+    let relay_config = vauchi_e2e_tests::relay_manager::RelayConfig {
+        http_api_enabled: true,
+        ohttp_enabled: true,
+        ohttp_key_rotation_hours: 1,
+        log_filter: Some("info".to_string()),
+        ..Default::default()
+    };
+    let mut relay_mgr = vauchi_e2e_tests::relay_manager::RelayManager::with_config(relay_config)
+        .await
+        .expect("relay manager");
+    relay_mgr.spawn(1).await.expect("spawn relay");
+
+    let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
+    let mut ohttp_mgr =
+        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
+    ohttp_mgr
+        .spawn(&relay_http_url)
+        .await
+        .expect("spawn ohttp-relay");
+    let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
+
+    let client = reqwest::Client::new();
+    let key_bytes = client
+        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .send()
+        .await
+        .expect("fetch key")
+        .bytes()
+        .await
+        .expect("read key");
+    let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
+    let recipient_id = "a".repeat(64);
+    transport
+        .send_update(&recipient_id, ENCODED_MARKER)
+        .expect("send update via OHTTP");
+
+    let metrics = client
+        .get(relay_mgr.relay(0).expect("relay instance").metrics_url())
+        .send()
+        .await
+        .expect("fetch relay metrics")
+        .text()
+        .await
+        .expect("read relay metrics");
+    let output = relay_mgr
+        .relay(0)
+        .expect("relay instance")
+        .captured_output()
+        .join("\n");
+
+    assert!(
+        output.contains("OHTTP gateway enabled"),
+        "relay output capture must observe the live process"
+    );
+    for forbidden in [PLAINTEXT_MARKER, ENCODED_MARKER, recipient_id.as_str()] {
+        assert!(
+            !output.contains(forbidden),
+            "relay output must not expose {forbidden:?}"
+        );
+        assert!(
+            !metrics.contains(forbidden),
+            "relay metrics must not expose {forbidden:?}"
+        );
+    }
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
+
 // ── P1: Exchange via OHTTP ─────────────────────────────────────────
 
 // @scenario: exchange:OHTTP relay exchange

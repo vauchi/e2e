@@ -6,10 +6,11 @@
 //!
 //! Spawns and manages isolated relay server instances for testing.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -64,6 +65,34 @@ impl OhttpKeyWorkspace {
 
 /// Timeout for relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_CAPTURED_RELAY_OUTPUT_LINES: usize = 1_024;
+
+#[derive(Clone, Default)]
+struct RelayOutputCapture {
+    lines: Arc<Mutex<VecDeque<String>>>,
+}
+
+impl RelayOutputCapture {
+    fn record(&self, line: &str) {
+        let mut lines = self
+            .lines
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if lines.len() == MAX_CAPTURED_RELAY_OUTPUT_LINES {
+            lines.pop_front();
+        }
+        lines.push_back(line.to_string());
+    }
+
+    fn snapshot(&self) -> Vec<String> {
+        self.lines
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .iter()
+            .cloned()
+            .collect()
+    }
+}
 
 /// A running relay server instance.
 pub struct RelayInstance {
@@ -81,6 +110,8 @@ pub struct RelayInstance {
     ohttp_key_file_path: Option<PathBuf>,
     /// The child process handle.
     process: Option<Child>,
+    /// Captured stdout and stderr lines from the relay process.
+    output_capture: RelayOutputCapture,
 }
 
 impl RelayInstance {
@@ -110,6 +141,11 @@ impl RelayInstance {
     /// Check if the relay is running.
     pub fn is_running(&self) -> bool {
         self.process.is_some()
+    }
+
+    /// Returns a snapshot of all relay stdout and stderr lines captured so far.
+    pub fn captured_output(&self) -> Vec<String> {
+        self.output_capture.snapshot()
     }
 }
 
@@ -185,6 +221,9 @@ pub struct RelayConfig {
     /// key survives `restart_relay` and the CLI's injected bundled key
     /// stays valid.
     pub ohttp_key_file_path: Option<PathBuf>,
+    /// Optional relay-specific tracing filter for observer scenarios.
+    /// When unset, the manager inherits `RUST_LOG` from its parent.
+    pub log_filter: Option<String>,
 }
 
 impl Default for RelayConfig {
@@ -206,6 +245,7 @@ impl Default for RelayConfig {
             version_grace_days: None,
             version_changed_at_secs: None,
             ohttp_key_file_path: None,
+            log_filter: None,
         }
     }
 }
@@ -401,7 +441,10 @@ impl RelayManager {
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
         // the relay rejects a request). Default to `warn` for quiet
         // happy-path runs.
-        let relay_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        let relay_log =
+            self.config.log_filter.clone().unwrap_or_else(|| {
+                std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string())
+            });
         env_vars.insert("RUST_LOG".to_string(), relay_log);
         // Strip ANSI colour codes — the subprocess's tty detection
         // treats the inherited stdout/stderr as a colour-capable
@@ -426,7 +469,8 @@ impl RelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
 
-        spawn_relay_drains(&mut child, index);
+        let output_capture = RelayOutputCapture::default();
+        spawn_relay_drains(&mut child, index, output_capture.clone());
 
         // Verify the relay is actually listening and serving requests
         let url = format!("ws://127.0.0.1:{}", port);
@@ -441,6 +485,7 @@ impl RelayManager {
             metrics_port,
             ohttp_key_file_path,
             process: Some(child),
+            output_capture,
         };
 
         self.relays.push(instance);
@@ -585,15 +630,17 @@ impl RelayManager {
         // Get the port and existing OHTTP key file from the current relay
         // instance. Reusing the same key file keeps the CLI's injected
         // bundled key valid after the restart.
-        let (port, metrics_port, existing_key_file) = if let Some(relay) = self.relays.get(index) {
-            (
-                relay.port,
-                relay.metrics_port,
-                relay.ohttp_key_file_path.clone(),
-            )
-        } else {
-            return Err(E2eError::relay(format!("Relay {} not found", index)));
-        };
+        let (port, metrics_port, existing_key_file, output_capture) =
+            if let Some(relay) = self.relays.get(index) {
+                (
+                    relay.port,
+                    relay.metrics_port,
+                    relay.ohttp_key_file_path.clone(),
+                    relay.output_capture.clone(),
+                )
+            } else {
+                return Err(E2eError::relay(format!("Relay {} not found", index)));
+            };
 
         if let Some(relay) = self.relays.get_mut(index)
             && let Some(mut process) = relay.process.take()
@@ -672,7 +719,10 @@ impl RelayManager {
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
         // the relay rejects a request). Default to `warn` for quiet
         // happy-path runs.
-        let relay_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        let relay_log =
+            self.config.log_filter.clone().unwrap_or_else(|| {
+                std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string())
+            });
         env_vars.insert("RUST_LOG".to_string(), relay_log);
         // Strip ANSI colour codes — the subprocess's tty detection
         // treats the inherited stdout/stderr as a colour-capable
@@ -693,7 +743,7 @@ impl RelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to restart relay {}: {}", index, e)))?;
 
-        spawn_relay_drains(&mut child, index);
+        spawn_relay_drains(&mut child, index, output_capture);
 
         self.wait_for_health(port, metrics_port, index, &mut child)
             .await?;
@@ -763,26 +813,25 @@ impl Drop for RelayManager {
 /// `eprintln!` lines hit stderr. The orchestrator pipes both so the
 /// next time a test fails because the relay rejected a request, the
 /// relay's own log line explaining the rejection surfaces.
-fn spawn_relay_drains(child: &mut Child, index: usize) {
+fn spawn_relay_drains(child: &mut Child, index: usize, output_capture: RelayOutputCapture) {
     if let Some(stdout) = child.stdout.take() {
         let fd = stdout
             .into_owned_fd()
             .expect("ChildStdout → OwnedFd (Unix only)");
-        crate::subprocess_log::drain_pipe(
-            fd,
-            format!("relay-{index}-stdout"),
-            move |line| warn!(target: "relay", relay = index, "{}", line),
-        );
+        let capture = output_capture.clone();
+        crate::subprocess_log::drain_pipe(fd, format!("relay-{index}-stdout"), move |line| {
+            capture.record(line);
+            warn!(target: "relay", relay = index, "{}", line);
+        });
     }
     if let Some(stderr) = child.stderr.take() {
         let fd = stderr
             .into_owned_fd()
             .expect("ChildStderr → OwnedFd (Unix only)");
-        crate::subprocess_log::drain_pipe(
-            fd,
-            format!("relay-{index}-stderr"),
-            move |line| warn!(target: "relay", relay = index, "{}", line),
-        );
+        crate::subprocess_log::drain_pipe(fd, format!("relay-{index}-stderr"), move |line| {
+            output_capture.record(line);
+            warn!(target: "relay", relay = index, "{}", line);
+        });
     }
 }
 
@@ -829,6 +878,24 @@ mod tests {
         // base_port 0 means dynamic allocation
         assert_eq!(config.base_port, 0);
         assert_eq!(config.storage_backend, "memory");
+        assert!(config.log_filter.is_none());
+    }
+
+    // @internal
+    #[test]
+    fn relay_output_capture_is_bounded() {
+        let capture = RelayOutputCapture::default();
+        for index in 0..=MAX_CAPTURED_RELAY_OUTPUT_LINES {
+            capture.record(&format!("line-{index}"));
+        }
+
+        let lines = capture.snapshot();
+        assert_eq!(lines.len(), MAX_CAPTURED_RELAY_OUTPUT_LINES);
+        assert_eq!(lines.first(), Some(&"line-1".to_string()));
+        assert_eq!(
+            lines.last(),
+            Some(&format!("line-{MAX_CAPTURED_RELAY_OUTPUT_LINES}"))
+        );
     }
 
     // @internal
