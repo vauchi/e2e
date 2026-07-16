@@ -39,17 +39,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-const DISTINCT_ORIGIN_ERROR: &str = "distinct valid origin";
-const CLI_TIMEOUT: Duration = Duration::from_secs(30);
+pub(crate) const DISTINCT_ORIGIN_ERROR: &str = "distinct valid origin";
+pub(crate) const CLI_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// (label, relay CLI args, extra env) for an origin-boundary probe case.
-type OriginCase = (
+pub(crate) type OriginCase = (
     &'static str,
     Vec<&'static str>,
     Vec<(&'static str, &'static str)>,
 );
 
-fn cli_binary() -> PathBuf {
+pub(crate) fn cli_binary() -> PathBuf {
     if let Ok(dir) = std::env::var("E2E_BIN_DIR") {
         let path = PathBuf::from(&dir).join("vauchi");
         if path.exists() {
@@ -63,16 +63,16 @@ fn cli_binary() -> PathBuf {
     panic!("CLI binary not found; set E2E_BIN_DIR or build cli debug");
 }
 
-struct CliOutcome {
-    success: bool,
-    stdout: String,
-    stderr: String,
-    timed_out: bool,
+pub(crate) struct CliOutcome {
+    pub(crate) success: bool,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
+    pub(crate) timed_out: bool,
 }
 
 /// Runs the CLI with a watchdog: kills the child on timeout so a
 /// fail-open hang is reported as a failure, not a stuck pipeline.
-fn run_cli(args: &[&str], envs: &[(&str, &str)], data_dir: &Path) -> CliOutcome {
+pub(crate) fn run_cli(args: &[&str], envs: &[(&str, &str)], data_dir: &Path) -> CliOutcome {
     let mut cmd = Command::new(cli_binary());
     cmd.arg("--data-dir")
         .arg(data_dir)
@@ -108,7 +108,7 @@ fn run_cli(args: &[&str], envs: &[(&str, &str)], data_dir: &Path) -> CliOutcome 
     }
 }
 
-fn init_probe_identity(data_dir: &Path) {
+pub(crate) fn init_probe_identity(data_dir: &Path) {
     let outcome = run_cli(&["init", "Probe"], &[], data_dir);
     assert!(
         outcome.success,
@@ -118,7 +118,7 @@ fn init_probe_identity(data_dir: &Path) {
 }
 
 #[derive(Clone, Copy)]
-enum KeyMode {
+pub(crate) enum KeyMode {
     Garbage,
     Oversized,
     WrongType,
@@ -127,7 +127,7 @@ enum KeyMode {
 
 /// In-process hostile HTTP endpoint: records every request line and
 /// serves a poisoned `/v2/ohttp-key` response (500 elsewhere).
-struct HostileServer {
+pub(crate) struct HostileServer {
     port: u16,
     requests: Arc<Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
@@ -135,7 +135,7 @@ struct HostileServer {
 }
 
 impl HostileServer {
-    fn start(mode: KeyMode) -> Self {
+    pub(crate) fn start(mode: KeyMode) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("hostile server should bind");
         let port = listener.local_addr().expect("bound addr").port();
         listener
@@ -204,11 +204,11 @@ impl HostileServer {
         let _ = stream.write_all(&body);
     }
 
-    fn url(&self) -> String {
+    pub(crate) fn url(&self) -> String {
         format!("http://127.0.0.1:{}", self.port)
     }
 
-    fn recorded(&self) -> Vec<String> {
+    pub(crate) fn recorded(&self) -> Vec<String> {
         self.requests.lock().expect("request log").clone()
     }
 }

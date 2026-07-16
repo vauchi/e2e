@@ -27,6 +27,7 @@ fn install_rustls_provider() {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 }
 
+mod action_family_oracles;
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;
