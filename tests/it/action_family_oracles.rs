@@ -495,12 +495,11 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
 /// period, `execute-deletion` must deliver Bob's revocation and the
 /// relay purge through the OHTTP outer hop only, and Bob must observe
 /// the revocation. The grace period is crossed by pinning the test
-/// clock (`VAUCHI_TEST_CLOCK_EPOCH`) 8 days ahead on the execute and
-/// on Bob's sync — mailbox tokens are day-epoch-derived, so sender
-/// and receiver must share the pin. GREEN requires the CLI clock seam
-/// (cli!450), the pinned storage clock (cli!452), and the shred OHTTP
-/// path (cli!451); before those merge this fails at the grace gate
-/// ("Grace period has not elapsed").
+/// clock (`VAUCHI_TEST_CLOCK_EPOCH`) is used only while scheduling,
+/// eight days in the past. Execution and Bob's sync use real time, so
+/// the oracle validates normal OHTTP key handling as well as the
+/// deletion fan-out. The variable is compiled into the dedicated E2E
+/// CLI binary only; release binaries ignore it.
 // @internal
 #[tokio::test]
 async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
@@ -525,15 +524,16 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
         "Alice should have Bob staged as a contact"
     );
 
-    // Schedule at real time, one day past the 7-day grace period for
-    // the execute and the receiver's sync.
+    // Schedule eight days in the past with the dedicated E2E binary. The
+    // destructive action and the receiver's sync deliberately use their
+    // normal clocks, avoiding an artificial OHTTP-key time jump.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system clock after epoch")
         .as_secs();
-    let pinned = (now + 8 * 24 * 60 * 60).to_string();
+    let scheduled_at = now.saturating_sub(8 * 24 * 60 * 60).to_string();
 
-    let outcome = run_cli_pty(
+    let outcome = run_cli_pty_env(
         &[
             "gdpr",
             "schedule-deletion",
@@ -544,6 +544,7 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
         ],
         "delete\n",
         alice.path(),
+        &[("VAUCHI_TEST_CLOCK_EPOCH", &scheduled_at)],
     );
     assert!(
         outcome.stdout.contains("Identity deletion scheduled"),
@@ -551,10 +552,10 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
         outcome.stdout
     );
 
-    // Alice executes the deletion with the clock pinned past the grace
-    // period. The fan-out (relay purge + Bob's revocation delivery)
-    // must go through the outer hop; the report must show both legs.
-    let outcome = run_cli_pty_env(
+    // Alice executes after the elapsed grace period. The fan-out (relay
+    // purge + Bob's revocation delivery) must go through the outer hop;
+    // the report must show both legs.
+    let outcome = run_cli_pty(
         &[
             "gdpr",
             "execute-deletion",
@@ -565,7 +566,6 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
         ],
         "EXECUTE\n",
         alice.path(),
-        &[("VAUCHI_TEST_CLOCK_EPOCH", &pinned)],
     );
     assert!(
         !outcome.timed_out,
@@ -588,11 +588,11 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
         outcome.stdout
     );
 
-    // Bob syncs pinned to the same epoch: the delivered revocation
-    // crypto-shreds Alice's CEK and removes her contact row.
+    // Bob's normal-clock sync crypto-shreds Alice's CEK and removes her
+    // contact row after receiving the delivered revocation.
     let sync = run_cli(
         &["sync", "--relay", &app.url(), "--ohttp-relay", &ohttp_url],
-        &[("VAUCHI_TEST_CLOCK_EPOCH", &pinned)],
+        &[],
         bob.path(),
     );
     assert!(sync.success, "pinned sync should succeed: {}", sync.stderr);

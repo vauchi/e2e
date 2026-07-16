@@ -193,6 +193,7 @@ test:smoke:
       RELAY_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" main | cut -f1)
       CLI_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" main | cut -f1)
       CORE_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" main | cut -f1)
+      CLI_BUILD_PROFILE="e2e-test-clock-v1"
 
       CACHED_CORE=""
       [ -f .smoke-bin/core.sha ] && CACHED_CORE=$(cat .smoke-bin/core.sha)
@@ -200,7 +201,7 @@ test:smoke:
       REBUILD_RELAY=1
       REBUILD_CLI=1
       [ -f .smoke-bin/relay.sha ] && [ "$(cat .smoke-bin/relay.sha)" = "$RELAY_HEAD" ] && [ "$CACHED_CORE" = "$CORE_HEAD" ] && [ -x .smoke-bin/vauchi-relay ] && REBUILD_RELAY=0
-      [ -f .smoke-bin/cli.sha ] && [ "$(cat .smoke-bin/cli.sha)" = "$CLI_HEAD" ] && [ "$CACHED_CORE" = "$CORE_HEAD" ] && [ -x .smoke-bin/vauchi ] && REBUILD_CLI=0
+      [ -f .smoke-bin/cli.sha ] && [ "$(cat .smoke-bin/cli.sha)" = "$CLI_HEAD" ] && [ "$CACHED_CORE" = "$CORE_HEAD" ] && [ -f .smoke-bin/cli.build-profile ] && [ "$(cat .smoke-bin/cli.build-profile)" = "$CLI_BUILD_PROFILE" ] && [ -x .smoke-bin/vauchi ] && REBUILD_CLI=0
 
       BUILD_TMPDIR=$(mktemp -d)
 
@@ -216,12 +217,13 @@ test:smoke:
       fi
 
       if [ "$REBUILD_CLI" -eq 1 ]; then
-        echo "Building CLI binary..."
+        echo "Building dedicated E2E CLI binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
-        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml" --features e2e-test-clock
         cp "$BUILD_TMPDIR/cli/target/debug/vauchi" .smoke-bin/
         echo "$CLI_HEAD" > .smoke-bin/cli.sha
+        echo "$CLI_BUILD_PROFILE" > .smoke-bin/cli.build-profile
       else
         echo "CLI binary cached (${CLI_HEAD:0:8})"
       fi
@@ -329,10 +331,12 @@ test:release-rg4-rg5:
       - rg4-rg5-release-results.txt
     expire_in: 1 week
 
-# RG-8 release certification — OHTTP fail-closed adversarial matrix: origin
-# boundary probes (plaintext/TLS-only/ws/escape-hatch/same-origin) and hostile
-# bootstrap poisoning must all fail closed against the release CLI. Blocking
-# named lane mirroring test:release-rg4-rg5.
+# RG-8 release certification — OHTTP fail-closed adversarial matrix plus
+# action-family fan-out: origin boundary probes and hostile bootstrap poisoning
+# must fail closed; device-link, panic-shred, and hard-shred fan-out must use
+# only the OHTTP outer hop. The dedicated E2E CLI contains its compile-time
+# test clock; the shipping CLI does not. Blocking named lane mirroring
+# test:release-rg4-rg5.
 test:release-rg8:
   extends: [.linux-runner, .timeout-standard]
   stage: test
@@ -347,9 +351,11 @@ test:release-rg8:
   script:
     - |
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-relay"
       test -x "$E2E_BIN_DIR/vauchi"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
       cargo nextest run --profile ci --run-ignored default -j 1 \
-        -E 'binary(=it) & test(/ohttp_fail_closed_matrix/)' \
+        -E 'binary(=it) & test(/ohttp_fail_closed_matrix|action_family_oracles/)' \
         2>&1 | tee rg8-release-results.txt
   artifacts:
     when: always
