@@ -35,6 +35,7 @@ mod five_user_exchange;
 mod multi_device_sync;
 mod offline_catchup;
 mod ohttp_advanced;
+mod ohttp_fail_closed_matrix;
 mod ohttp_helpers;
 mod ohttp_integration;
 mod onboarding_flow;
