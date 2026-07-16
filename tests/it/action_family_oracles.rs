@@ -15,14 +15,16 @@
 //!    direct dial is a fail-open regression.
 //! 2. Panic shred: emergency erasure must complete locally even when
 //!    the relay endpoints are hostile, and must not dial either hop
-//!    when there is nothing to notify.
+//!    when there is nothing to notify — and WITH a staged contact the
+//!    revocation delivery and relay purge must traverse the outer hop
+//!    only while the contact observes the revocation.
+//! 3. Scheduled hard shred: after the 7-day grace period (pinned test
+//!    clock), the execute-deletion fan-out must likewise traverse only
+//!    the outer hop and the contact must observe the revocation.
 //!
 //! Claim boundary: the core-level recorder tests of core!1393/1396 pin
 //! the transport construction for these families; these oracles pin
-//! the externally observable CLI behavior. A panic-shred-with-contacts
-//! notification oracle (CLI-driven split-relay exchange to stage a
-//! contact, then asserting the notification traverses only the outer
-//! hop) is tracked as a follow-up in the same problem record.
+//! the externally observable CLI behavior.
 
 use std::io::Write;
 use std::path::Path;
@@ -37,6 +39,16 @@ use super::ohttp_fail_closed_matrix::{
 /// (e.g. "Type 'PANIC'") work. Exit status is not portable across
 /// script(1) variants — assert on output markers, not `success`.
 fn run_cli_pty(args: &[&str], stdin_text: &str, data_dir: &Path) -> CliOutcome {
+    run_cli_pty_env(args, stdin_text, data_dir, &[])
+}
+
+/// `run_cli_pty` with extra environment (e.g. the pinned test clock).
+fn run_cli_pty_env(
+    args: &[&str],
+    stdin_text: &str,
+    data_dir: &Path,
+    envs: &[(&str, &str)],
+) -> CliOutcome {
     let bin = cli_binary();
     let mut full: Vec<String> = vec!["--data-dir".to_string(), data_dir.display().to_string()];
     full.extend(args.iter().map(|arg| arg.to_string()));
@@ -59,6 +71,7 @@ fn run_cli_pty(args: &[&str], stdin_text: &str, data_dir: &Path) -> CliOutcome {
 
     let mut child = Command::new(program)
         .args(&pty_args)
+        .envs(envs.iter().copied())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -459,6 +472,130 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
     // Bob syncs: the delivered revocation crypto-shreds Alice's CEK and
     // removes her contact row.
     sync_cli(bob.path(), &app.url(), &ohttp_url);
+    let bob_contacts = contacts_list(bob.path(), &app.url(), &ohttp_url);
+    assert!(
+        !bob_contacts.contains("Alice"),
+        "Bob must observe Alice's revocation (contact removed), got: {bob_contacts}"
+    );
+
+    // Privacy leg: nothing may have dialed the application-relay
+    // endpoint the devices were configured with.
+    assert!(
+        app.recorded().is_empty(),
+        "no action may dial the application relay directly: {:?}",
+        app.recorded()
+    );
+
+    ohttp_mgr.stop().await;
+    relay_mgr.stop_all().await;
+}
+
+// @scenario: privacy_compliance.feature:Execute deletion after grace period sends revocations and purge
+/// Scheduled hard shred WITH a staged contact: after the 7-day grace
+/// period, `execute-deletion` must deliver Bob's revocation and the
+/// relay purge through the OHTTP outer hop only, and Bob must observe
+/// the revocation. The grace period is crossed by pinning the test
+/// clock (`VAUCHI_TEST_CLOCK_EPOCH`) is used only while scheduling,
+/// eight days in the past. Execution and Bob's sync use real time, so
+/// the oracle validates normal OHTTP key handling as well as the
+/// deletion fan-out. The variable is compiled into the dedicated E2E
+/// CLI binary only; release binaries ignore it.
+// @internal
+#[tokio::test]
+async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
+    let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
+    let app = HostileServer::start(KeyMode::Garbage);
+
+    let alice = tempfile::tempdir().expect("alice data dir");
+    let bob = tempfile::tempdir().expect("bob data dir");
+    init_named_identity(alice.path(), "Alice", &app.url(), &ohttp_url);
+    init_named_identity(bob.path(), "Bob", &app.url(), &ohttp_url);
+
+    // Stage the contact through the OHTTP path — same mutual-exchange
+    // flow as the panic-shred oracle.
+    let alice_qr = exchange_start(alice.path(), &app.url(), &ohttp_url);
+    let bob_qr = exchange_start(bob.path(), &app.url(), &ohttp_url);
+    exchange_complete(bob.path(), &alice_qr, &app.url(), &ohttp_url);
+    exchange_complete(alice.path(), &bob_qr, &app.url(), &ohttp_url);
+    sync_cli(alice.path(), &app.url(), &ohttp_url);
+    sync_cli(bob.path(), &app.url(), &ohttp_url);
+    assert!(
+        contacts_list(alice.path(), &app.url(), &ohttp_url).contains("Bob"),
+        "Alice should have Bob staged as a contact"
+    );
+
+    // Schedule eight days in the past with the dedicated E2E binary. The
+    // destructive action and the receiver's sync deliberately use their
+    // normal clocks, avoiding an artificial OHTTP-key time jump.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock after epoch")
+        .as_secs();
+    let scheduled_at = now.saturating_sub(8 * 24 * 60 * 60).to_string();
+
+    let outcome = run_cli_pty_env(
+        &[
+            "gdpr",
+            "schedule-deletion",
+            "--relay",
+            &app.url(),
+            "--ohttp-relay",
+            &ohttp_url,
+        ],
+        "delete\n",
+        alice.path(),
+        &[("VAUCHI_TEST_CLOCK_EPOCH", &scheduled_at)],
+    );
+    assert!(
+        outcome.stdout.contains("Identity deletion scheduled"),
+        "schedule-deletion should confirm, got stdout: {}",
+        outcome.stdout
+    );
+
+    // Alice executes after the elapsed grace period. The fan-out (relay
+    // purge + Bob's revocation delivery) must go through the outer hop;
+    // the report must show both legs.
+    let outcome = run_cli_pty(
+        &[
+            "gdpr",
+            "execute-deletion",
+            "--relay",
+            &app.url(),
+            "--ohttp-relay",
+            &ohttp_url,
+        ],
+        "EXECUTE\n",
+        alice.path(),
+    );
+    assert!(
+        !outcome.timed_out,
+        "execute deletion must complete bounded, not hang; stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Shred Report"),
+        "execute deletion should report completion, got stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Relay purge sent:       true"),
+        "relay purge must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout
+    );
+    assert!(
+        outcome.stdout.contains("Contacts notified:      1"),
+        "Bob's revocation delivery must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout
+    );
+
+    // Bob's normal-clock sync crypto-shreds Alice's CEK and removes her
+    // contact row after receiving the delivered revocation.
+    let sync = run_cli(
+        &["sync", "--relay", &app.url(), "--ohttp-relay", &ohttp_url],
+        &[],
+        bob.path(),
+    );
+    assert!(sync.success, "pinned sync should succeed: {}", sync.stderr);
     let bob_contacts = contacts_list(bob.path(), &app.url(), &ohttp_url);
     assert!(
         !bob_contacts.contains("Alice"),
