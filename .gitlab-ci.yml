@@ -193,9 +193,10 @@ test:smoke:
       RELAY_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" main | cut -f1)
       CLI_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" main | cut -f1)
       CORE_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" main | cut -f1)
-      # v1 was found to label a non-feature CLI artifact as test-clock
-      # capable. Bump the identity to rebuild it with the command below.
-      CLI_BUILD_PROFILE="e2e-test-clock-v2"
+      # v2 was cached before test:integration validated the feature marker,
+      # so it can still name a normal CLI binary. Bump the identity to
+      # rebuild it with the command below.
+      CLI_BUILD_PROFILE="e2e-test-clock-v3"
 
       CACHED_CORE=""
       [ -f .smoke-bin/core.sha ] && CACHED_CORE=$(cat .smoke-bin/core.sha)
@@ -423,12 +424,16 @@ test:integration:
     - |
       mkdir -p .smoke-bin
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      CLI_BUILD_PROFILE="e2e-test-clock-v3"
 
       # Verify cached binaries are usable (not just present).
       # Stale binaries built against older core versions SIGABRT on startup.
       NEED_REBUILD=0
       if [ ! -x "$E2E_BIN_DIR/vauchi-relay" ] || [ ! -x "$E2E_BIN_DIR/vauchi" ] || [ ! -x "$E2E_BIN_DIR/vauchi-ohttp-relay" ]; then
         echo "Cached binaries not found (need relay, cli, ohttp-relay)"
+        NEED_REBUILD=1
+      elif [ ! -f "$E2E_BIN_DIR/cli.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/cli.build-profile")" != "$CLI_BUILD_PROFILE" ]; then
+        echo "Cached CLI lacks the required E2E test-clock build profile"
         NEED_REBUILD=1
       else
         # Health check: relay should respond to --version without crashing
@@ -456,8 +461,9 @@ test:integration:
         echo "Building CLI binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/cli.git" "$BUILD_TMPDIR/cli"
-        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml"
+        cargo build --manifest-path "$BUILD_TMPDIR/cli/Cargo.toml" --features e2e-test-clock
         cp "$BUILD_TMPDIR/cli/target/debug/vauchi" "$E2E_BIN_DIR/"
+        echo "$CLI_BUILD_PROFILE" > "$E2E_BIN_DIR/cli.build-profile"
 
         echo "Building ohttp-relay binary..."
         git clone --depth=1 --branch main \
