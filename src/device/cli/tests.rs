@@ -106,6 +106,24 @@ Total: 3
 
 // @internal
 #[test]
+fn device_id_parser_selects_the_requested_linked_device() {
+    let output = r#"
+Linked devices:
+  1. Alice_0 [active] (this device)
+     ID: 0102030405060708...
+  2. Alice_1 [active]
+     ID: 1112131415161718...
+"#;
+
+    assert_eq!(
+        CliDevice::device_id_for_name(output, "Alice_1"),
+        Some("1112131415161718".to_string())
+    );
+    assert_eq!(CliDevice::device_id_for_name(output, "Alice_2"), None);
+}
+
+// @internal
+#[test]
 fn label_parser_ignores_missing_localization_diagnostics() {
     let output = r#"
 Missing: cli.labels.list.header

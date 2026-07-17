@@ -155,6 +155,13 @@ pub trait Device: Send + Sync {
     /// List linked devices.
     async fn list_devices(&self) -> E2eResult<Vec<String>>;
 
+    /// Revoke the linked device identified by its display name.
+    async fn revoke_device_named(&self, _device_name: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Device revocation is not supported on this device type".to_string(),
+        ))
+    }
+
     /// Sync with the relay server.
     async fn sync(&self) -> E2eResult<()>;
 
@@ -185,6 +192,27 @@ pub trait Device: Send + Sync {
 
     /// Update the display name.
     async fn edit_name(&self, name: &str) -> E2eResult<()>;
+
+    /// Add an owner-private personal note to a contact.
+    async fn add_personal_note(&self, _contact: &str, _note: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Personal notes not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Read an owner-private personal note from a contact.
+    async fn read_personal_note(&self, _contact: &str) -> E2eResult<Option<String>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Personal notes not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Delete an owner-private personal note from a contact.
+    async fn delete_personal_note(&self, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Personal notes not supported on this device type".to_string(),
+        ))
+    }
 
     /// Create a visibility label.
     async fn create_label(&self, _name: &str) -> E2eResult<()> {

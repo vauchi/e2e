@@ -302,6 +302,30 @@ impl Orchestrator {
         self.ohttp_relay_manager.as_ref().and_then(|m| m.url())
     }
 
+    /// Arm the E2E-only outer-relay duplicate-delivery controller.
+    pub async fn arm_ohttp_duplicate_next_forward(&self) -> E2eResult<()> {
+        let manager = self.ohttp_relay_manager.as_ref().ok_or_else(|| {
+            E2eError::relay("duplicate OHTTP delivery requires an outer OHTTP relay")
+        })?;
+        manager.arm_duplicate_next_forward().await
+    }
+
+    /// Arm the E2E-only outer-relay opaque-forward reorder controller.
+    pub async fn arm_ohttp_reorder_next_forward(&self) -> E2eResult<()> {
+        let manager = self.ohttp_relay_manager.as_ref().ok_or_else(|| {
+            E2eError::relay("reordered OHTTP delivery requires an outer OHTTP relay")
+        })?;
+        manager.arm_reorder_next_forward().await
+    }
+
+    /// Wait until the E2E-only outer relay has held its reordered forward.
+    pub async fn wait_for_ohttp_reorder_pending(&self) -> E2eResult<()> {
+        let manager = self.ohttp_relay_manager.as_ref().ok_or_else(|| {
+            E2eError::relay("reordered OHTTP delivery requires an outer OHTTP relay")
+        })?;
+        manager.wait_for_reorder_pending().await
+    }
+
     fn cli_ohttp_route_url(&self) -> E2eResult<String> {
         self.ohttp_relay_url()
             .map_or_else(|| self.primary_relay_http_url(), Ok)
@@ -393,6 +417,57 @@ impl Orchestrator {
         self.users.insert(name, user.clone());
 
         Ok(user)
+    }
+
+    /// Add a split-OHTTP user whose devices each receive their own test-only
+    /// environment values, while the outer relay route remains fixed.
+    pub fn add_user_split_ohttp_with_device_envs(
+        &mut self,
+        name: impl Into<String>,
+        device_extra_envs: Vec<HashMap<String, String>>,
+    ) -> E2eResult<Arc<RwLock<User>>> {
+        if device_extra_envs.is_empty() {
+            return Err(E2eError::user(
+                "split-OHTTP user requires at least one device",
+            ));
+        }
+
+        let name = name.into();
+        let relay_url = self.primary_relay_http_url()?;
+        let ohttp_url = self.ohttp_relay_url().ok_or_else(|| {
+            E2eError::relay(
+                "add_user_split_ohttp_with_device_envs requires \
+                 OrchestratorConfig::with_ohttp_relay",
+            )
+        })?;
+        let mut user = User::with_relay(&name, &relay_url);
+        for mut extra_env in device_extra_envs {
+            extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url.clone());
+            user.add_cli_device_with_env(&relay_url, &extra_env)?;
+        }
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+        Ok(user)
+    }
+
+    /// Add one CLI device to an existing user through the production-shaped
+    /// split relay and OHTTP route.
+    pub async fn add_cli_device_split_ohttp(&self, user_name: &str) -> E2eResult<usize> {
+        let relay_url = self.primary_relay_http_url()?;
+        let ohttp_url = self.ohttp_relay_url().ok_or_else(|| {
+            E2eError::relay(
+                "add_cli_device_split_ohttp requires OrchestratorConfig::with_ohttp_relay",
+            )
+        })?;
+        let user = self
+            .user(user_name)
+            .ok_or_else(|| E2eError::user(format!("User '{user_name}' not found")))?;
+        let mut extra_env = HashMap::new();
+        extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
+        user.write()
+            .await
+            .add_cli_device_with_env(&relay_url, &extra_env)
     }
 
     /// Get a user by name.

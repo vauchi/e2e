@@ -183,42 +183,48 @@ impl User {
             return Ok(());
         }
 
+        for i in 1..self.devices.len() {
+            self.link_device(i).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Link one newly-created secondary device to the primary device.
+    pub async fn link_device(&self, device_index: usize) -> E2eResult<()> {
+        if device_index == 0 || device_index >= self.devices.len() {
+            return Err(E2eError::user(format!(
+                "Device {device_index} is not an unlinked secondary device"
+            )));
+        }
+
+        info!("Linking device {device_index} for user '{}'", self.name);
         let primary = self
             .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
+        let secondary = &self.devices[device_index];
+        let link_qr = primary.read().await.start_device_link().await?;
+        let device_name = format!("{}_{}", self.name, device_index);
+        let request_data = secondary
+            .read()
+            .await
+            .join_identity(&link_qr, &device_name)
+            .await?;
+        let response_data = primary
+            .read()
+            .await
+            .complete_device_link(&request_data)
+            .await?;
+        secondary
+            .read()
+            .await
+            .finish_device_join(&response_data)
+            .await?;
 
-        for i in 1..self.devices.len() {
-            info!("Linking device {} for user '{}'", i, self.name);
-
-            // Step 1: Primary generates link QR
-            let link_qr = {
-                let device = primary.read().await;
-                device.start_device_link().await?
-            };
-
-            // Step 2: Secondary joins with QR
-            let secondary = &self.devices[i];
-            let request_data = {
-                let device = secondary.read().await;
-                let device_name = format!("{}_{}", self.name, i);
-                device.join_identity(&link_qr, &device_name).await?
-            };
-
-            // Step 3: Primary completes the link
-            let response_data = {
-                let device = primary.read().await;
-                device.complete_device_link(&request_data).await?
-            };
-
-            // Step 4: Secondary finishes joining
-            {
-                let device = secondary.read().await;
-                device.finish_device_join(&response_data).await?;
-            }
-
-            info!("Device {} linked successfully for user '{}'", i, self.name);
-        }
-
+        info!(
+            "Device {device_index} linked successfully for user '{}'",
+            self.name
+        );
         Ok(())
     }
 

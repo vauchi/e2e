@@ -337,6 +337,24 @@ impl CliDevice {
             .collect()
     }
 
+    fn device_id_for_name(output: &str, device_name: &str) -> Option<String> {
+        let mut is_requested_device = false;
+        for line in output.lines() {
+            let line = line.trim();
+            if let Some((ordinal, device)) = line.split_once(". ")
+                && ordinal.parse::<usize>().is_ok()
+            {
+                let name = device.split_once(" [").map_or(device, |(name, _)| name);
+                is_requested_device = name == device_name;
+                continue;
+            }
+            if is_requested_device && let Some(device_id) = line.strip_prefix("ID: ") {
+                return Some(device_id.trim_end_matches("...").to_string());
+            }
+        }
+        None
+    }
+
     fn parse_labels(output: &str) -> Vec<String> {
         let mut labels = Vec::new();
         for line in output.lines() {
@@ -722,6 +740,18 @@ impl Device for CliDevice {
         Ok(Self::parse_devices(&output))
     }
 
+    async fn revoke_device_named(&self, device_name: &str) -> E2eResult<()> {
+        let output = self.run_command_success(&["device", "list"]).await?;
+        let device_id = Self::device_id_for_name(&output, device_name).ok_or_else(|| {
+            E2eError::device(format!(
+                "Linked device '{device_name}' has no listed device ID"
+            ))
+        })?;
+        self.run_command_success(&["device", "revoke", &device_id, "--yes"])
+            .await?;
+        Ok(())
+    }
+
     async fn sync(&self) -> E2eResult<()> {
         // Retry on relay rate-limit (429) with exponential backoff.
         // The test relay enforces per-client token-bucket rate limiting;
@@ -829,6 +859,34 @@ impl Device for CliDevice {
 
     async fn edit_name(&self, name: &str) -> E2eResult<()> {
         self.run_command_success(&["card", "edit-name", name])
+            .await?;
+        Ok(())
+    }
+
+    async fn add_personal_note(&self, contact: &str, note: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "add-note", contact, note])
+            .await?;
+        Ok(())
+    }
+
+    async fn read_personal_note(&self, contact: &str) -> E2eResult<Option<String>> {
+        let output = self
+            .run_command_success(&["contacts", "show-note", contact])
+            .await?;
+        let line = output
+            .lines()
+            .map(str::trim)
+            .rfind(|line| !line.is_empty())
+            .unwrap_or_default();
+        if line.contains("No note for ") {
+            Ok(None)
+        } else {
+            Ok(Some(line.to_string()))
+        }
+    }
+
+    async fn delete_personal_note(&self, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "delete-note", contact])
             .await?;
         Ok(())
     }

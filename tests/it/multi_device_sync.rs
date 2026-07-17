@@ -322,19 +322,10 @@ async fn integration_cross_device_card_convergence() {
 // @internal
 #[tokio::test]
 async fn integration_six_device_exchange_and_update_convergence() {
-    for (device_index, alice_phone, bob_phone) in [
-        (0, "+12025550101", "+12025550201"),
-        (1, "+12025550102", "+12025550202"),
-        (2, "+12025550103", "+12025550203"),
-    ] {
-        certify_six_device_role(device_index, alice_phone, bob_phone).await;
-    }
-}
-
-async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &str) {
-    let alice_phone_label = format!("ReleasePhone{}", device_index + 1);
-    let bob_phone_label = format!("ReleaseBobPhone{}", device_index + 1);
-    let mut orch = Orchestrator::new();
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
     orch.start().await.expect("Failed to start orchestrator");
 
     let cli_url = orch
@@ -355,8 +346,10 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
         "certification traffic must traverse a distinct OHTTP origin"
     );
 
-    orch.add_user("Alice", 3).expect("Failed to add Alice");
-    orch.add_user("Bob", 3).expect("Failed to add Bob");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
     orch.create_all_identities()
         .await
         .expect("Failed to create identities");
@@ -370,6 +363,935 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
             .expect("All devices should synchronize linked-device topology");
     }
 
+    assert_six_device_owner_topology(&orch).await;
+
+    for (device_index, alice_phone, bob_phone) in [
+        (0, "+12025550101", "+12025550201"),
+        (1, "+12025550102", "+12025550202"),
+        (2, "+12025550103", "+12025550203"),
+    ] {
+        certify_six_device_role(&orch, device_index, alice_phone, bob_phone).await;
+    }
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
+/// Release certification: a linked device on each side misses live sync while
+/// both owners update, then catches up to the exact permitted contact cards.
+// @internal
+#[tokio::test]
+async fn integration_six_device_offline_catchup_converges_exact_values() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("all linked devices should synchronize their topology");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("Alice device should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("Bob device should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("Bob device should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("Alice device should complete exchange");
+        for _ in 0..2 {
+            alice.sync_all().await.expect("Alice exchange sync");
+            bob.sync_all().await.expect("Bob exchange sync");
+        }
+
+        let alice_device = alice.device(1).expect("A2 should exist").clone();
+        let alice_device = alice_device.read().await;
+        alice_device
+            .add_field("phone", "OfflineAlicePhone", "+12025550301")
+            .await
+            .expect("A2 should publish while A3 is offline");
+        alice_device
+            .unhide_field_to_contact("Bob", "OfflineAlicePhone")
+            .await
+            .expect("A2 should permit Bob to receive the field");
+
+        let bob_device = bob.device(1).expect("B2 should exist").clone();
+        let bob_device = bob_device.read().await;
+        bob_device
+            .add_field("phone", "OfflineBobPhone", "+12025550401")
+            .await
+            .expect("B2 should publish while B3 is offline");
+        bob_device
+            .unhide_field_to_contact("Alice", "OfflineBobPhone")
+            .await
+            .expect("B2 should permit Alice to receive the field");
+    }
+
+    // A3 and B3 deliberately remain offline while their sibling devices
+    // receive and exchange updates.
+    for _ in 0..3 {
+        let alice = alice.read().await;
+        alice.sync_device(0).await.expect("A1 sync should succeed");
+        alice.sync_device(1).await.expect("A2 sync should succeed");
+        drop(alice);
+        let bob = bob.read().await;
+        bob.sync_device(0).await.expect("B1 sync should succeed");
+        bob.sync_device(1).await.expect("B2 sync should succeed");
+    }
+
+    for _ in 0..5 {
+        orch.sync_all()
+            .await
+            .expect("offline devices should catch up");
+        let missing_alice =
+            missing_six_device_phone_cards(&alice, &bob, "OfflineAlicePhone", "+12025550301").await;
+        let missing_bob =
+            missing_six_device_bob_phone_cards(&alice, &bob, "OfflineBobPhone", "+12025550401")
+                .await;
+        if missing_alice.is_empty() && missing_bob.is_empty() {
+            orch.stop().await.expect("Failed to stop orchestrator");
+            return;
+        }
+    }
+
+    let missing_alice =
+        missing_six_device_phone_cards(&alice, &bob, "OfflineAlicePhone", "+12025550301").await;
+    let missing_bob =
+        missing_six_device_bob_phone_cards(&alice, &bob, "OfflineBobPhone", "+12025550401").await;
+    assert!(
+        missing_alice.is_empty(),
+        "offline A3/B3 catch-up lost Alice's permitted update on {missing_alice:?}"
+    );
+    assert!(
+        missing_bob.is_empty(),
+        "offline A3/B3 catch-up lost Bob's permitted update on {missing_bob:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
+/// Release certification: the application relay is unavailable while both
+/// owners publish permitted updates from linked devices. Once the split-OHTTP
+/// route recovers, all owner and peer copies must converge to the exact values.
+// @internal
+#[tokio::test]
+async fn integration_six_device_faulted_relay_delivery_converges_exact_values() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("all linked devices should synchronize their topology");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("Alice device should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("Bob device should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("Bob device should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("Alice device should complete exchange");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("exchange state should synchronize before the outage");
+    }
+
+    // This faults the application relay behind the OHTTP outer hop. The
+    // updates remain local and must be retried after the same relay restarts.
+    orch.stop_relay(0)
+        .await
+        .expect("Failed to stop the application relay");
+    {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        let a2 = a2.read().await;
+        a2.add_field("phone", "FaultedAlicePhone", "+12025550801")
+            .await
+            .expect("A2 should retain its update while delivery is faulted");
+        a2.unhide_field_to_contact("Bob", "FaultedAlicePhone")
+            .await
+            .expect("A2 should permit Bob to receive the queued update");
+
+        let bob = bob.read().await;
+        let b2 = bob.device(1).expect("B2 should exist").clone();
+        let b2 = b2.read().await;
+        b2.add_field("phone", "FaultedBobPhone", "+12025550901")
+            .await
+            .expect("B2 should retain its update while delivery is faulted");
+        b2.unhide_field_to_contact("Alice", "FaultedBobPhone")
+            .await
+            .expect("B2 should permit Alice to receive the queued update");
+    }
+    let _ = orch.sync_all().await;
+
+    orch.restart_relay(0)
+        .await
+        .expect("Failed to restart the application relay");
+    for _ in 0..6 {
+        orch.sync_all()
+            .await
+            .expect("faulted relay delivery should recover through split OHTTP");
+        let missing_alice =
+            missing_six_device_phone_cards(&alice, &bob, "FaultedAlicePhone", "+12025550801").await;
+        let missing_bob =
+            missing_six_device_bob_phone_cards(&alice, &bob, "FaultedBobPhone", "+12025550901")
+                .await;
+        if missing_alice.is_empty() && missing_bob.is_empty() {
+            orch.stop().await.expect("Failed to stop orchestrator");
+            return;
+        }
+    }
+
+    let missing_alice =
+        missing_six_device_phone_cards(&alice, &bob, "FaultedAlicePhone", "+12025550801").await;
+    let missing_bob =
+        missing_six_device_bob_phone_cards(&alice, &bob, "FaultedBobPhone", "+12025550901").await;
+    assert!(
+        missing_alice.is_empty(),
+        "faulted relay delivery lost Alice's permitted update on {missing_alice:?}"
+    );
+    assert!(
+        missing_bob.is_empty(),
+        "faulted relay delivery lost Bob's permitted update on {missing_bob:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
+/// Release certification: one opaque update delivery is duplicated after the
+/// six-device exchange topology is synchronized. All owner and peer copies
+/// must retain the exact permitted value after the duplicate delivery.
+// @internal
+#[tokio::test]
+async fn integration_six_device_duplicate_ohttp_delivery_converges_exact_values() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("all linked devices should synchronize their topology");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("Alice device should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("Bob device should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("Bob device should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("Alice device should complete exchange");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("exchange state should synchronize before the fault");
+    }
+
+    {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        let a2 = a2.read().await;
+        a2.add_field("phone", "DuplicateAlicePhone", "+12025550802")
+            .await
+            .expect("A2 should add its update before the duplicate delivery");
+    }
+    orch.arm_ohttp_duplicate_next_forward()
+        .await
+        .expect("E2E OHTTP relay should arm exactly one duplicate delivery");
+    {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        a2.read()
+            .await
+            .unhide_field_to_contact("Bob", "DuplicateAlicePhone")
+            .await
+            .expect("A2 should publish the duplicated permitted update");
+    }
+
+    for _ in 0..6 {
+        orch.sync_all()
+            .await
+            .expect("duplicate OHTTP delivery should converge through the outer relay");
+        let missing =
+            missing_six_device_phone_cards(&alice, &bob, "DuplicateAlicePhone", "+12025550802")
+                .await;
+        if missing.is_empty() {
+            orch.stop().await.expect("Failed to stop orchestrator");
+            return;
+        }
+    }
+
+    let missing =
+        missing_six_device_phone_cards(&alice, &bob, "DuplicateAlicePhone", "+12025550802").await;
+    assert!(
+        missing.is_empty(),
+        "duplicate OHTTP delivery lost Alice's permitted update on {missing:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Simultaneous linked-device edits converge
+/// Release certification: concurrent edits to one visible field from two
+/// linked devices converge on every owner and peer card through split OHTTP.
+// @internal
+#[tokio::test]
+async fn integration_six_device_concurrent_field_edits_converge() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+    assert_six_device_owner_topology(&orch).await;
+    for (device_index, alice_phone, bob_phone) in [
+        (0, "+12025550601", "+12025550701"),
+        (1, "+12025550602", "+12025550702"),
+        (2, "+12025550603", "+12025550703"),
+    ] {
+        certify_six_device_role(&orch, device_index, alice_phone, bob_phone).await;
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a1 = a1.read().await;
+        a1.add_field("phone", "ConcurrentPhone", "+12025550500")
+            .await
+            .expect("A1 should add the shared field");
+        a1.unhide_field_to_contact("Bob", "ConcurrentPhone")
+            .await
+            .expect("A1 should permit Bob to receive the field");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("field setup should synchronize");
+    }
+
+    // Do not sync between the edits: both devices author a competing update
+    // from the same pre-edit field state. ADR-020 resolves the conflict by
+    // `(timestamp, device_id)` after the following deliberately reordered syncs.
+    let (a1, a2) = {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        (a1, a2)
+    };
+    let (a1_edit, a2_edit) = tokio::join!(
+        async {
+            a1.read()
+                .await
+                .edit_field("ConcurrentPhone", "+12025550501")
+                .await
+        },
+        async {
+            a2.read()
+                .await
+                .edit_field("ConcurrentPhone", "+12025550502")
+                .await
+        },
+    );
+    a1_edit.expect("A1 concurrent edit should succeed");
+    a2_edit.expect("A2 concurrent edit should succeed");
+
+    orch.arm_ohttp_reorder_next_forward()
+        .await
+        .expect("E2E OHTTP relay should arm one reordered delivery");
+    let first_sync = tokio::spawn(async move { a1.read().await.sync().await });
+    orch.wait_for_ohttp_reorder_pending()
+        .await
+        .expect("first concurrent sync should reach the E2E OHTTP relay");
+    let a2_sync = a2.read().await.sync().await;
+    let a1_sync = first_sync
+        .await
+        .expect("A1 concurrent sync task should not panic");
+    a1_sync.expect("A1 concurrent sync should succeed");
+    a2_sync.expect("A2 concurrent sync should succeed");
+
+    let mut winner = None;
+    let mut last_missing_alice = Vec::new();
+    let mut last_peer_values = Vec::new();
+    for _ in 0..6 {
+        orch.sync_all()
+            .await
+            .expect("concurrent edits should synchronize");
+        let value = {
+            let alice_guard = alice.read().await;
+            alice_guard
+                .get_card_on_device(0)
+                .await
+                .expect("A1 owner card should be readable")
+                .fields
+                .into_iter()
+                .find(|field| field.label == "ConcurrentPhone")
+                .map(|field| field.value)
+                .expect("A1 should retain the concurrently edited field")
+        };
+
+        let missing_alice =
+            missing_six_device_phone_cards(&alice, &bob, "ConcurrentPhone", &value).await;
+        if missing_alice.is_empty() {
+            winner = Some(value);
+            break;
+        }
+        last_missing_alice = missing_alice;
+        let bob_guard = bob.read().await;
+        last_peer_values = Vec::new();
+        for device_index in 0..3 {
+            let device = bob_guard
+                .device(device_index)
+                .expect("Bob device should exist");
+            let value = device
+                .read()
+                .await
+                .get_contact_card("Alice")
+                .await
+                .ok()
+                .flatten()
+                .and_then(|card| {
+                    card.fields
+                        .into_iter()
+                        .find(|field| field.label == "ConcurrentPhone")
+                        .map(|field| field.value)
+                });
+            last_peer_values.push(format!("B{}={value:?}", device_index + 1));
+        }
+    }
+
+    assert!(
+        matches!(winner.as_deref(), Some("+12025550501" | "+12025550502")),
+        "all six owner and peer cards must converge to one concurrent-write winner; \
+         got {winner:?}; missing Alice update on {last_missing_alice:?}; \
+         peer values {last_peer_values:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
+/// Release certification: a bounded A2 clock skew must deterministically win
+/// a concurrent visible-field edit and converge through split OHTTP.
+// @internal
+#[tokio::test]
+async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock should be after the Unix epoch")
+        .as_secs();
+    let mut a2_env = std::collections::HashMap::new();
+    a2_env.insert(
+        "VAUCHI_TEST_CLOCK_EPOCH".to_string(),
+        now.saturating_add(30).to_string(),
+    );
+
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp_with_device_envs(
+        "Alice",
+        vec![
+            std::collections::HashMap::new(),
+            a2_env,
+            std::collections::HashMap::new(),
+        ],
+    )
+    .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp_with_device_envs(
+        "Bob",
+        vec![
+            std::collections::HashMap::new(),
+            std::collections::HashMap::new(),
+            std::collections::HashMap::new(),
+        ],
+    )
+    .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("exchange state should synchronize before skewed edits");
+    }
+
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a1 = a1.read().await;
+        a1.add_field("phone", "ClockSkewPhone", "+12025551100")
+            .await
+            .expect("A1 should add the shared field");
+        a1.unhide_field_to_contact("Bob", "ClockSkewPhone")
+            .await
+            .expect("A1 should permit Bob to receive the shared field");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("shared field should synchronize before competing edits");
+    }
+
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        a1.read()
+            .await
+            .edit_field("ClockSkewPhone", "+12025551101")
+            .await
+            .expect("A1 should make the earlier edit");
+        a2.read()
+            .await
+            .edit_field("ClockSkewPhone", "+12025551102")
+            .await
+            .expect("A2 should make the bounded-skew later edit");
+    }
+
+    let mut missing = Vec::new();
+    for _ in 0..6 {
+        orch.sync_all()
+            .await
+            .expect("bounded-skew concurrent edits should synchronize");
+        missing =
+            missing_six_device_phone_cards(&alice, &bob, "ClockSkewPhone", "+12025551102").await;
+        if missing.is_empty() {
+            orch.stop().await.expect("Failed to stop orchestrator");
+            return;
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "A2's bounded clock-skew winner must converge to every owner and peer card; missing on {missing:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Complete owner-private state converges across linked devices
+/// A personal note must converge only among Alice's linked devices, and a
+/// deletion must remove it everywhere rather than leaving an owner-private
+/// copy on a sibling or peer device.
+// @internal
+#[tokio::test]
+async fn integration_six_device_personal_note_tombstone_converges_owner_only() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+    }
+
+    let note = "private note must never reach Bob";
+    {
+        let alice = alice.read().await;
+        alice
+            .device(0)
+            .expect("A1 should exist")
+            .read()
+            .await
+            .add_personal_note("Bob", note)
+            .await
+            .expect("A1 should add Bob's owner-private note");
+    }
+
+    for _ in 0..5 {
+        orch.sync_all().await.expect("note sync should succeed");
+        let alice = alice.read().await;
+        let mut notes = Vec::new();
+        for device_index in 0..3 {
+            notes.push(
+                alice
+                    .device(device_index)
+                    .expect("Alice device should exist")
+                    .read()
+                    .await
+                    .read_personal_note("Bob")
+                    .await
+                    .expect("owner device should read Bob's note"),
+            );
+        }
+        if notes.iter().all(|value| value.as_deref() == Some(note)) {
+            break;
+        }
+    }
+
+    {
+        let alice = alice.read().await;
+        for device_index in 0..3 {
+            let value = alice
+                .device(device_index)
+                .expect("Alice device should exist")
+                .read()
+                .await
+                .read_personal_note("Bob")
+                .await
+                .expect("owner device should read Bob's note");
+            assert_eq!(
+                value.as_deref(),
+                Some(note),
+                "A{} must contain the exact owner-private note",
+                device_index + 1
+            );
+        }
+    }
+    {
+        let bob = bob.read().await;
+        for device_index in 0..3 {
+            let value = bob
+                .device(device_index)
+                .expect("Bob device should exist")
+                .read()
+                .await
+                .read_personal_note("Alice")
+                .await
+                .expect("Bob device should read its own note state");
+            assert_eq!(
+                value,
+                None,
+                "B{} must not receive Alice's owner-private note",
+                device_index + 1
+            );
+        }
+    }
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(0)
+            .expect("A1 should exist")
+            .read()
+            .await
+            .delete_personal_note("Bob")
+            .await
+            .expect("A1 should delete Bob's owner-private note");
+    }
+    for _ in 0..5 {
+        orch.sync_all()
+            .await
+            .expect("tombstone sync should succeed");
+        let alice = alice.read().await;
+        let mut all_removed = true;
+        for device_index in 0..3 {
+            let value = alice
+                .device(device_index)
+                .expect("Alice device should exist")
+                .read()
+                .await
+                .read_personal_note("Bob")
+                .await
+                .expect("owner device should read deleted note state");
+            all_removed &= value.is_none();
+        }
+        if all_removed {
+            break;
+        }
+    }
+    {
+        let alice = alice.read().await;
+        for device_index in 0..3 {
+            let value = alice
+                .device(device_index)
+                .expect("Alice device should exist")
+                .read()
+                .await
+                .read_personal_note("Bob")
+                .await
+                .expect("owner device should read deleted note state");
+            assert_eq!(
+                value,
+                None,
+                "A{} must remove the owner-private note after its tombstone",
+                device_index + 1
+            );
+        }
+    }
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Revocation and replacement preserve continuity
+/// Release certification: after an exchanged three-device topology gains A4
+/// and revokes A2, the active devices retain the exact permitted update.
+// @internal
+#[tokio::test]
+async fn integration_six_device_replacement_and_revocation_preserve_active_convergence() {
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        ..Default::default()
+    });
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+    }
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("exchange state should synchronize before replacement");
+    }
+
+    let a4_index = orch
+        .add_cli_device_split_ohttp("Alice")
+        .await
+        .expect("A4 should use the same split-OHTTP route");
+    {
+        let alice = alice.read().await;
+        alice
+            .link_device(a4_index)
+            .await
+            .expect("A4 should link to Alice's existing identity");
+    }
+    for _ in 0..3 {
+        orch.sync_all()
+            .await
+            .expect("A4 should receive the linked-device topology");
+    }
+
+    {
+        let alice = alice.read().await;
+        let a4 = alice.device(a4_index).expect("A4 should exist").clone();
+        let a4 = a4.read().await;
+        a4.add_field("phone", "ReplacementAlicePhone", "+12025551001")
+            .await
+            .expect("A4 should publish after joining");
+        a4.unhide_field_to_contact("Bob", "ReplacementAlicePhone")
+            .await
+            .expect("A4 should permit Bob to receive the field");
+    }
+    for _ in 0..5 {
+        orch.sync_all()
+            .await
+            .expect("A4's permitted update should converge before revocation");
+    }
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(0)
+            .expect("A1 should exist")
+            .read()
+            .await
+            .revoke_device_named("Alice_1")
+            .await
+            .expect("A1 should revoke A2");
+    }
+    for _ in 0..5 {
+        orch.sync_all()
+            .await
+            .expect("revocation should converge without losing A4's update");
+    }
+
+    let missing = missing_active_replacement_phone_cards(
+        &alice,
+        &bob,
+        a4_index,
+        "ReplacementAlicePhone",
+        "+12025551001",
+    )
+    .await;
+    assert!(
+        missing.is_empty(),
+        "A1, A3, A4, and every Bob device must retain A4's permitted update after A2 is revoked; missing on {missing:?}"
+    );
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+async fn assert_six_device_owner_topology(orch: &Orchestrator) {
     let alice = orch.user("Alice").expect("Alice should exist");
     let bob = orch.user("Bob").expect("Bob should exist");
 
@@ -393,6 +1315,18 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
             );
         }
     }
+}
+
+async fn certify_six_device_role(
+    orch: &Orchestrator,
+    device_index: usize,
+    phone: &str,
+    bob_phone: &str,
+) {
+    let alice_phone_label = format!("ReleasePhone{}", device_index + 1);
+    let bob_phone_label = format!("ReleaseBobPhone{}", device_index + 1);
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
 
     {
         let alice = alice.read().await;
@@ -485,8 +1419,6 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
         device_index + 1,
         device_index + 1
     );
-
-    orch.stop().await.expect("Failed to stop orchestrator");
 }
 
 async fn missing_six_device_phone_cards(
@@ -560,6 +1492,45 @@ async fn missing_six_device_bob_phone_cards(
                     .iter()
                     .any(|field| field.label == field_label && field.value == phone) => {}
             _ => missing.push(format!("A{} Bob contact", device_index + 1)),
+        }
+    }
+    missing
+}
+
+async fn missing_active_replacement_phone_cards(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    replacement_index: usize,
+    field_label: &str,
+    phone: &str,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    let alice = alice.read().await;
+    for device_index in [0, 2, replacement_index] {
+        match alice.get_card_on_device(device_index).await {
+            Ok(card)
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == field_label && field.value == phone) => {}
+            _ => missing.push(format!("A{} owner card", device_index + 1)),
+        }
+    }
+    drop(alice);
+
+    let bob = bob.read().await;
+    for device_index in 0..3 {
+        let Some(device) = bob.device(device_index) else {
+            missing.push(format!("B{} device", device_index + 1));
+            continue;
+        };
+        match device.read().await.get_contact_card("Alice").await {
+            Ok(Some(card))
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == field_label && field.value == phone) => {}
+            _ => missing.push(format!("B{} Alice contact", device_index + 1)),
         }
     }
     missing

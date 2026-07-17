@@ -21,6 +21,12 @@ use crate::relay_manager::find_available_port;
 
 /// Timeout for vauchi-ohttp-relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
+/// Feature-gated test control path exposed only by the E2E fault relay binary.
+const E2E_DUPLICATE_NEXT_FORWARD_PATH: &str = "/__e2e/duplicate-next-forward";
+/// Feature-gated test control path for one reordered pair of opaque forwards.
+const E2E_REORDER_NEXT_FORWARD_PATH: &str = "/__e2e/reorder-next-forward";
+/// Feature-gated test status path for the reordered opaque forward.
+const E2E_REORDER_STATUS_PATH: &str = "/__e2e/reorder-status";
 
 /// Configuration for the OHTTP relay proxy.
 #[derive(Debug, Clone)]
@@ -292,6 +298,83 @@ impl OhttpRelayManager {
     /// Get the URL clients should use (the vauchi-ohttp-relay's listen address).
     pub fn url(&self) -> Option<String> {
         self.instance.as_ref().map(|i| i.url())
+    }
+
+    /// Arm the feature-gated relay to duplicate its next opaque forward.
+    pub async fn arm_duplicate_next_forward(&self) -> E2eResult<()> {
+        self.arm_e2e_fault(E2E_DUPLICATE_NEXT_FORWARD_PATH).await
+    }
+
+    /// Arm the feature-gated relay to reorder its next two opaque forwards.
+    pub async fn arm_reorder_next_forward(&self) -> E2eResult<()> {
+        self.arm_e2e_fault(E2E_REORDER_NEXT_FORWARD_PATH).await
+    }
+
+    /// Wait until the feature-gated relay has held the first reordered forward.
+    pub async fn wait_for_reorder_pending(&self) -> E2eResult<()> {
+        let instance = self
+            .instance
+            .as_ref()
+            .ok_or_else(|| E2eError::relay("OHTTP relay is not running"))?;
+        let endpoint = format!("{}{}", instance.url(), E2E_REORDER_STATUS_PATH);
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .map_err(|e| E2eError::relay(format!("Failed to create HTTP client: {e}")))?;
+
+        for _ in 0..100 {
+            let response = client.get(&endpoint).send().await.map_err(|e| {
+                E2eError::relay(format!("Failed to read OHTTP relay fault status: {e}"))
+            })?;
+            if response.status() != reqwest::StatusCode::OK {
+                return Err(E2eError::relay(format!(
+                    "OHTTP relay fault controller returned {}",
+                    response.status()
+                )));
+            }
+            match response
+                .text()
+                .await
+                .map_err(|e| {
+                    E2eError::relay(format!("Failed to read OHTTP relay fault response: {e}"))
+                })?
+                .as_str()
+            {
+                "pending" => return Ok(()),
+                "idle" => tokio::task::yield_now().await,
+                status => {
+                    return Err(E2eError::relay(format!(
+                        "OHTTP relay fault controller returned unexpected status: {status}"
+                    )));
+                }
+            }
+        }
+        Err(E2eError::timeout(
+            "OHTTP relay did not hold the first reordered forward",
+        ))
+    }
+
+    async fn arm_e2e_fault(&self, path: &str) -> E2eResult<()> {
+        let instance = self
+            .instance
+            .as_ref()
+            .ok_or_else(|| E2eError::relay("OHTTP relay is not running"))?;
+        let endpoint = format!("{}{}", instance.url(), path);
+        let response = reqwest::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .map_err(|e| E2eError::relay(format!("Failed to create HTTP client: {e}")))?
+            .post(&endpoint)
+            .send()
+            .await
+            .map_err(|e| E2eError::relay(format!("Failed to arm OHTTP relay fault: {e}")))?;
+        if response.status() != reqwest::StatusCode::NO_CONTENT {
+            return Err(E2eError::relay(format!(
+                "OHTTP relay fault controller returned {}",
+                response.status()
+            )));
+        }
+        Ok(())
     }
 
     /// Stop the OHTTP relay.

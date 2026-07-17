@@ -252,7 +252,7 @@ test:smoke:
         echo "Building ohttp-relay binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
-        cargo build --release --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" .smoke-bin/
         echo "$OHTTP_HEAD" > .smoke-bin/ohttp.sha
       else
@@ -286,10 +286,12 @@ test:smoke:
   # release lanes.
   timeout: 1 hour
 
-# RG-3 release certification — exact two-user exchange and update propagation
-# through distinct outer OHTTP and application-relay hops. This named lane is
-# intentionally narrower than test:integration so release evidence can point
-# to one stable, blocking contract on merge requests, main, and schedules.
+# RG-4/RG-5 release certification, plus the personal-note RG-10 slice —
+# exact six-device convergence through distinct outer OHTTP and application
+# relay hops. Full owner-private-state certification remains a separate gate.
+# This named lane is intentionally narrower than test:integration so release
+# evidence can point to one stable, blocking contract on merge requests, main,
+# and schedules.
 test:release-rg3:
   extends: [.linux-runner, .timeout-standard]
   stage: test
@@ -340,7 +342,7 @@ test:release-rg4-rg5:
       test -x "$E2E_BIN_DIR/vauchi"
       test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
       cargo nextest run --profile ci --run-ignored default -j 1 \
-        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)' \
+        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_(exchange_and_update_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|personal_note_tombstone_converges_owner_only|replacement_and_revocation_preserve_active_convergence)/)' \
         2>&1 | tee rg4-rg5-release-results.txt
   artifacts:
     when: always
@@ -488,7 +490,7 @@ test:integration:
         echo "Building ohttp-relay binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
-        cargo build --release --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$E2E_BIN_DIR/"
 
         rm -rf "$BUILD_TMPDIR"
