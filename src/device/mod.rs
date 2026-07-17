@@ -122,6 +122,20 @@ pub trait Device: Send + Sync {
     /// Get the relay URL this device connects to.
     fn relay_url(&self) -> &str;
 
+    /// Set one environment variable on future commands from this test device.
+    fn set_command_env(&mut self, _key: &str, _value: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Command environment is not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Remove one environment variable from future commands from this test device.
+    fn remove_command_env(&mut self, _key: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Command environment is not supported on this device type".to_string(),
+        ))
+    }
+
     /// Create a new identity with the given display name.
     async fn create_identity(&self, name: &str) -> E2eResult<()>;
 

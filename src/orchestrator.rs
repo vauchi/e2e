@@ -566,13 +566,18 @@ impl Orchestrator {
             user.complete_exchange(&qr_b).await?;
         }
 
-        {
-            let user = user_a.read().await;
-            user.sync_all().await?;
-        }
-        {
-            let user = user_b.read().await;
-            user.sync_all().await?;
+        // The exchange completion messages establish the first ratchet
+        // direction. Run a complete receive/send round for both peers so
+        // callers can immediately publish cards or visibility changes.
+        for _ in 0..2 {
+            {
+                let user = user_a.read().await;
+                user.sync_all().await?;
+            }
+            {
+                let user = user_b.read().await;
+                user.sync_all().await?;
+            }
         }
 
         Ok(())

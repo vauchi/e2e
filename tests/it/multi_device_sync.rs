@@ -868,16 +868,6 @@ async fn integration_six_device_concurrent_field_edits_converge() {
 // @internal
 #[tokio::test]
 async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system clock should be after the Unix epoch")
-        .as_secs();
-    let mut a2_env = std::collections::HashMap::new();
-    a2_env.insert(
-        "VAUCHI_TEST_CLOCK_EPOCH".to_string(),
-        now.saturating_add(30).to_string(),
-    );
-
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
         inject_local_ohttp_key_into_cli: false,
         ..Default::default()
@@ -887,7 +877,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
         "Alice",
         vec![
             std::collections::HashMap::new(),
-            a2_env,
+            std::collections::HashMap::new(),
             std::collections::HashMap::new(),
         ],
     )
@@ -966,11 +956,28 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
             .edit_field("ClockSkewPhone", "+12025551101")
             .await
             .expect("A1 should make the earlier edit");
-        a2.read()
-            .await
-            .edit_field("ClockSkewPhone", "+12025551102")
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after the Unix epoch")
+            .as_secs();
+        let a2_clock_epoch = now.saturating_add(30).to_string();
+        let mut a2 = a2.write().await;
+        a2.set_command_env("VAUCHI_TEST_CLOCK_EPOCH", &a2_clock_epoch)
+            .expect("A2 should accept the scoped test clock");
+        a2.edit_field("ClockSkewPhone", "+12025551102")
             .await
             .expect("A2 should make the bounded-skew later edit");
+        a2.remove_command_env("VAUCHI_TEST_CLOCK_EPOCH")
+            .expect("A2 should restore its normal command environment");
+        assert!(
+            a2.get_card()
+                .await
+                .expect("A2 owner card should be readable after its edit")
+                .fields
+                .iter()
+                .any(|field| field.label == "ClockSkewPhone" && field.value == "+12025551102"),
+            "A2 must retain its bounded-skew local write before synchronization"
+        );
     }
 
     let mut missing = Vec::new();
@@ -1317,6 +1324,18 @@ async fn assert_six_device_owner_topology(orch: &Orchestrator) {
     }
 }
 
+fn exchanged_contact_id(contacts: &[Contact], display_name: &str) -> String {
+    contacts
+        .iter()
+        .find(|contact| contact.name == display_name && contact.id.is_some())
+        .and_then(|contact| contact.id.clone())
+        .unwrap_or_else(|| {
+            panic!(
+                "exchange should leave an addressable {display_name} contact; contacts={contacts:?}"
+            )
+        })
+}
+
 async fn certify_six_device_role(
     orch: &Orchestrator,
     device_index: usize,
@@ -1328,7 +1347,7 @@ async fn certify_six_device_role(
     let alice = orch.user("Alice").expect("Alice should exist");
     let bob = orch.user("Bob").expect("Bob should exist");
 
-    {
+    let (alice_bob_contact_id, bob_alice_contact_id) = {
         let alice = alice.read().await;
         let bob = bob.read().await;
         let alice_qr = alice
@@ -1346,6 +1365,20 @@ async fn certify_six_device_role(
             .complete_exchange_on_device(device_index, &bob_qr)
             .await
             .expect("Alice device should complete exchange");
+
+        let alice_bob_contact_id = exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(device_index)
+                .await
+                .expect("Alice exchange device should list contacts after exchange"),
+            "Bob",
+        );
+        let bob_alice_contact_id = exchanged_contact_id(
+            &bob.list_contacts_on_device(device_index)
+                .await
+                .expect("Bob exchange device should list contacts after exchange"),
+            "Alice",
+        );
 
         for _ in 0..2 {
             alice
@@ -1367,7 +1400,7 @@ async fn certify_six_device_role(
             .await
             .expect("Alice exchange device should publish phone update");
         device
-            .unhide_field_to_contact("Bob", &alice_phone_label)
+            .unhide_field_to_contact(&alice_bob_contact_id, &alice_phone_label)
             .await
             .expect("Alice should permit Bob to receive the phone update");
 
@@ -1381,10 +1414,12 @@ async fn certify_six_device_role(
             .await
             .expect("Bob exchange device should publish phone update");
         bob_device
-            .unhide_field_to_contact("Alice", &bob_phone_label)
+            .unhide_field_to_contact(&bob_alice_contact_id, &bob_phone_label)
             .await
             .expect("Bob should permit Alice to receive the phone update");
-    }
+
+        (alice_bob_contact_id, bob_alice_contact_id)
+    };
 
     let mut missing_cards = Vec::new();
     let mut missing_bob_cards = Vec::new();
@@ -1398,10 +1433,22 @@ async fn certify_six_device_role(
             bob.sync_all().await.expect("Bob sync should succeed");
         }
 
-        missing_cards =
-            missing_six_device_phone_cards(&alice, &bob, &alice_phone_label, phone).await;
-        missing_bob_cards =
-            missing_six_device_bob_phone_cards(&alice, &bob, &bob_phone_label, bob_phone).await;
+        missing_cards = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            &alice_phone_label,
+            phone,
+        )
+        .await;
+        missing_bob_cards = missing_six_device_bob_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &alice_bob_contact_id,
+            &bob_phone_label,
+            bob_phone,
+        )
+        .await;
         if missing_cards.is_empty() && missing_bob_cards.is_empty() {
             break;
         }
@@ -1427,6 +1474,16 @@ async fn missing_six_device_phone_cards(
     field_label: &str,
     phone: &str,
 ) -> Vec<String> {
+    missing_six_device_phone_cards_by_contact_id(alice, bob, "Alice", field_label, phone).await
+}
+
+async fn missing_six_device_phone_cards_by_contact_id(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    alice_contact_id: &str,
+    field_label: &str,
+    phone: &str,
+) -> Vec<String> {
     let mut missing = Vec::new();
     let alice = alice.read().await;
     for device_index in 0..3 {
@@ -1447,7 +1504,7 @@ async fn missing_six_device_phone_cards(
             missing.push(format!("B{} device", device_index + 1));
             continue;
         };
-        match device.read().await.get_contact_card("Alice").await {
+        match device.read().await.get_contact_card(alice_contact_id).await {
             Ok(Some(card))
                 if card
                     .fields
@@ -1462,6 +1519,16 @@ async fn missing_six_device_phone_cards(
 async fn missing_six_device_bob_phone_cards(
     alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
     bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    field_label: &str,
+    phone: &str,
+) -> Vec<String> {
+    missing_six_device_bob_phone_cards_by_contact_id(alice, bob, "Bob", field_label, phone).await
+}
+
+async fn missing_six_device_bob_phone_cards_by_contact_id(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob_contact_id: &str,
     field_label: &str,
     phone: &str,
 ) -> Vec<String> {
@@ -1485,7 +1552,7 @@ async fn missing_six_device_bob_phone_cards(
             missing.push(format!("A{} device", device_index + 1));
             continue;
         };
-        match device.read().await.get_contact_card("Bob").await {
+        match device.read().await.get_contact_card(bob_contact_id).await {
             Ok(Some(card))
                 if card
                     .fields

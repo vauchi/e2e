@@ -212,40 +212,15 @@ async fn test_exchange_already_contact() {
         .await
         .expect("Bob should have 1 contact");
 
-    // Alice generates a new QR code for a second exchange
-    let alice = orch.user("Alice").unwrap();
-    let qr_data = {
-        let alice_guard = alice.read().await;
-        alice_guard
-            .generate_qr()
-            .await
-            .expect("Failed to generate QR")
-    };
-
-    // Bob attempts to exchange again with Alice. Bob must start his own
-    // offline responder session first — completing without a pending
-    // session is rejected with "no pending qr exchange" since the
-    // offline-exchange protocol (00747b9) requires both peers to start.
-    let bob = orch.user("Bob").unwrap();
-    {
-        let bob_guard = bob.read().await;
-        bob_guard
-            .generate_qr()
-            .await
-            .expect("Failed to generate Bob's QR");
-    }
-    let second_exchange_result = {
-        let bob_guard = bob.read().await;
-        bob_guard.complete_exchange(&qr_data).await
-    };
-
-    // The second exchange should either:
-    // 1. Succeed and update the existing contact (no duplicate created), or
-    // 2. Return an error indicating the contact already exists
-    //
-    // Either behavior is acceptable - the key invariant is no duplicate contact.
+    // A fresh reciprocal exchange rekeys the existing contact without adding
+    // a duplicate. Both participants must start the new exchange first.
+    orch.exchange("Alice", "Bob")
+        .await
+        .expect("Repeat exchange should rekey the existing contact");
 
     // Sync both users
+    let alice = orch.user("Alice").unwrap();
+    let bob = orch.user("Bob").unwrap();
     {
         let alice_guard = alice.read().await;
         alice_guard.sync_all().await.expect("Alice sync failed");
@@ -260,20 +235,6 @@ async fn test_exchange_already_contact() {
     orch.verify_contact_count("Bob", 1)
         .await
         .expect("Bob should still have exactly 1 contact (no duplicate)");
-
-    // If the second exchange returned an error, verify it mentions duplicate/existing
-    if let Err(e) = second_exchange_result {
-        let error_msg = e.to_string().to_lowercase();
-        // Error should indicate existing contact or already connected
-        assert!(
-            error_msg.contains("already")
-                || error_msg.contains("exist")
-                || error_msg.contains("duplicate")
-                || error_msg.contains("contact"),
-            "Error should indicate duplicate contact: {}",
-            error_msg
-        );
-    }
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }

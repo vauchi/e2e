@@ -41,6 +41,22 @@ fn test_parse_contacts_empty() {
 
 // @internal
 #[test]
+fn test_parse_contacts_raw_preserves_full_contact_ids() {
+    let contacts = CliDevice::parse_contacts_raw(
+        r#"[{"id":"aabbccddeeff00112233445566778899","display_name":"Bob","fingerprint_verified":true,"recovery_trusted":false,"card":{"display_name":"Bob","fields":[]}}]"#,
+    )
+    .expect("raw contacts list should parse");
+
+    assert_eq!(contacts.len(), 1);
+    assert_eq!(
+        contacts[0].id.as_deref(),
+        Some("aabbccddeeff00112233445566778899")
+    );
+    assert!(contacts[0].verified);
+}
+
+// @internal
+#[test]
 fn test_parse_contacts_with_data() {
     let output = r#"
 Contacts (2):

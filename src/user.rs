@@ -421,8 +421,12 @@ impl User {
         other.complete_exchange(&my_qr).await?;
         self.complete_exchange(&their_qr).await?;
 
-        self.sync_all().await?;
-        other.sync_all().await?;
+        // Complete both ratchet directions before returning, so an immediate
+        // card or visibility mutation never depends on delivery timing.
+        for _ in 0..2 {
+            self.sync_all().await?;
+            other.sync_all().await?;
+        }
 
         Ok(())
     }

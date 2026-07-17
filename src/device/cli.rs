@@ -21,6 +21,8 @@ use crate::error::{E2eError, E2eResult};
 
 const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
 
+mod raw;
+
 fn configure_command_environment(command: &mut Command, extra_env: &HashMap<String, String>) {
     for (key, value) in extra_env {
         command.env(key, value);
@@ -29,25 +31,6 @@ fn configure_command_environment(command: &mut Command, extra_env: &HashMap<Stri
     // The E2E harness must remain fail closed even when the parent shell or a
     // caller tries to inject the retired development escape hatch.
     command.env_remove(ALLOW_DIRECT_ENV);
-}
-
-/// Raw JSON representation of `vauchi card show --raw`.
-#[derive(Debug, serde::Deserialize)]
-struct RawCard {
-    display_name: String,
-    fields: Vec<RawCardField>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct RawCardField {
-    field_type: String,
-    label: String,
-    value: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct RawContact {
-    card: RawCard,
 }
 
 /// A device controlled via the CLI.
@@ -254,6 +237,7 @@ impl CliDevice {
     /// │ 1 │ Bob  │ bcdbedd4... │ not verified │
     /// ╰───┴──────┴─────────────┴──────────────╯
     /// ```
+    #[cfg(test)]
     fn parse_contacts(output: &str) -> Vec<Contact> {
         let mut contacts = Vec::new();
 
@@ -548,44 +532,6 @@ impl CliDevice {
         Ok(ContactCard { name, fields })
     }
 
-    /// Parse a contact card from the `--raw` JSON output.
-    ///
-    /// `--raw` is the preferred parser entry point: it is independent of
-    /// icon tokens, column widths, and terminal styling, so CLI display
-    /// changes cannot silently break field-level assertions.
-    fn parse_card_raw(output: &str) -> E2eResult<ContactCard> {
-        let raw: RawCard = serde_json::from_str(output).map_err(|e| {
-            E2eError::parse_output(format!("Failed to parse 'card show --raw' JSON: {e}"))
-        })?;
-
-        Ok(Self::contact_card_from_raw(raw))
-    }
-
-    fn parse_contact_card_raw(output: &str) -> E2eResult<ContactCard> {
-        let raw: RawContact = serde_json::from_str(output).map_err(|e| {
-            E2eError::parse_output(format!("Failed to parse 'contacts show --raw' JSON: {e}"))
-        })?;
-
-        Ok(Self::contact_card_from_raw(raw.card))
-    }
-
-    fn contact_card_from_raw(raw: RawCard) -> ContactCard {
-        let fields = raw
-            .fields
-            .into_iter()
-            .map(|f| CardField {
-                field_type: f.field_type.to_lowercase(),
-                label: f.label,
-                value: f.value,
-            })
-            .collect();
-
-        ContactCard {
-            name: raw.display_name,
-            fields,
-        }
-    }
-
     /// Extract QR data from CLI output.
     fn extract_qr_data(output: &str) -> E2eResult<String> {
         // Look for lines that contain base64-like data (long string without spaces)
@@ -653,6 +599,16 @@ impl Device for CliDevice {
 
     fn relay_url(&self) -> &str {
         &self.relay_url
+    }
+
+    fn set_command_env(&mut self, key: &str, value: &str) -> E2eResult<()> {
+        self.extra_env.insert(key.to_string(), value.to_string());
+        Ok(())
+    }
+
+    fn remove_command_env(&mut self, key: &str) -> E2eResult<()> {
+        self.extra_env.remove(key);
+        Ok(())
     }
 
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
@@ -792,8 +748,10 @@ impl Device for CliDevice {
     }
 
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
-        let output = self.run_command_success(&["contacts", "list"]).await?;
-        Ok(Self::parse_contacts(&output))
+        let output = self
+            .run_command_success(&["--raw", "contacts", "list"])
+            .await?;
+        Self::parse_contacts_raw(&output)
     }
 
     async fn get_contact(&self, name_or_id: &str) -> E2eResult<Option<Contact>> {

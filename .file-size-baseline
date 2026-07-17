@@ -7,3 +7,4 @@
 
 # SPLIT — Phase 4: per-command-category handlers
 src/yaml/executor.rs 1353
+tests/it/multi_device_sync.rs exempt
