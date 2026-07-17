@@ -332,6 +332,8 @@ async fn integration_six_device_exchange_and_update_convergence() {
 }
 
 async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &str) {
+    let alice_phone_label = format!("ReleasePhone{}", device_index + 1);
+    let bob_phone_label = format!("ReleaseBobPhone{}", device_index + 1);
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -427,11 +429,11 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
             .clone();
         let device = device.read().await;
         device
-            .add_field("phone", "ReleasePhone", phone)
+            .add_field("phone", &alice_phone_label, phone)
             .await
             .expect("Alice exchange device should publish phone update");
         device
-            .unhide_field_to_contact("Bob", "ReleasePhone")
+            .unhide_field_to_contact("Bob", &alice_phone_label)
             .await
             .expect("Alice should permit Bob to receive the phone update");
 
@@ -441,11 +443,11 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
             .clone();
         let bob_device = bob_device.read().await;
         bob_device
-            .add_field("phone", "ReleaseBobPhone", bob_phone)
+            .add_field("phone", &bob_phone_label, bob_phone)
             .await
             .expect("Bob exchange device should publish phone update");
         bob_device
-            .unhide_field_to_contact("Alice", "ReleaseBobPhone")
+            .unhide_field_to_contact("Alice", &bob_phone_label)
             .await
             .expect("Bob should permit Alice to receive the phone update");
     }
@@ -462,8 +464,10 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
             bob.sync_all().await.expect("Bob sync should succeed");
         }
 
-        missing_cards = missing_six_device_phone_cards(&alice, &bob, phone).await;
-        missing_bob_cards = missing_six_device_bob_phone_cards(&alice, &bob, bob_phone).await;
+        missing_cards =
+            missing_six_device_phone_cards(&alice, &bob, &alice_phone_label, phone).await;
+        missing_bob_cards =
+            missing_six_device_bob_phone_cards(&alice, &bob, &bob_phone_label, bob_phone).await;
         if missing_cards.is_empty() && missing_bob_cards.is_empty() {
             break;
         }
@@ -488,6 +492,7 @@ async fn certify_six_device_role(device_index: usize, phone: &str, bob_phone: &s
 async fn missing_six_device_phone_cards(
     alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
     bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    field_label: &str,
     phone: &str,
 ) -> Vec<String> {
     let mut missing = Vec::new();
@@ -498,7 +503,7 @@ async fn missing_six_device_phone_cards(
                 if card
                     .fields
                     .iter()
-                    .any(|field| field.label == "ReleasePhone" && field.value == phone) => {}
+                    .any(|field| field.label == field_label && field.value == phone) => {}
             _ => missing.push(format!("A{} owner card", device_index + 1)),
         }
     }
@@ -515,7 +520,7 @@ async fn missing_six_device_phone_cards(
                 if card
                     .fields
                     .iter()
-                    .any(|field| field.label == "ReleasePhone" && field.value == phone) => {}
+                    .any(|field| field.label == field_label && field.value == phone) => {}
             _ => missing.push(format!("B{} Alice contact", device_index + 1)),
         }
     }
@@ -525,6 +530,7 @@ async fn missing_six_device_phone_cards(
 async fn missing_six_device_bob_phone_cards(
     alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
     bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    field_label: &str,
     phone: &str,
 ) -> Vec<String> {
     let mut missing = Vec::new();
@@ -535,7 +541,7 @@ async fn missing_six_device_bob_phone_cards(
                 if card
                     .fields
                     .iter()
-                    .any(|field| field.label == "ReleaseBobPhone" && field.value == phone) => {}
+                    .any(|field| field.label == field_label && field.value == phone) => {}
             _ => missing.push(format!("B{} owner card", device_index + 1)),
         }
     }
@@ -552,7 +558,7 @@ async fn missing_six_device_bob_phone_cards(
                 if card
                     .fields
                     .iter()
-                    .any(|field| field.label == "ReleaseBobPhone" && field.value == phone) => {}
+                    .any(|field| field.label == field_label && field.value == phone) => {}
             _ => missing.push(format!("A{} Bob contact", device_index + 1)),
         }
     }
