@@ -7,7 +7,24 @@ use std::collections::HashMap;
 
 use tokio::process::Command;
 
-use super::{CliDevice, configure_command_environment};
+use super::{CliDevice, configure_command_environment, rate_limit_retry_after};
+
+// @internal
+#[test]
+fn sync_retry_delay_detects_rate_limit_warning_on_success_stdout() {
+    let stdout = b"\xe2\x9c\x93 Connected\n\n\xe2\x84\xb9 Sync complete: No new messages or pending updates\n\
+        \xe2\x9a\xa0 Sync error: incoming: Rate limited (retry after 10s)\n";
+
+    assert_eq!(rate_limit_retry_after(stdout, b""), Some(10));
+    assert_eq!(
+        rate_limit_retry_after(b"", b"Rate limited (retry after 7s)"),
+        Some(7)
+    );
+    assert_eq!(
+        rate_limit_retry_after(b"Sync complete: No new messages", b""),
+        None
+    );
+}
 
 // @internal
 #[test]
