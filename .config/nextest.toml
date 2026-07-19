@@ -7,6 +7,22 @@
 [test-groups.relay-tests]
 max-threads = 4
 
+# Per-test budget: under runner contention every test inflates ~10-15x
+# (observed 2026-07-16/17, problems/2026-07-19-e2e-multi-device-
+# serialization-hang). 15 min bounds ordinary tests (~10x headroom over
+# the 54s green max); the four heavy exclusive tests get 30 min in their
+# override below. Without terminate-after, nextest reports SLOW but never
+# kills — the 45-65 min runner kill was the only backstop and surfaced as
+# inscrutable `job_token_expired` instead of a named, debuggable failure.
+# Guarded by scripts/check-test-timeouts.sh — do not remove.
+[profile.default.slow-timeout]
+period = "60s"
+terminate-after = 15
+
+[profile.ci.slow-timeout]
+period = "60s"
+terminate-after = 15
+
 [[profile.default.overrides]]
 filter = "binary(=it)"
 test-group = "relay-tests"
@@ -14,6 +30,8 @@ test-group = "relay-tests"
 [[profile.default.overrides]]
 filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/cross_platform::integration_mixed_devices/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
 threads-required = "num-test-threads"
+# Heavy mesh tests passed at 1370s under contention — budget 30 min.
+slow-timeout = { period = "60s", terminate-after = 30 }
 
 [profile.ci.junit]
 # Path is relative to nextest's output dir (target/nextest/ci/), not project root.
@@ -26,3 +44,4 @@ test-group = "relay-tests"
 [[profile.ci.overrides]]
 filter = "test(/five_user_exchange::integration_five_user_exchange/) | test(/onboarding_flow::test_time_to_value_under_2_minutes/) | test(/cross_platform::integration_mixed_devices/) | test(/multi_device_sync::integration_six_device_exchange_and_update_convergence/)"
 threads-required = "num-test-threads"
+slow-timeout = { period = "60s", terminate-after = 30 }

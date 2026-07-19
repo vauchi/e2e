@@ -192,7 +192,13 @@ impl CliDevice {
             .arg("--relay")
             .arg(&self.relay_url)
             .args(args)
-            .stdin(std::process::Stdio::null());
+            .stdin(std::process::Stdio::null())
+            // Reap the child when the timeout below fires — otherwise the
+            // timed-out `vauchi sync` keeps running, holds its data-dir
+            // lock, and compounds runner contention for the rest of the
+            // job (problems/2026-07-19-e2e-multi-device-serialization-hang).
+            // Guarded by scripts/check-test-timeouts.sh — do not remove.
+            .kill_on_drop(true);
 
         configure_command_environment(&mut cmd, &self.extra_env);
 

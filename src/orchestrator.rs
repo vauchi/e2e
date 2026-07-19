@@ -188,14 +188,40 @@ impl Orchestrator {
             let relay_http_url = self.primary_relay_http_url()?;
             let key_url = format!("{}/v2/ohttp-key", relay_http_url.trim_end_matches('/'));
             debug!("Fetching local relay OHTTP gateway key from {key_url}");
-            let bytes = reqwest::get(&key_url)
-                .await
-                .map_err(|e| E2eError::scenario(format!("Failed to fetch {key_url}: {e}")))?
-                .error_for_status()
-                .map_err(|e| E2eError::scenario(format!("{key_url} returned non-2xx: {e}")))?
-                .bytes()
-                .await
-                .map_err(|e| E2eError::scenario(format!("Failed to read {key_url} body: {e}")))?;
+            // Bounded fetch: a relay that accepts TCP but stalls would
+            // otherwise hang Orchestrator::start() (and the whole test)
+            // forever — the bare `reqwest::get` had no timeout
+            // (problems/2026-07-19-e2e-multi-device-serialization-hang).
+            // Guarded by scripts/check-test-timeouts.sh — do not revert
+            // to the unbounded call.
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .map_err(|e| E2eError::scenario(format!("HTTP client build failed: {e}")))?;
+            let mut last_err = String::new();
+            let mut fetched = None;
+            for attempt in 1..=3u32 {
+                match client.get(&key_url).send().await {
+                    Ok(resp) => match resp.error_for_status() {
+                        Ok(ok) => match ok.bytes().await {
+                            Ok(b) => {
+                                fetched = Some(b);
+                                break;
+                            }
+                            Err(e) => last_err = format!("read body: {e}"),
+                        },
+                        Err(e) => last_err = format!("non-2xx: {e}"),
+                    },
+                    Err(e) => last_err = format!("request: {e}"),
+                }
+                debug!("OHTTP key fetch attempt {attempt} failed: {last_err}");
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            let bytes = fetched.ok_or_else(|| {
+                E2eError::scenario(format!(
+                    "Failed to fetch {key_url} after 3 attempts: {last_err}"
+                ))
+            })?;
             self.cli_bundled_ohttp_key_hex = Some(hex::encode(&bytes));
             info!(
                 "Injecting local relay OHTTP gateway key into cli subprocesses ({} bytes)",

@@ -161,6 +161,18 @@ security:deny:
 test:smoke:
   extends: [.linux-runner, .timeout-standard]
   stage: test
+  # Self-heal contention episodes: a lane killed by the runner/job
+  # timeout (uniform 10-15x inflation under host contention,
+  # problems/2026-07-19-e2e-multi-device-serialization-hang) reruns once
+  # automatically, usually into a quieter window. Real test failures
+  # (script_failure) are NOT retried. max: 1 bounds the runner cost.
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - job_execution_timeout
+      - unknown_failure
   needs:
     - job: lint:format
       optional: true
@@ -410,6 +422,14 @@ test:release-rg8:
 test:integration:
   extends: [.linux-runner, .timeout-long]
   stage: test
+  # Same self-heal rationale as test:smoke above.
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - job_execution_timeout
+      - unknown_failure
   needs:
     - job: test:smoke
       optional: true
@@ -514,6 +534,7 @@ check:test-lane-coverage:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - sh scripts/check-test-lane-coverage.sh
+    - sh scripts/check-test-timeouts.sh
 
 # GitLab security templates configuration
 # Override child analyzer jobs (not parent stubs) to add tags and rules
