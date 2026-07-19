@@ -33,6 +33,21 @@ fn configure_command_environment(command: &mut Command, extra_env: &HashMap<Stri
     command.env_remove(ALLOW_DIRECT_ENV);
 }
 
+fn rate_limit_retry_after(stdout: &[u8], stderr: &[u8]) -> Option<u64> {
+    [stdout, stderr].into_iter().find_map(|bytes| {
+        let text = String::from_utf8_lossy(bytes);
+        let rate_limit = text.find("Rate limited")?;
+        let retry_after = text[rate_limit..]
+            .find("retry after ")
+            .and_then(|position| {
+                let value = &text[rate_limit + position + 12..];
+                value.split('s').next()?.trim().parse::<u64>().ok()
+            })
+            .unwrap_or(10);
+        Some(retry_after)
+    })
+}
+
 /// A device controlled via the CLI.
 pub struct CliDevice {
     /// Device name/identifier.
@@ -717,19 +732,18 @@ impl Device for CliDevice {
         const MAX_RETRIES: u32 = 3;
         for attempt in 0..=MAX_RETRIES {
             let output = self.run_command(&["sync"]).await?;
-            if output.status.success() {
-                return Ok(());
-            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            if stderr.contains("Rate limited") && attempt < MAX_RETRIES {
-                // Parse "retry after Ns" from stderr, fall back to 10s.
-                let retry_after = stderr
-                    .find("retry after ")
-                    .and_then(|pos| {
-                        let rest = &stderr[pos + 12..];
-                        rest.split('s').next()?.trim().parse::<u64>().ok()
-                    })
-                    .unwrap_or(10);
+            if let Some(retry_after) = rate_limit_retry_after(&output.stdout, &output.stderr) {
+                if attempt == MAX_RETRIES {
+                    return Err(E2eError::CliCommand {
+                        command: "vauchi sync".to_string(),
+                        stderr: format!(
+                            "rate limited after {} attempts; stdout: {stdout}; stderr: {stderr}",
+                            MAX_RETRIES + 1
+                        ),
+                    });
+                }
                 let wait_secs = retry_after + (attempt as u64 * 2);
                 debug!(
                     "Sync rate-limited, retrying in {wait_secs}s (attempt {}/{})",
@@ -738,6 +752,9 @@ impl Device for CliDevice {
                 );
                 tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
                 continue;
+            }
+            if output.status.success() {
+                return Ok(());
             }
             return Err(E2eError::CliCommand {
                 command: "vauchi sync".to_string(),
