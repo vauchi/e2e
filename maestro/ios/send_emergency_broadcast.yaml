@@ -11,6 +11,8 @@ appId: app.vauchi.ios
 ---
 
 # Navigate to Settings > Emergency Broadcast
+- tapOn:
+    id: "tab.more"
 - tapOn: "Settings"
 - tapOn: "Emergency Broadcast"
 

@@ -3,8 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # iOS Maestro Flow: Delete Decoy Contact
-# Removes a decoy contact from the duress profile.
-# Requires a decoy contact to exist.
+# Rewritten 2026-07-18: decoy management now lives at
+# Settings > Decoy Contacts with tap-row → InlineConfirm delete
+# (was Settings > Duress PIN with a per-row trash button).
+#
+# Precondition: a decoy contact exists (run add_decoy_contact.yaml first)
 # Environment variables:
 #   DECOY_NAME - Name of the decoy contact to delete (required)
 
@@ -12,21 +15,47 @@ appId: app.vauchi.ios
 
 ---
 
-# Navigate to Settings > Duress PIN
-- tapOn: "Settings"
-- tapOn: "Duress PIN"
-
-# Verify decoy contact exists
-- assertVisible: ${DECOY_NAME}
-
-# Delete the decoy contact (tap trash icon next to name)
-# The delete button is in the same row as the contact name
+# Navigate to More > Settings > Decoy Contacts by wire ids (deterministic
+# — text taps on sectioned rows are flaky, see
+# problems/2026-07-18-ios-sectioned-action-rows-not-addressable).
 - tapOn:
-    id: "delete_decoy_${DECOY_NAME}"
-
+    id: "tab.more"
+- waitForAnimationToEnd
+# The More list keeps its scroll position across navigations — scroll
+# back to top so the Settings row is on-screen before tapping
+- swipe:
+    direction: DOWN
+    duration: 300
+- waitForAnimationToEnd
+- tapOn:
+    id: "more_menu.primary.settings"
+    repeat: 2
+    delay: 800
 - waitForAnimationToEnd
 
-# Verify decoy contact is gone
+# Decoy Contacts lives below the fold — fast flick to reveal, then tap
+# by id (security.decoy_contacts)
+- swipe:
+    start: "50%,70%"
+    end: "50%,40%"
+    duration: 200
+- waitForAnimationToEnd
+- tapOn:
+    id: "security_backup.decoy_contacts"
+    retryTapIfNoChange: true
+
+# Verify the decoy exists
+- assertVisible: ${DECOY_NAME}
+
+# Tap the decoy row → inline confirm appears
+- tapOn: ${DECOY_NAME}
+- waitForAnimationToEnd
+
+# Confirm removal
+- tapOn: "Remove"
+- waitForAnimationToEnd
+
+# Verify the decoy is gone
 - assertNotVisible: ${DECOY_NAME}
 
 # Go back

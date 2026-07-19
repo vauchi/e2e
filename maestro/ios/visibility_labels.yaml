@@ -10,6 +10,8 @@ appId: app.vauchi.ios
 ---
 
 # Navigate to Labels
+- tapOn:
+    id: "tab.more"
 - tapOn: "Settings"
 - tapOn: "Visibility Labels"
 

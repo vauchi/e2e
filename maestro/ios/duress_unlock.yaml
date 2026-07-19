@@ -21,7 +21,9 @@ appId: app.vauchi.ios
 - waitForAnimationToEnd:
     timeout: 10000
 
-# Enter duress PIN (triggers duress mode)
+# Enter duress PIN (triggers duress mode). The lock-screen field has no
+# a11y identifier — tap its label first so inputText has a focused target.
+- tapOn: "App password input"
 - inputText: ${DURESS_PIN}
 - tapOn: "Unlock"
 

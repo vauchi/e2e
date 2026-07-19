@@ -10,6 +10,8 @@ appId: app.vauchi.ios
 ---
 
 # Navigate to Devices screen
+- tapOn:
+    id: "tab.more"
 - tapOn: "Settings"
 - tapOn: "Linked Devices"
 

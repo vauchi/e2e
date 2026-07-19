@@ -5,6 +5,32 @@
 
 This directory contains Maestro YAML flows for automated mobile testing.
 
+## Flow Maintenance Rules (learned 2026-07-18 flow-rot sweep)
+
+- **Navigation**: Settings is reached via `id: "tab.more"` →
+  `tapOn: "Settings"` — there is no top-level "Settings" tab. Destructive
+  actions live under **Settings → Advanced** (Danger Zone: Emergency
+  Wipe, Wipe All Data); **Delete Identity** lives under **More → Privacy**
+  (GDPR screen).
+- **Never use `hideKeyboard` on iOS** — it fires a phantom action
+  equivalent to a second submit (onboarding skipped `groups_setup`).
+  Android tolerates it. The action footer is tappable with the keyboard
+  up; just delete the step.
+- **Scroll before tapping below-fold rows**: after opening Settings,
+  `waitForAnimationToEnd`, then `scrollUntilVisible` to the target row
+  before `tapOn` (see `add_decoy_contact.yaml` for the pattern).
+- **Physical iOS devices** need `maestro test --device <udid>
+  --apple-team-id L2853TNSJ4` and an **unlocked** phone (no remote-unlock
+  API exists). First run also needs
+  `MAESTRO_DRIVER_STARTUP_TIMEOUT=240000` while the xctestrunner driver
+  installs. `just device-gate ios` handles all of this.
+- **Android physical**: the device gate wakes/unlocks per flow
+  (`PIN=123456` default). If maestro reports
+  `UNAVAILABLE / Connection refused: ...:7001`, the driver died — restart
+  it: `adb shell am instrument -w
+  dev.mobile.maestro.test/androidx.test.runner.AndroidJUnitRunner &` and
+  `adb forward tcp:7001 tcp:7001`.
+
 ## Setup
 
 1. Select a specific Maestro CLI version from the

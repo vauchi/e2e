@@ -35,7 +35,6 @@ name: Add Custom Group During Onboarding
 - tapOn:
     id: "display_name"
 - inputText: "Maestro Test"
-- hideKeyboard
 - tapOn:
     id: "continue"
 
@@ -43,13 +42,29 @@ name: Add Custom Group During Onboarding
 
 # -- First custom group -----------------------------------------
 
+# The field is the last scrollable component and renders clipped at
+# the bottom edge of the scroll region (footer is now a layout
+# sibling, so nothing overlays it — problems/2026-07-18-ios-custom-
+# group-field-unfocusable). Flick it fully into view, then tap by id.
+# The swipe must carry explicit start/end INSIDE the scroll region —
+# maestro's bare `direction: UP` swipe starts on the footer and the
+# ScrollView never moves (verified on iPhone 16e).
+- swipe:
+    start: "50%,55%"
+    end: "50%,35%"
+    duration: 200
+# Let the scroll settle before the driver re-queries the hierarchy;
+# otherwise the tap resolves against the pre-scroll a11y frame.
+- waitForAnimationToEnd
 - tapOn:
     id: "custom_group"
 - inputText: "MyCustomGroup"
 
-# Commit affordance expected post-fix. The a11y identifier
-# should match the `submit_custom_group` action_id the handler
-# at `core/vauchi-app/src/ui/onboarding.rs:606` already consumes.
+# Commit affordance. `submit_custom_group` stays disabled until the
+# textChanged events reach core (`enabled: !custom_group_input
+# .trim().is_empty()` at core/vauchi-app/src/ui/onboarding.rs:463);
+# waitForAnimationToEnd lets the rebuild enable it before the tap.
+- waitForAnimationToEnd
 - tapOn:
     id: "submit_custom_group"
 
@@ -60,9 +75,18 @@ name: Add Custom Group During Onboarding
 
 # -- Second custom group -----------------------------------------
 
+# The committed group joined the toggle list, pushing the field down
+# again — flick it back into view before tapping (explicit start/end
+# inside the scroll region, same as above).
+- swipe:
+    start: "50%,55%"
+    end: "50%,35%"
+    duration: 200
+- waitForAnimationToEnd
 - tapOn:
     id: "custom_group"
 - inputText: "AnotherGroup"
+- waitForAnimationToEnd
 - tapOn:
     id: "submit_custom_group"
 

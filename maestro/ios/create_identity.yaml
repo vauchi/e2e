@@ -28,7 +28,6 @@ name: Create Identity
 - tapOn:
     id: "display_name"
 - inputText: ${NAME}
-- hideKeyboard
 - tapOn:
     id: "continue"
 

@@ -2,44 +2,55 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# iOS Maestro Flow: Setup Duress PIN
-# Enables duress PIN (requires app password to be set first).
+# iOS Maestro Flow: Set Up Duress PIN
+# Rewritten 2026-07-18 against the 4-step DuressPin wizard
+# (Overview → EnterPin → ConfirmPin → ConfigureAlerts). Note: the
+# wizard's Save requires >=1 alert recipient, so a REAL contact must
+# exist — decoy contacts live in a separate table and never appear in
+# the recipient list, so this flow CANNOT complete on a single device
+# (marked contact-dependent in just/e2e.just).
+#
+# Preconditions:
+#   - Identity exists (create_identity.yaml)
+#   - App password set (setup_app_password.yaml)
+#   - At least one REAL contact as alert recipient (multi-device)
 # Environment variables:
 #   DURESS_PIN - 6-digit duress PIN (required, must differ from app password)
+#   DECOY_NAME - the decoy contact to select as alert recipient
 
 appId: app.vauchi.ios
 
 ---
 
-# Navigate to Settings > Duress PIN
+# Navigate to More > Settings > Duress PIN
+- tapOn:
+    id: "tab.more"
 - tapOn: "Settings"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: "Duress PIN"
+    direction: DOWN
 - tapOn: "Duress PIN"
 
-# Verify app password is enabled (prerequisite)
-- assertVisible: "Enabled"
+# Step 1 (Overview): not yet configured
+- assertVisible: "Duress PIN not set up"
+- tapOn: "Set Up PIN"
 
-# Tap to set duress PIN
-- tapOn: "Set Duress PIN"
-
-# Enter duress PIN and confirm
-- assertVisible: "Set Duress PIN"
+# Step 2: enter the PIN
 - tapOn:
-    id: "duress_pin_field"
+    id: "pin"
 - inputText: ${DURESS_PIN}
+- tapOn: "Continue"
+
+# Step 3: confirm the PIN
 - tapOn:
-    id: "confirm_duress_pin_field"
+    id: "confirm_pin"
 - inputText: ${DURESS_PIN}
+- tapOn: "Continue"
 
-# Save
-- tapOn: "Set"
-
-# Wait for key derivation
+# Step 4: select the alert recipient (Save is gated on >=1 recipient)
+- tapOn: ${DECOY_NAME}
+- tapOn: "Save"
 - waitForAnimationToEnd:
     timeout: 15000
-
-# Verify duress is now enabled
-- assertVisible: "Duress PIN"
-- assertVisible: "Enabled"
-
-# Go back
-- back

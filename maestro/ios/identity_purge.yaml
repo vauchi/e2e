@@ -16,39 +16,63 @@ appId: app.vauchi.ios
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
-- assertVisible: "Settings"
+# Navigate to More > Privacy (Delete Identity lives there per
+# more.rs legal section; the Settings screen no longer carries it).
+# Fast flick scrolls the list — slow swipes rubber-band and
+# scrollUntilVisible trusts the off-screen a11y tree
+# (problems/2026-07-18-ios-sectioned-action-rows-not-addressable).
+- tapOn:
+    id: "tab.more"
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 200
+- waitForAnimationToEnd
+- tapOn: "Privacy"
+- waitForAnimationToEnd
 
-# Scroll to Privacy section and tap Delete Identity
-- scrollUntilVisible:
-    element: "Delete Identity"
-    direction: DOWN
+# Tap Delete Identity → review screen ("Review what will be deleted")
 - tapOn: "Delete Identity"
+- assertVisible: "Review what will be deleted"
 
-# Confirm scheduling in alert dialog
-- assertVisible: "Schedule Deletion"
-- tapOn: "Schedule"
+# Confirm by wire id — the overview AND review buttons share the text
+# "Delete Identity", so a text tap is ambiguous (hits the stale
+# overview button). The review confirm is `confirm_delete`.
+- tapOn:
+    id: "confirm_delete"
+- waitForAnimationToEnd:
+    timeout: 15000
 
-# Verify scheduled state
-- scrollUntilVisible:
-    element: "Cancel Deletion"
-    direction: DOWN
+# Scheduled: app navigated back with the toast; re-enter Privacy via
+# the fast flick (below-fold on small screens)
+- tapOn:
+    id: "tab.more"
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 200
+- waitForAnimationToEnd
+- tapOn: "Privacy"
+- waitForAnimationToEnd
 - assertVisible: "Cancel Deletion"
 
-# Cancel the scheduled deletion
+# Cancel the scheduled deletion (id: cancel_deletion)
 - tapOn: "Cancel Deletion"
+- waitForAnimationToEnd:
+    timeout: 10000
 
-# Confirm cancellation
+# Verify back to active state — Delete Identity reappears on the
+# overview (the cancel completion navigates back to More; re-enter)
 - tapOn:
-    text: "Cancel Deletion"
-    index: 1
-
-# Verify back to active state — Delete Identity button reappears
+    id: "tab.more"
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 200
 - waitForAnimationToEnd
-- scrollUntilVisible:
-    element: "Delete Identity"
-    direction: DOWN
+- tapOn: "Privacy"
+- waitForAnimationToEnd
 - assertVisible: "Delete Identity"
 
 # Go back to home

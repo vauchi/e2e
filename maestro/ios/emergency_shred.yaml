@@ -16,28 +16,39 @@ appId: app.vauchi.ios
 
 ---
 
-# Navigate to Settings
-- tapOn: "Settings"
-- assertVisible: "Settings"
+# Navigate to More > Privacy > Panic Shred. Fast flick scrolls the
+# list — slow swipes rubber-band and scrollUntilVisible trusts the
+# off-screen a11y tree
+# (problems/2026-07-18-ios-sectioned-action-rows-not-addressable).
+- tapOn:
+    id: "tab.more"
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 200
+- waitForAnimationToEnd
+- tapOn: "Privacy"
+- waitForAnimationToEnd
 
-# Scroll to Emergency Shred
-- scrollUntilVisible:
-    element: "Emergency Shred"
-    direction: DOWN
-- tapOn: "Emergency Shred"
+# Tap Panic Shred (Emergency Wipe flow)
+- tapOn: "Panic Shred"
 
-# Step 1: Warning screen — tap "I Understand"
-- assertVisible: "Emergency Data Wipe"
-- tapOn: "I Understand"
+# Warning screen ("Immediately wipe everything", no grace period)
+- assertVisible: "Emergency wipe"
+- assertVisible: "Immediately wipe everything"
 
-# Step 2: Confirm screen — type DELETE
-- assertVisible: "Type DELETE to confirm"
-- inputText: "DELETE"
-- tapOn: "Wipe All Data"
+# Confirm — shred now
+- tapOn: "Shred Everything"
 
-# Step 3: Wait for wiping to complete
+# The wipe executes immediately; the UI does NOT navigate to onboarding
+# on its own (problems/2026-07-18-ios-panic-shred-confirm-noop —
+# WipeComplete re-renders the stale confirm screen). Relaunch to verify
+# the post-wipe state from a cold start.
 - waitForAnimationToEnd:
     timeout: 15000
+- stopApp
+- launchApp
 
-# Step 4: Verify data wiped — app returns to onboarding
+# Verify data wiped — app cold-starts into onboarding
 - assertVisible: "Create new identity"

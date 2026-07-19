@@ -35,7 +35,6 @@ appId: app.vauchi.ios
 - tapOn:
     id: "new_decoy_name"
 - inputText: ${DECOY_NAME}
-- hideKeyboard
 - tapOn:
     id: "add_decoy"
 
