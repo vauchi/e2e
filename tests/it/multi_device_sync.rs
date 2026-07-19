@@ -17,6 +17,20 @@
 
 use vauchi_e2e_tests::prelude::*;
 
+fn six_device_certification_config() -> OrchestratorConfig {
+    OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        // These scenarios certify convergence under explicit delivery faults.
+        // Rate limiting has its own OHTTP integration test and can otherwise
+        // delay one causal round beyond this suite's bounded convergence loop.
+        ohttp_relay_config: OhttpRelayConfig {
+            rate_limit_per_sec: 0,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
 // @scenario: sync_updates:Card update received from contact
 /// Smoke test: Card update propagation across devices.
 /// Tags: smoke, sync
@@ -617,10 +631,7 @@ async fn integration_six_device_faulted_relay_delivery_converges_exact_values() 
 // @internal
 #[tokio::test]
 async fn integration_six_device_duplicate_ohttp_delivery_converges_exact_values() {
-    let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
-        ..Default::default()
-    });
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
     orch.start().await.expect("Failed to start orchestrator");
     orch.add_user_split_ohttp("Alice", 3)
         .expect("Failed to add Alice through split OHTTP");
@@ -714,10 +725,7 @@ async fn integration_six_device_duplicate_ohttp_delivery_converges_exact_values(
 // @internal
 #[tokio::test]
 async fn integration_six_device_concurrent_field_edits_converge() {
-    let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
-        ..Default::default()
-    });
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
     orch.start().await.expect("Failed to start orchestrator");
     orch.add_user_split_ohttp("Alice", 3)
         .expect("Failed to add Alice through split OHTTP");
@@ -868,10 +876,7 @@ async fn integration_six_device_concurrent_field_edits_converge() {
 // @internal
 #[tokio::test]
 async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
-    let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
-        ..Default::default()
-    });
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
     orch.start().await.expect("Failed to start orchestrator");
     orch.add_user_split_ohttp_with_device_envs(
         "Alice",
