@@ -247,13 +247,21 @@ test:smoke:
       # Build ohttp-relay (lives in-tree, no git clone needed)
       OHTTP_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" main | cut -f1)
       REBUILD_OHTTP=1
-      [ -f .smoke-bin/ohttp.sha ] && [ "$(cat .smoke-bin/ohttp.sha)" = "$OHTTP_HEAD" ] && [ -f .smoke-bin/ohttp.build-profile ] && [ "$(cat .smoke-bin/ohttp.build-profile)" = "$OHTTP_BUILD_PROFILE" ] && [ -x .smoke-bin/vauchi-ohttp-relay ] && REBUILD_OHTTP=0
+      # Marker-integrity: trust the cache only if the binary actually contains
+      # the e2e-faults route literal, which is compiled in solely under
+      # --features e2e-faults (the .route() is #[cfg]-gated). A matching
+      # build-profile marker alone can lie — a feature-less binary cached under
+      # the same marker 404s the fault routes (multi_device_sync reorder test).
+      [ -f .smoke-bin/ohttp.sha ] && [ "$(cat .smoke-bin/ohttp.sha)" = "$OHTTP_HEAD" ] && [ -f .smoke-bin/ohttp.build-profile ] && [ "$(cat .smoke-bin/ohttp.build-profile)" = "$OHTTP_BUILD_PROFILE" ] && [ -x .smoke-bin/vauchi-ohttp-relay ] && grep -qa '__e2e/reorder-next-forward' .smoke-bin/vauchi-ohttp-relay && REBUILD_OHTTP=0
 
       if [ "$REBUILD_OHTTP" -eq 1 ]; then
         echo "Building ohttp-relay binary..."
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
         cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        # Fail loud if the feature did not compile in — never cache/mark a
+        # feature-less binary (the root cause of the fault-route 404s).
+        grep -qa '__e2e/reorder-next-forward' "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" || { echo "FATAL: built ohttp-relay lacks e2e-faults routes"; exit 1; }
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" .smoke-bin/
         echo "$OHTTP_HEAD" > .smoke-bin/ohttp.sha
         echo "$OHTTP_BUILD_PROFILE" > .smoke-bin/ohttp.build-profile
@@ -460,8 +468,11 @@ test:integration:
       elif [ ! -f "$E2E_BIN_DIR/cli.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/cli.build-profile")" != "$CLI_BUILD_PROFILE" ]; then
         echo "Cached CLI lacks the required E2E test-clock build profile"
         NEED_REBUILD=1
-      elif [ ! -f "$E2E_BIN_DIR/ohttp.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/ohttp.build-profile")" != "$OHTTP_BUILD_PROFILE" ]; then
-        echo "Cached OHTTP relay lacks the required E2E fault-controller build profile"
+      elif [ ! -f "$E2E_BIN_DIR/ohttp.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/ohttp.build-profile")" != "$OHTTP_BUILD_PROFILE" ] || ! grep -qa '__e2e/reorder-next-forward' "$E2E_BIN_DIR/vauchi-ohttp-relay"; then
+        # Marker-integrity: reject a cached binary whose build-profile marker
+        # matches but which lacks the #[cfg(e2e-faults)]-gated route literal —
+        # a feature-less binary otherwise 404s the fault routes.
+        echo "Cached OHTTP relay lacks the required E2E fault-controller routes"
         NEED_REBUILD=1
       else
         # Health check: relay should respond to --version without crashing
@@ -497,6 +508,9 @@ test:integration:
         git clone --depth=1 --branch main \
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
         cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
+        # Fail loud if the feature did not compile in — never cache/mark a
+        # feature-less binary (the root cause of the fault-route 404s).
+        grep -qa '__e2e/reorder-next-forward' "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" || { echo "FATAL: built ohttp-relay lacks e2e-faults routes"; exit 1; }
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$E2E_BIN_DIR/"
         echo "$OHTTP_BUILD_PROFILE" > "$E2E_BIN_DIR/ohttp.build-profile"
 
