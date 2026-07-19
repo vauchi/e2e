@@ -209,6 +209,7 @@ test:smoke:
       # so it can still name a normal CLI binary. Bump the identity to
       # rebuild it with the command below.
       CLI_BUILD_PROFILE="e2e-test-clock-v3"
+      OHTTP_BUILD_PROFILE="e2e-faults-v1"
 
       CACHED_CORE=""
       [ -f .smoke-bin/core.sha ] && CACHED_CORE=$(cat .smoke-bin/core.sha)
@@ -246,7 +247,7 @@ test:smoke:
       # Build ohttp-relay (lives in-tree, no git clone needed)
       OHTTP_HEAD=$(git ls-remote --heads "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" main | cut -f1)
       REBUILD_OHTTP=1
-      [ -f .smoke-bin/ohttp.sha ] && [ "$(cat .smoke-bin/ohttp.sha)" = "$OHTTP_HEAD" ] && [ -x .smoke-bin/vauchi-ohttp-relay ] && REBUILD_OHTTP=0
+      [ -f .smoke-bin/ohttp.sha ] && [ "$(cat .smoke-bin/ohttp.sha)" = "$OHTTP_HEAD" ] && [ -f .smoke-bin/ohttp.build-profile ] && [ "$(cat .smoke-bin/ohttp.build-profile)" = "$OHTTP_BUILD_PROFILE" ] && [ -x .smoke-bin/vauchi-ohttp-relay ] && REBUILD_OHTTP=0
 
       if [ "$REBUILD_OHTTP" -eq 1 ]; then
         echo "Building ohttp-relay binary..."
@@ -255,6 +256,7 @@ test:smoke:
         cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" .smoke-bin/
         echo "$OHTTP_HEAD" > .smoke-bin/ohttp.sha
+        echo "$OHTTP_BUILD_PROFILE" > .smoke-bin/ohttp.build-profile
       else
         echo "OHTTP relay binary cached (${OHTTP_HEAD:0:8})"
       fi
@@ -447,6 +449,7 @@ test:integration:
       mkdir -p .smoke-bin
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
       CLI_BUILD_PROFILE="e2e-test-clock-v3"
+      OHTTP_BUILD_PROFILE="e2e-faults-v1"
 
       # Verify cached binaries are usable (not just present).
       # Stale binaries built against older core versions SIGABRT on startup.
@@ -456,6 +459,9 @@ test:integration:
         NEED_REBUILD=1
       elif [ ! -f "$E2E_BIN_DIR/cli.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/cli.build-profile")" != "$CLI_BUILD_PROFILE" ]; then
         echo "Cached CLI lacks the required E2E test-clock build profile"
+        NEED_REBUILD=1
+      elif [ ! -f "$E2E_BIN_DIR/ohttp.build-profile" ] || [ "$(cat "$E2E_BIN_DIR/ohttp.build-profile")" != "$OHTTP_BUILD_PROFILE" ]; then
+        echo "Cached OHTTP relay lacks the required E2E fault-controller build profile"
         NEED_REBUILD=1
       else
         # Health check: relay should respond to --version without crashing
@@ -492,6 +498,7 @@ test:integration:
           "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$BUILD_TMPDIR/ohttp-relay"
         cargo build --release --features e2e-faults --manifest-path "$BUILD_TMPDIR/ohttp-relay/Cargo.toml"
         cp "$BUILD_TMPDIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$E2E_BIN_DIR/"
+        echo "$OHTTP_BUILD_PROFILE" > "$E2E_BIN_DIR/ohttp.build-profile"
 
         rm -rf "$BUILD_TMPDIR"
       fi

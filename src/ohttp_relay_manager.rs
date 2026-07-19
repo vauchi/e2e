@@ -341,7 +341,10 @@ impl OhttpRelayManager {
                 .as_str()
             {
                 "pending" => return Ok(()),
-                "idle" => tokio::task::yield_now().await,
+                // Give the concurrently spawned CLI sync time to reach the
+                // relay. A yield-only loop can exhaust all 100 local status
+                // requests before the subprocess is scheduled.
+                "idle" => tokio::time::sleep(Duration::from_millis(50)).await,
                 status => {
                     return Err(E2eError::relay(format!(
                         "OHTTP relay fault controller returned unexpected status: {status}"

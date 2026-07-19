@@ -7,6 +7,7 @@ const RG3_TEST: &str =
     "orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay";
 const RG4_RG5_TEST_FILTER: &str = "multi_device_sync::integration_six_device_(exchange_and_update_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|personal_note_tombstone_converges_owner_only|replacement_and_revocation_preserve_active_convergence)";
 const OHTTP_E2E_FAULT_BUILD: &str = "cargo build --release --features e2e-faults --manifest-path \"$BUILD_TMPDIR/ohttp-relay/Cargo.toml\"";
+const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=\"e2e-faults-v1\"";
 const RG6_TEST: &str =
     "ohttp_integration::integration_ohttp_relay_observations_exclude_update_content";
 const RG8_TEST: &str = "ohttp_fail_closed_matrix";
@@ -68,6 +69,23 @@ fn rg4_rg5_release_lane_is_blocking_and_runs_the_six_device_journey() {
 #[test]
 fn native_e2e_binary_builds_the_feature_gated_ohttp_fault_controller() {
     assert_eq!(CI_CONFIG.matches(OHTTP_E2E_FAULT_BUILD).count(), 2);
+}
+
+// @internal
+#[test]
+fn ohttp_fault_build_profile_invalidates_incompatible_cached_binaries() {
+    let smoke = top_level_job("test:smoke");
+    assert!(smoke.contains(OHTTP_E2E_FAULT_PROFILE));
+    assert!(smoke.contains(".smoke-bin/ohttp.build-profile"));
+    assert!(smoke.contains("echo \"$OHTTP_BUILD_PROFILE\" > .smoke-bin/ohttp.build-profile"));
+
+    let integration = top_level_job("test:integration");
+    assert!(integration.contains(OHTTP_E2E_FAULT_PROFILE));
+    assert!(integration.contains("$E2E_BIN_DIR/ohttp.build-profile"));
+    assert!(
+        integration
+            .contains("echo \"$OHTTP_BUILD_PROFILE\" > \"$E2E_BIN_DIR/ohttp.build-profile\"")
+    );
 }
 
 // @internal
