@@ -222,8 +222,18 @@ async fn test_exchange_already_contact() {
             .expect("Failed to generate QR")
     };
 
-    // Bob attempts to exchange again with Alice
+    // Bob attempts to exchange again with Alice. Bob must start his own
+    // offline responder session first — completing without a pending
+    // session is rejected with "no pending qr exchange" since the
+    // offline-exchange protocol (00747b9) requires both peers to start.
     let bob = orch.user("Bob").unwrap();
+    {
+        let bob_guard = bob.read().await;
+        bob_guard
+            .generate_qr()
+            .await
+            .expect("Failed to generate Bob's QR");
+    }
     let second_exchange_result = {
         let bob_guard = bob.read().await;
         bob_guard.complete_exchange(&qr_data).await
