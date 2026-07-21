@@ -390,6 +390,269 @@ async fn integration_six_device_exchange_and_update_convergence() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// @scenario: release_privacy_multidevice_certification.feature:A single exchange converges across all linked devices
+/// Release certification: after a SINGLE A1<->B1 exchange (all six devices
+/// linked *before* the exchange), updates authored on secondary linked devices
+/// converge on every device — the production topology real users hit.
+///
+/// This closes the coverage hole the diagonal `certify_six_device_role` leaves:
+/// there, every Alice device that sends has first done its OWN direct exchange
+/// with a Bob device, so no secondary device ever sends without a direct
+/// session. Here only A1<->B1 exchange; the record
+/// `problems/2026-07-10-multi-device-ratchet-topology-gap` (line 143) flagged
+/// that the per-device-role topology never proved this path. It asserts, in
+/// order: (1) a secondary device A2 that never exchanged delivers to every Bob
+/// device, and (2) concurrent competing edits from A1 and A2 converge to one
+/// ADR-020 LWW winner on all six devices. Convergence is achieved through the
+/// shared_key-bootstrapped session + owner-device card sync + per-peer-device
+/// LWW; per-device ratchet *registry* activation from exchange remains dormant
+/// (see `backlog/2026-07-21-per-device-ratchet-registry-dormant`).
+// @internal
+#[tokio::test]
+async fn integration_six_device_single_exchange_convergence() {
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+    assert_six_device_owner_topology(&orch).await;
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    // A SINGLE exchange, primary devices only (A1 <-> B1). Secondary devices
+    // never exchange — they must rely on the peer registry propagating over
+    // owner-device sync.
+    let bob_alice_contact_id = {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+
+        for _ in 0..2 {
+            alice
+                .sync_all()
+                .await
+                .expect("Alice devices should synchronize the exchange");
+            bob.sync_all()
+                .await
+                .expect("Bob devices should synchronize the exchange");
+        }
+
+        exchanged_contact_id(
+            &bob.list_contacts_on_device(0)
+                .await
+                .expect("B1 should list contacts after exchange"),
+            "Alice",
+        )
+    };
+
+    // Sanity: owner-device sync propagated the Bob contact to A2, even though
+    // A2 never exchanged. A failure here is a harness fault, not the registry
+    // gap under test — the gap is delivery, not contact discovery.
+    let alice_bob_contact_id_on_a2 = {
+        let alice = alice.read().await;
+        exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(1)
+                .await
+                .expect("A2 should list contacts"),
+            "Bob",
+        )
+    };
+
+    // Baseline: the exchanged device (A1) reaches every Bob device. Proves the
+    // split-OHTTP path and Bob's owner-device card fanout are sound, isolating
+    // the secondary-device failure below.
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a1 = a1.read().await;
+        let a1_bob = exchanged_contact_id(
+            &a1.list_contacts().await.expect("A1 should list contacts"),
+            "Bob",
+        );
+        a1.add_field("phone", "PrimaryPhone", "+12025550801")
+            .await
+            .expect("A1 should publish the baseline field");
+        a1.unhide_field_to_contact(&a1_bob, "PrimaryPhone")
+            .await
+            .expect("A1 should permit Bob to receive the baseline field");
+    }
+    let mut baseline_missing = Vec::new();
+    for _ in 0..8 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+        baseline_missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "PrimaryPhone",
+            "+12025550801",
+        )
+        .await;
+        if baseline_missing.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        baseline_missing.is_empty(),
+        "baseline: A1's update must converge on all devices; missing {baseline_missing:?}"
+    );
+
+    // The gap: an update authored on A2 (a secondary device that never
+    // exchanged) must reach every Bob device. On current main it cannot — A2
+    // holds no ratchet session for Bob and no seeded peer registry to bootstrap
+    // one, so the update never reaches any Bob device.
+    {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        let a2 = a2.read().await;
+        a2.add_field("phone", "SecondaryPhone", "+12025550802")
+            .await
+            .expect("A2 should publish the field locally");
+        a2.unhide_field_to_contact(&alice_bob_contact_id_on_a2, "SecondaryPhone")
+            .await
+            .expect("A2 should permit Bob to receive the field");
+    }
+    let mut gap_missing = Vec::new();
+    for _ in 0..8 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+        gap_missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "SecondaryPhone",
+            "+12025550802",
+        )
+        .await;
+        if gap_missing.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        gap_missing.is_empty(),
+        "secondary-device update from A2 must converge on all Bob devices after a \
+         single exchange; missing {gap_missing:?}"
+    );
+
+    // The decisive ADR-064 case: CONCURRENT sends from two Alice devices under
+    // a single exchange. A1 and A2 edit the same field to competing values with
+    // no owner-sync between them, then both deliver to Bob. Bob must reconcile
+    // two independently advanced device chains and converge to one LWW winner on
+    // every device. The green `concurrent_field_edits` test only covers this in
+    // the diagonal topology where A1 and A2 each hold their own direct exchange
+    // session; here neither secondary session came from a direct exchange.
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a1 = a1.read().await;
+        let a1_bob = exchanged_contact_id(
+            &a1.list_contacts().await.expect("A1 should list contacts"),
+            "Bob",
+        );
+        a1.add_field("phone", "ConcurrentPhone", "+12025550900")
+            .await
+            .expect("A1 should seed the shared field");
+        a1.unhide_field_to_contact(&a1_bob, "ConcurrentPhone")
+            .await
+            .expect("A1 should permit Bob to receive the shared field");
+    }
+    for _ in 0..3 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+    }
+
+    let (a1, a2) = {
+        let alice = alice.read().await;
+        (
+            alice.device(0).expect("A1 should exist").clone(),
+            alice.device(1).expect("A2 should exist").clone(),
+        )
+    };
+    let (a1_edit, a2_edit) = tokio::join!(
+        async {
+            a1.read()
+                .await
+                .edit_field("ConcurrentPhone", "+12025550901")
+                .await
+        },
+        async {
+            a2.read()
+                .await
+                .edit_field("ConcurrentPhone", "+12025550902")
+                .await
+        },
+    );
+    a1_edit.expect("A1 concurrent edit should succeed");
+    a2_edit.expect("A2 concurrent edit should succeed");
+
+    let mut winner = None;
+    let mut concurrent_missing = Vec::new();
+    for _ in 0..8 {
+        orch.sync_all()
+            .await
+            .expect("concurrent edits should synchronize");
+        let value = {
+            let alice = alice.read().await;
+            alice
+                .get_card_on_device(0)
+                .await
+                .expect("A1 owner card should be readable")
+                .fields
+                .into_iter()
+                .find(|field| field.label == "ConcurrentPhone")
+                .map(|field| field.value)
+                .expect("A1 should retain the concurrently edited field")
+        };
+        concurrent_missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "ConcurrentPhone",
+            &value,
+        )
+        .await;
+        if concurrent_missing.is_empty() {
+            winner = Some(value);
+            break;
+        }
+    }
+    assert!(
+        winner.is_some(),
+        "concurrent A1/A2 edits under a single exchange must converge to one LWW \
+         winner on every device; still missing {concurrent_missing:?}"
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
 // @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
 /// Release certification: a linked device on each side misses live sync while
 /// both owners update, then catches up to the exact permitted contact cards.
