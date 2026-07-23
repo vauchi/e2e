@@ -23,7 +23,7 @@
 # Shared templates + GitLab Ultimate Templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.07.2
+    ref: ci-templates-v2026.07.11
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -50,7 +50,7 @@ stages:
 
 variables:
   # Pin fetched helper scripts independently from the structural templates.
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.4"
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.11"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
@@ -78,7 +78,7 @@ lint:format:
   extends: [.rust-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
 
 lint:clippy:
-  extends: [.rust-runner-readonly, .lint-clippy, .validation-rust, .timeout-quick]
+  extends: [.rust-runner-readonly, .lint-clippy, .validation-rust, .timeout-cold-rebuild]
 
 # ADR-046: HPKE-internal AEAD must be ChaCha20-Poly1305 (not AES-GCM).
 # `scripts/scripts/check-aead.sh` greps `*.rs` for forbidden
@@ -159,7 +159,7 @@ security:deny:
 # Target: < 5 minutes total (< 1 min if binaries cached).
 
 test:smoke:
-  extends: [.linux-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   # Self-heal contention episodes: a lane killed by the runner/job
   # timeout (uniform 10-15x inflation under host contention,
@@ -303,7 +303,7 @@ test:smoke:
 # evidence can point to one stable, blocking contract on merge requests, main,
 # and schedules.
 test:release-rg3:
-  extends: [.linux-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: test:smoke
@@ -335,7 +335,7 @@ test:release-rg3:
 # named lane mirroring test:release-rg3 so release evidence points to one
 # stable contract on merge requests, main, and schedules.
 test:release-rg4-rg5:
-  extends: [.linux-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: test:smoke
@@ -367,7 +367,7 @@ test:release-rg4-rg5:
 # process output or Prometheus metrics. Other service-boundary surfaces remain
 # required before RG-6 itself can close.
 test:release-rg6-observability:
-  extends: [.linux-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: test:smoke
@@ -400,7 +400,7 @@ test:release-rg6-observability:
 # test clock; the shipping CLI does not. Blocking named lane mirroring
 # test:release-rg4-rg5.
 test:release-rg8:
-  extends: [.linux-runner, .timeout-standard]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs:
     - job: test:smoke
@@ -432,7 +432,7 @@ test:release-rg8:
 # Blocking comprehensive coverage; the named RG-3 lane above provides the
 # stable release-certification result for its exact split-OHTTP journey.
 test:integration:
-  extends: [.linux-runner, .timeout-long]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   # Same self-heal rationale as test:smoke above.
   retry:
