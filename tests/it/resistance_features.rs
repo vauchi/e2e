@@ -376,13 +376,14 @@ fn test_emergency_broadcast_max_contacts() {
     );
 }
 
-/// @scenario: Send emergency broadcast requires established ratchet (queues for delivery)
+/// @scenario: Send emergency broadcast queues for delivery
 #[test]
 fn test_send_emergency_broadcast_queues_for_delivery() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    // Create trusted contact (without ratchet, so can't send directly)
+    // Trusted contact without an established ratchet — the genesis path's
+    // target case (ADR-068, core!1432).
     let bob = make_contact(1, "Bob");
     let bob_id = bob.id().to_string();
     vauchi.add_contact(bob).unwrap();
@@ -396,13 +397,15 @@ fn test_send_emergency_broadcast_queues_for_delivery() {
         )
         .unwrap();
 
-    // Send emergency broadcast without ratchet = no delivery possible
-    // (real app would exchange first, establishing ratchet)
     let result = vauchi.send_emergency_broadcast().unwrap();
 
-    // Contact exists (total=1) but has no ratchet (sent=0)
+    // Session-less is no longer a skip: the alert rides a genesis envelope
+    // rooted in the exchanged shared_key.
     assert_eq!(result.total, 1);
-    assert!(result.sent <= result.total);
+    assert_eq!(
+        result.sent, 1,
+        "a session-less trusted contact must receive a genesis-sealed alert"
+    );
 }
 
 /// @scenario: Emergency broadcast configuration respects blocked contacts
@@ -500,14 +503,14 @@ fn test_duress_full_workflow() {
     assert!(hidden_ids.contains(&bob_id.as_str()));
     assert!(hidden_ids.contains(&charlie_id.as_str()));
 
-    // ADR-032: covert duress alerts require an established ratchet with the
-    // trusted contact. Bob and Charlie were added without an in-person
-    // exchange, so no ratchet exists and the covert send is skipped
-    // (fail-safe) — nothing is queued. The positive queuing path is owned by
-    // core's safety-alert and duress-unlock wiring tests.
+    // ADR-032 + ADR-068: a trusted contact WITHOUT an established ratchet
+    // still receives the covert alert — the send path seals a genesis
+    // envelope rooted in the exchanged shared_key (pre-genesis this was
+    // silently skipped, the life-safety gap closed by core!1432). Both
+    // configured contacts must have a queued, wire-ordinary blob.
     assert_eq!(
         alice.pending_update_count().unwrap(),
-        0,
-        "duress alert skips trusted contacts without an established ratchet"
+        2,
+        "a duress alert must queue a genesis-sealed blob per session-less trusted contact"
     );
 }
