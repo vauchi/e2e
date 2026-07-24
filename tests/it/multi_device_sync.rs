@@ -653,6 +653,220 @@ async fn integration_six_device_single_exchange_convergence() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+/// Polls every Bob device for an `ALERT` line containing `needle`, syncing
+/// both fleets between rounds. Returns the matching line, or None after the
+/// bounded rounds.
+async fn poll_bob_devices_for_alert(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    needle: &str,
+) -> Option<String> {
+    for _ in 0..8 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+        let bob = bob.read().await;
+        for device_index in 0..3 {
+            let Ok(lines) = bob.list_alerts_on_device(device_index).await else {
+                continue;
+            };
+            if let Some(line) = lines.into_iter().find(|line| line.contains(needle)) {
+                return Some(line);
+            }
+        }
+    }
+    None
+}
+
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+/// Release certification: the ADR-032 alert path over the production-shaped
+/// six-device split-OHTTP topology — the socket-backed layer the core
+/// in-process guard tests cannot reach
+/// (record: 2026-07-24-duress-alert-e2e-coverage-gap).
+///
+/// 1. A secondary device (A2, never exchanged, no session) raises an
+///    emergency alert; it traverses genesis → relay → some Bob device
+///    surfaces it durably. The promise is AT LEAST ONE device: the contact
+///    mailbox is consume-once and sibling fan-out is the deferred F3
+///    (`backlog/2026-07-21-per-device-ratchet-registry-dormant.md`).
+/// 2. The exchanging device A1's SUBSEQUENT edit still converges on all six
+///    devices. The two-sided re-seat guard's chain-level invariants are
+///    pinned at core level (core !1446, ADR-064 Amendment 2026-07-24);
+///    this step certifies the user-visible outcome — post-alert card flow
+///    keeps working over the production-shaped topology.
+/// 3. A second session-less sibling (A3) alert also arrives. The SAME-device
+///    repeat is pinned in core with a FakeClock (broadcast cooldown is
+///    real-time here, CC-06 forbids waiting it out); A3 exercises the same
+///    session-less genesis class end to end.
+///
+/// ADR-032 wire indistinguishability stays deferred until the relay
+/// data-dir plumbing (rg10 branch) merges; rg6 covers marker-absence in
+/// relay output meanwhile.
+// @internal
+#[tokio::test]
+async fn integration_six_device_duress_alert_certification() {
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    // Single exchange, primary devices only — secondaries never exchange.
+    let bob_alice_contact_id = {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+        for _ in 0..2 {
+            alice.sync_all().await.expect("Alice devices should sync");
+            bob.sync_all().await.expect("Bob devices should sync");
+        }
+        exchanged_contact_id(
+            &bob.list_contacts_on_device(0)
+                .await
+                .expect("B1 should list contacts"),
+            "Alice",
+        )
+    };
+    let bob_id_on_a2 = {
+        let alice = alice.read().await;
+        exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(1)
+                .await
+                .expect("A2 should list contacts"),
+            "Bob",
+        )
+    };
+
+    // 1. Secondary-device alert: session-less A2 → genesis → some Bob device.
+    {
+        let alice = alice.read().await;
+        alice
+            .configure_emergency_on_device(1, &bob_id_on_a2, "duress check")
+            .await
+            .expect("A2 should configure the emergency broadcast");
+        let sent = alice
+            .send_emergency_from_device(1)
+            .await
+            .expect("A2 should send the emergency broadcast");
+        assert!(
+            sent.contains("1/1"),
+            "the session-less secondary must queue the alert (genesis), got: {sent}"
+        );
+    }
+    let surfaced = poll_bob_devices_for_alert(&alice, &bob, "duress check").await;
+    let surfaced = surfaced.expect(
+        "at least one Bob device must durably surface the secondary-device alert \
+         (consume-once mailbox: sibling fan-out is the deferred F3)",
+    );
+    assert!(
+        surfaced.contains("kind=emergency"),
+        "the surfaced line must carry the alert kind, got: {surfaced}"
+    );
+
+    // 2. The guard: A1's channel survives the sibling's genesis alert — its
+    // next edit converges on all six devices (RED on pre-guard core).
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").clone();
+        let a1 = a1.read().await;
+        let a1_bob = exchanged_contact_id(
+            &a1.list_contacts().await.expect("A1 should list contacts"),
+            "Bob",
+        );
+        a1.add_field("phone", "PostAlertPhone", "+12025550903")
+            .await
+            .expect("A1 should publish the post-alert field");
+        a1.unhide_field_to_contact(&a1_bob, "PostAlertPhone")
+            .await
+            .expect("A1 should permit Bob to receive the post-alert field");
+    }
+    let mut post_alert_missing = Vec::new();
+    for _ in 0..8 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+        post_alert_missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "PostAlertPhone",
+            "+12025550903",
+        )
+        .await;
+        if post_alert_missing.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        post_alert_missing.is_empty(),
+        "A1's post-alert edit must still converge everywhere — a sibling's genesis \
+         alert must not sever the exchanging device's channel (two-sided guard); \
+         missing {post_alert_missing:?}"
+    );
+
+    // 3. A second session-less sibling's alert also arrives.
+    let bob_id_on_a3 = {
+        let alice = alice.read().await;
+        exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(2)
+                .await
+                .expect("A3 should list contacts"),
+            "Bob",
+        )
+    };
+    {
+        let alice = alice.read().await;
+        alice
+            .configure_emergency_on_device(2, &bob_id_on_a3, "second alarm")
+            .await
+            .expect("A3 should configure the emergency broadcast");
+        let sent = alice
+            .send_emergency_from_device(2)
+            .await
+            .expect("A3 should send the emergency broadcast");
+        assert!(
+            sent.contains("1/1"),
+            "the second session-less sibling must queue its alert, got: {sent}"
+        );
+    }
+    let second = poll_bob_devices_for_alert(&alice, &bob, "second alarm").await;
+    assert!(
+        second.is_some(),
+        "the second session-less sibling's alert must also surface on a Bob device"
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
 // @scenario: release_privacy_multidevice_certification.feature:Faulted delivery still converges deterministically
 /// Release certification: a linked device on each side misses live sync while
 /// both owners update, then catches up to the exact permitted contact cards.

@@ -832,6 +832,33 @@ impl Device for CliDevice {
         Ok(())
     }
 
+    async fn configure_emergency(&self, contact_ids: &str, message: &str) -> E2eResult<()> {
+        self.run_command_success(&[
+            "emergency",
+            "configure",
+            "--contacts",
+            contact_ids,
+            "--message",
+            message,
+        ])
+        .await?;
+        Ok(())
+    }
+
+    async fn send_emergency(&self) -> E2eResult<String> {
+        self.run_command_success(&["emergency", "send", "--yes"])
+            .await
+    }
+
+    async fn list_alerts(&self) -> E2eResult<Vec<String>> {
+        let output = self.run_command_success(&["alerts"]).await?;
+        Ok(output
+            .lines()
+            .filter(|line| line.trim_start().starts_with("ALERT "))
+            .map(|line| line.trim().to_string())
+            .collect())
+    }
+
     async fn edit_name(&self, name: &str) -> E2eResult<()> {
         self.run_command_success(&["card", "edit-name", name])
             .await?;

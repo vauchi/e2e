@@ -214,6 +214,28 @@ pub trait Device: Send + Sync {
         ))
     }
 
+    /// Configure the emergency broadcast without prompts.
+    async fn configure_emergency(&self, _contact_ids: &str, _message: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Emergency broadcast not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Send the configured emergency broadcast unattended; returns the
+    /// command output (carries the sent/total counts).
+    async fn send_emergency(&self) -> E2eResult<String> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Emergency broadcast not supported on this device type".to_string(),
+        ))
+    }
+
+    /// List received safety alerts as rendered `ALERT ...` lines.
+    async fn list_alerts(&self) -> E2eResult<Vec<String>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Safety alerts not supported on this device type".to_string(),
+        ))
+    }
+
     /// Read an owner-private personal note from a contact.
     async fn read_personal_note(&self, _contact: &str) -> E2eResult<Option<String>> {
         Err(crate::error::E2eError::DeviceNotSupported(

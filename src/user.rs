@@ -317,6 +317,41 @@ impl User {
         device.list_contacts().await
     }
 
+    /// Configure the emergency broadcast on one device, without prompts.
+    pub async fn configure_emergency_on_device(
+        &self,
+        device_index: usize,
+        contact_ids: &str,
+        message: &str,
+    ) -> E2eResult<()> {
+        let device = self
+            .device(device_index)
+            .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
+
+        let device = device.read().await;
+        device.configure_emergency(contact_ids, message).await
+    }
+
+    /// Send the configured emergency broadcast from one device, unattended.
+    pub async fn send_emergency_from_device(&self, device_index: usize) -> E2eResult<String> {
+        let device = self
+            .device(device_index)
+            .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
+
+        let device = device.read().await;
+        device.send_emergency().await
+    }
+
+    /// List received safety alerts on one device as rendered `ALERT` lines.
+    pub async fn list_alerts_on_device(&self, device_index: usize) -> E2eResult<Vec<String>> {
+        let device = self
+            .device(device_index)
+            .ok_or_else(|| E2eError::user(format!("Device {} not found", device_index)))?;
+
+        let device = device.read().await;
+        device.list_alerts().await
+    }
+
     /// Get the public identity ID from the primary device.
     pub async fn get_public_id(&self) -> E2eResult<String> {
         let primary = self
