@@ -41,6 +41,28 @@ fn top_level_job(name: &str) -> &str {
 
 // @internal
 #[test]
+fn scheduled_pipeline_requires_explicit_e2e_ownership() {
+    let workflow = top_level_job("workflow");
+    let selected = "$CI_PIPELINE_SOURCE == \"schedule\" && $SCHEDULE_KIND == \"e2e\"";
+    let reject_other_schedules = "$CI_PIPELINE_SOURCE == \"schedule\"\n      when: never";
+
+    assert!(workflow.contains(selected));
+    assert!(workflow.contains(reject_other_schedules));
+    assert!(workflow.find(selected) < workflow.find(reject_other_schedules));
+}
+
+// @internal
+#[test]
+fn scheduled_pipeline_does_not_publish_pages_or_mirror() {
+    for job_name in ["pages", "github-mirror"] {
+        let job = top_level_job(job_name);
+        assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+        assert!(job.contains("when: never"));
+    }
+}
+
+// @internal
+#[test]
 fn rg3_release_lane_is_blocking_and_runs_the_exact_split_ohttp_journey() {
     let job = top_level_job("test:release-rg3");
 
