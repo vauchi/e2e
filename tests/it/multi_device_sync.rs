@@ -405,8 +405,10 @@ async fn integration_six_device_exchange_and_update_convergence() {
 /// device, and (2) concurrent competing edits from A1 and A2 converge to one
 /// ADR-020 LWW winner on all six devices. Convergence is achieved through the
 /// shared_key-bootstrapped session + owner-device card sync + per-peer-device
-/// LWW; per-device ratchet *registry* activation from exchange remains dormant
-/// (see `backlog/2026-07-21-per-device-ratchet-registry-dormant`).
+/// LWW. F4 registry activation (ADR-064 Amendment 2026-07-25) now also runs
+/// during these sync rounds; the lost-primary certification below covers the
+/// activation-dependent path
+/// (`problems/2026-07-21-per-device-ratchet-registry-dormant/`).
 // @internal
 #[tokio::test]
 async fn integration_six_device_single_exchange_convergence() {
@@ -651,6 +653,228 @@ async fn integration_six_device_single_exchange_convergence() {
     );
 
     orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+/// F4 lost-primary continuity certification (ADR-064 Amendment 2026-07-25).
+///
+/// The alpha-gating scenario: the exchanging device A1 goes permanently
+/// dark right after the exchange — before any registry handshake ran — so
+/// the surviving siblings hold only the owner-synced contact + shared_key.
+/// Pre-F4 this orphaned the relationship bidirectionally (delivery was
+/// A1-mediated). With F4, A2's sync ticks genesis-push the registry, the
+/// bilateral handshake completes over the split-OHTTP relay path, and
+/// cards flow BOTH ways without A1 ever syncing again and without
+/// re-exchange.
+// @scenario: multi_device_sync :: Lost exchanging device no longer orphans the relationship
+#[tokio::test]
+async fn integration_six_device_lost_primary_continuity_certification() {
+    let mut orch = Orchestrator::with_config(six_device_certification_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    for _ in 0..2 {
+        orch.sync_all()
+            .await
+            .expect("linked-device topology should synchronize");
+    }
+    assert_six_device_owner_topology(&orch).await;
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    // Single exchange, primary devices only (A1 <-> B1).
+    let bob_alice_contact_id = {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+
+        // The ONLY rounds A1 ever syncs: enough owner-device sync for the
+        // siblings to learn the Bob contact + shared_key. After this, A1 is
+        // permanently lost.
+        for _ in 0..2 {
+            alice
+                .sync_all()
+                .await
+                .expect("Alice devices should synchronize the exchange");
+            bob.sync_all()
+                .await
+                .expect("Bob devices should synchronize the exchange");
+        }
+
+        exchanged_contact_id(
+            &bob.list_contacts_on_device(0)
+                .await
+                .expect("B1 should list contacts after exchange"),
+            "Alice",
+        )
+    };
+    let alice_bob_contact_id_on_a2 = {
+        let alice = alice.read().await;
+        exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(1)
+                .await
+                .expect("A2 should list contacts"),
+            "Bob",
+        )
+    };
+
+    // A1 IS NOW DEAD. Every sync below touches only A2, A3, and Bob's fleet.
+    let surviving_alice_sync = |alice: std::sync::Arc<tokio::sync::RwLock<User>>| async move {
+        let alice = alice.read().await;
+        alice.sync_device(1).await.expect("A2 sync");
+        alice.sync_device(2).await.expect("A3 sync");
+    };
+
+    // Outbound continuity: an update authored on the surviving sibling A2
+    // must reach every Bob device with A1 gone — the F4 genesis handshake
+    // plus per-device sessions carry it; there is no mediator left.
+    {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").clone();
+        let a2 = a2.read().await;
+        a2.add_field("phone", "SurvivorPhone", "+12025550811")
+            .await
+            .expect("A2 should publish the field locally");
+        a2.unhide_field_to_contact(&alice_bob_contact_id_on_a2, "SurvivorPhone")
+            .await
+            .expect("A2 should permit Bob to receive the field");
+    }
+    let mut outbound_missing = Vec::new();
+    for _ in 0..12 {
+        surviving_alice_sync(alice.clone()).await;
+        bob.read().await.sync_all().await.expect("Bob sync");
+        outbound_missing = missing_lost_primary_alice_field(
+            &bob,
+            &bob_alice_contact_id,
+            "SurvivorPhone",
+            "+12025550811",
+        )
+        .await;
+        if outbound_missing.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        outbound_missing.is_empty(),
+        "with A1 permanently lost, A2's update must still reach every Bob \
+         device (F4 un-orphaning); missing {outbound_missing:?}"
+    );
+
+    // Inbound continuity: Bob's update must reach the surviving siblings —
+    // pre-F4, incoming [0;32] ciphertext was undecryptable on session-less
+    // devices, orphaning this direction too.
+    {
+        let bob = bob.read().await;
+        let b1 = bob.device(0).expect("B1 should exist").clone();
+        let b1 = b1.read().await;
+        let b1_alice = exchanged_contact_id(
+            &b1.list_contacts().await.expect("B1 should list contacts"),
+            "Alice",
+        );
+        b1.add_field("phone", "BobReplyPhone", "+12025550812")
+            .await
+            .expect("B1 should publish the reply field");
+        b1.unhide_field_to_contact(&b1_alice, "BobReplyPhone")
+            .await
+            .expect("B1 should permit Alice to receive the reply field");
+    }
+    let mut inbound_missing = Vec::new();
+    for _ in 0..12 {
+        bob.read().await.sync_all().await.expect("Bob sync");
+        surviving_alice_sync(alice.clone()).await;
+        inbound_missing = missing_lost_primary_bob_field(
+            &alice,
+            &alice_bob_contact_id_on_a2,
+            "BobReplyPhone",
+            "+12025550812",
+        )
+        .await;
+        if inbound_missing.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        inbound_missing.is_empty(),
+        "with A1 permanently lost, Bob's update must still reach the \
+         surviving siblings A2/A3; missing {inbound_missing:?}"
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+/// Alice's field as seen by every Bob device (A1 excluded from the world).
+async fn missing_lost_primary_alice_field(
+    bob: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    alice_contact_id: &str,
+    field_label: &str,
+    phone: &str,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    let bob = bob.read().await;
+    for device_index in 0..3 {
+        let Some(device) = bob.device(device_index) else {
+            missing.push(format!("B{} device", device_index + 1));
+            continue;
+        };
+        match device.read().await.get_contact_card(alice_contact_id).await {
+            Ok(Some(card))
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == field_label && field.value == phone) => {}
+            _ => missing.push(format!("B{} Alice contact", device_index + 1)),
+        }
+    }
+    missing
+}
+
+/// Bob's field as seen by the SURVIVING Alice siblings (A2, A3 — never A1).
+async fn missing_lost_primary_bob_field(
+    alice: &std::sync::Arc<tokio::sync::RwLock<User>>,
+    bob_contact_id: &str,
+    field_label: &str,
+    phone: &str,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    let alice = alice.read().await;
+    for device_index in 1..3 {
+        let Some(device) = alice.device(device_index) else {
+            missing.push(format!("A{} device", device_index + 1));
+            continue;
+        };
+        match device.read().await.get_contact_card(bob_contact_id).await {
+            Ok(Some(card))
+                if card
+                    .fields
+                    .iter()
+                    .any(|field| field.label == field_label && field.value == phone) => {}
+            _ => missing.push(format!("A{} Bob contact", device_index + 1)),
+        }
+    }
+    missing
 }
 
 /// Polls every Bob device for an `ALERT` line containing `needle`, syncing
