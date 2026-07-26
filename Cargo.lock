@@ -1194,7 +1194,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3020,8 +3020,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.57.0"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#635447889a65f10401e567d5e2c2d45941af0a02"
+version = "0.58.0"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#26afcd942216bb36bbfdd227b1458fcfed417873"
 dependencies = [
  "base64",
  "hex",
@@ -3039,8 +3039,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.57.0"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#635447889a65f10401e567d5e2c2d45941af0a02"
+version = "0.58.0"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#26afcd942216bb36bbfdd227b1458fcfed417873"
 dependencies = [
  "argon2",
  "base64",
@@ -3116,8 +3116,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.57.0"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#635447889a65f10401e567d5e2c2d45941af0a02"
+version = "0.58.0"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#26afcd942216bb36bbfdd227b1458fcfed417873"
 dependencies = [
  "serde",
  "serde_json",
