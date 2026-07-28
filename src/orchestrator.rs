@@ -47,8 +47,9 @@ pub struct OrchestratorConfig {
     /// Production runs every request through an outer ohttp-relay per
     /// ADR-037 (gateway and forwarding-relay must be distinct
     /// entities). Setting this to `true` makes the test harness exercise
-    /// the same path, catching outer-hop regressions (proxy caching,
-    /// rate limiting, header forwarding) before release.
+    /// the same path, catching outer-hop regressions (proxy caching and
+    /// header forwarding) before release. Generic functional scenarios
+    /// disable throttling; rate limiting has a dedicated integration test.
     ///
     /// Source record: `_private/docs/problems/2026-04-27-e2e-ohttp-default/`.
     pub with_ohttp_relay: bool,
@@ -77,7 +78,10 @@ impl Default for OrchestratorConfig {
             relay_count: 1,
             operation_delay: Duration::from_millis(100),
             with_ohttp_relay: true,
-            ohttp_relay_config: OhttpRelayConfig::default(),
+            ohttp_relay_config: OhttpRelayConfig {
+                rate_limit_per_sec: 0,
+                ..Default::default()
+            },
             inject_local_ohttp_key_into_cli: true,
         }
     }
