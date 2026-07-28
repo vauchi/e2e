@@ -1950,7 +1950,7 @@ async fn integration_six_device_replacement_and_revocation_preserve_active_conve
 
     let alice = orch.user("Alice").expect("Alice should exist");
     let bob = orch.user("Bob").expect("Bob should exist");
-    {
+    let alice_bob_contact_id = {
         let alice = alice.read().await;
         let bob = bob.read().await;
         let alice_qr = alice
@@ -1968,7 +1968,14 @@ async fn integration_six_device_replacement_and_revocation_preserve_active_conve
             .complete_exchange_on_device(0, &bob_qr)
             .await
             .expect("A1 should complete exchange");
-    }
+        exchanged_contact_id(
+            &alice
+                .list_contacts_on_device(0)
+                .await
+                .expect("A1 should list contacts after exchange"),
+            "Bob",
+        )
+    };
     for _ in 0..2 {
         orch.sync_all()
             .await
@@ -1986,23 +1993,43 @@ async fn integration_six_device_replacement_and_revocation_preserve_active_conve
             .await
             .expect("A4 should link to Alice's existing identity");
     }
-    for _ in 0..8 {
-        orch.sync_all()
-            .await
-            .expect("A4 should receive the topology and complete registry activation");
-    }
-
-    {
+    let a4 = {
         let alice = alice.read().await;
         let a4 = alice.device(a4_index).expect("A4 should exist").clone();
-        let a4 = a4.read().await;
-        a4.add_field("phone", "ReplacementAlicePhone", "+12025551001")
+        a4.read()
+            .await
+            .add_field("phone", "ReplacementAlicePhone", "+12025551001")
             .await
             .expect("A4 should publish after joining");
-        a4.unhide_field_to_contact("Bob", "ReplacementAlicePhone")
+        a4
+    };
+    let mut unhide_succeeded = false;
+    let mut last_activation_error = None;
+    for _ in 0..12 {
+        orch.sync_all()
             .await
-            .expect("A4 should permit Bob to receive the field");
+            .expect("A4 should progress its registry activation");
+        match a4
+            .read()
+            .await
+            .unhide_field_to_contact(&alice_bob_contact_id, "ReplacementAlicePhone")
+            .await
+        {
+            Ok(()) => {
+                unhide_succeeded = true;
+                break;
+            }
+            Err(error) if error.to_string().contains("ratchet state") => {
+                last_activation_error = Some(error.to_string());
+            }
+            Err(error) => panic!("A4 visibility update failed unexpectedly: {error}"),
+        }
     }
+    assert!(
+        unhide_succeeded,
+        "A4 must complete registry activation before publishing; last error: \
+         {last_activation_error:?}"
+    );
     for _ in 0..5 {
         orch.sync_all()
             .await
