@@ -1986,10 +1986,10 @@ async fn integration_six_device_replacement_and_revocation_preserve_active_conve
             .await
             .expect("A4 should link to Alice's existing identity");
     }
-    for _ in 0..3 {
+    for _ in 0..8 {
         orch.sync_all()
             .await
-            .expect("A4 should receive the linked-device topology");
+            .expect("A4 should receive the topology and complete registry activation");
     }
 
     {
