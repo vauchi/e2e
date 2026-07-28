@@ -151,8 +151,8 @@ async fn integration_ohttp_oversized_blob_rejected() {
 
     let client = reqwest::Client::new();
 
-    // 128 KiB + 1 byte — exceeds ohttp-relay's default max_request_bytes (65536)
-    let oversized = vec![0xAA; 65537];
+    // 128 KiB + 1 byte — exceeds ohttp-relay's default max_request_bytes (131072)
+    let oversized = vec![0xAA; 131073];
     let resp = client
         .post(format!("{ohttp_url}/v2/ohttp"))
         .header("Content-Type", "message/ohttp-req")
