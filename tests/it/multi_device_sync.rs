@@ -1611,7 +1611,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
 
     let alice = orch.user("Alice").expect("Alice should exist");
     let bob = orch.user("Bob").expect("Bob should exist");
-    {
+    let (alice_bob_contact_id, bob_alice_contact_id) = {
         let alice = alice.read().await;
         let bob = bob.read().await;
         let alice_qr = alice
@@ -1629,7 +1629,22 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
             .complete_exchange_on_device(0, &bob_qr)
             .await
             .expect("A1 should complete exchange");
-    }
+        (
+            exchanged_contact_id(
+                &alice
+                    .list_contacts_on_device(0)
+                    .await
+                    .expect("A1 should list contacts after exchange"),
+                "Bob",
+            ),
+            exchanged_contact_id(
+                &bob.list_contacts_on_device(0)
+                    .await
+                    .expect("B1 should list contacts after exchange"),
+                "Alice",
+            ),
+        )
+    };
     for _ in 0..2 {
         orch.sync_all()
             .await
@@ -1643,15 +1658,31 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
         a1.add_field("phone", "ClockSkewPhone", "+12025551100")
             .await
             .expect("A1 should add the shared field");
-        a1.unhide_field_to_contact("Bob", "ClockSkewPhone")
+        a1.unhide_field_to_contact(&alice_bob_contact_id, "ClockSkewPhone")
             .await
             .expect("A1 should permit Bob to receive the shared field");
     }
-    for _ in 0..2 {
+    let mut baseline_missing = Vec::new();
+    for _ in 0..8 {
         orch.sync_all()
             .await
             .expect("shared field should synchronize before competing edits");
+        baseline_missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "ClockSkewPhone",
+            "+12025551100",
+        )
+        .await;
+        if baseline_missing.is_empty() {
+            break;
+        }
     }
+    assert!(
+        baseline_missing.is_empty(),
+        "clock-skew baseline must converge before competing edits; missing {baseline_missing:?}"
+    );
 
     {
         let alice = alice.read().await;
@@ -1691,8 +1722,14 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
         orch.sync_all()
             .await
             .expect("bounded-skew concurrent edits should synchronize");
-        missing =
-            missing_six_device_phone_cards(&alice, &bob, "ClockSkewPhone", "+12025551102").await;
+        missing = missing_six_device_phone_cards_by_contact_id(
+            &alice,
+            &bob,
+            &bob_alice_contact_id,
+            "ClockSkewPhone",
+            "+12025551102",
+        )
+        .await;
         if missing.is_empty() {
             orch.stop().await.expect("Failed to stop orchestrator");
             return;
