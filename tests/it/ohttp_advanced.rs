@@ -56,7 +56,7 @@ async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
     // 3. Send with cached key — must succeed
     let transport = create_ohttp_transport(&ohttp_url, &key);
     let blob_id = transport
-        .send_update(&"a".repeat(64), "dGVzdA==")
+        .send_update(&"a".repeat(64), "dGVzdA==", None)
         .expect("send with cached key must succeed");
     assert!(!blob_id.is_empty(), "blob_id must be non-empty");
 
@@ -85,14 +85,14 @@ async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
     //    via the gateway's S10 grace period (previous key fallback)
     let transport_stale = create_ohttp_transport(&ohttp_url, &key);
     let grace_blob_id = transport_stale
-        .send_update(&"b".repeat(64), "Z3JhY2U=")
+        .send_update(&"b".repeat(64), "Z3JhY2U=", None)
         .expect("send with stale key must succeed via S10 grace");
     assert!(!grace_blob_id.is_empty(), "grace blob_id must be non-empty");
 
     // 7. Send with fresh key — must succeed
     let transport_fresh = create_ohttp_transport(&ohttp_url, &key_after_expiry);
     let fresh_blob_id = transport_fresh
-        .send_update(&"c".repeat(64), "ZnJlc2g=")
+        .send_update(&"c".repeat(64), "ZnJlc2g=", None)
         .expect("send with fresh key must succeed");
     assert!(!fresh_blob_id.is_empty(), "fresh blob_id must be non-empty");
 
@@ -287,7 +287,7 @@ async fn integration_ohttp_and_direct_http_coexist() {
     // 1. Send via OHTTP (through ohttp-relay)
     let ohttp_transport = create_ohttp_transport(&ohttp_url, &key_bytes);
     let blob_id = ohttp_transport
-        .send_update(&"a".repeat(64), "b2h0dHBfc2VuZA==")
+        .send_update(&"a".repeat(64), "b2h0dHBfc2VuZA==", None)
         .expect("send via OHTTP");
     assert!(!blob_id.is_empty());
 
@@ -301,7 +301,7 @@ async fn integration_ohttp_and_direct_http_coexist() {
     };
     let direct_transport = HttpTransport::new(direct_config);
     let direct_blob_id = direct_transport
-        .send_update(&"b".repeat(64), "ZGlyZWN0X3NlbmQ=")
+        .send_update(&"b".repeat(64), "ZGlyZWN0X3NlbmQ=", None)
         .expect("send via direct HTTP");
     assert!(!direct_blob_id.is_empty());
 
@@ -433,13 +433,14 @@ async fn integration_ohttp_response_sizes_are_padded() {
     // be similar sizes due to padding (both small payloads land in the same
     // 256-byte bucket after padding).
     let transport1 = create_ohttp_transport(&ohttp_url, &key_bytes);
-    let r1 = transport1.send_update(&"a".repeat(64), "YQ=="); // tiny payload
+    let r1 = transport1.send_update(&"a".repeat(64), "YQ==", None); // tiny payload
     assert!(r1.is_ok(), "small send failed: {:?}", r1.err());
 
     let transport2 = create_ohttp_transport(&ohttp_url, &key_bytes);
     let r2 = transport2.send_update(
         &"b".repeat(64),
         "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=", // larger payload
+        None,
     );
     assert!(r2.is_ok(), "larger send failed: {:?}", r2.err());
 
@@ -487,7 +488,7 @@ async fn integration_ohttp_requests_during_rotation_succeed() {
     for i in 0..10 {
         let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
         let recipient = format!("{:0>64}", i);
-        match transport.send_update(&recipient, "dGVzdA==") {
+        match transport.send_update(&recipient, "dGVzdA==", None) {
             Ok(_) => success_count += 1,
             Err(_) => error_count += 1,
         }

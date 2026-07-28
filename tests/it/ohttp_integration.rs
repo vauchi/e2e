@@ -87,7 +87,7 @@ async fn integration_ohttp_send_and_fetch() {
 
     // 4. Send a message via OHTTP
     let recipient_id = "a".repeat(64); // 64-char hex-like ID
-    let result = transport.send_update(&recipient_id, "dGVzdCBwYXlsb2Fk");
+    let result = transport.send_update(&recipient_id, "dGVzdCBwYXlsb2Fk", None);
 
     assert!(result.is_ok(), "send via OHTTP failed: {:?}", result.err());
 
@@ -182,7 +182,7 @@ async fn integration_ohttp_relay_observations_exclude_update_content() {
     let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
     let recipient_id = "a".repeat(64);
     transport
-        .send_update(&recipient_id, ENCODED_MARKER)
+        .send_update(&recipient_id, ENCODED_MARKER, None)
         .expect("send update via OHTTP");
 
     let metrics = client
@@ -283,7 +283,7 @@ async fn integration_ohttp_fail_closed_without_config() {
     };
     let transport = HttpTransport::new(config);
 
-    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(
@@ -548,7 +548,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
 
     // 2. Send with K1 — should succeed (K1 is current)
     let transport_k1 = create_ohttp_transport(&ohttp_url, &key_k1);
-    let result = transport_k1.send_update(&"a".repeat(64), "dGVzdA==");
+    let result = transport_k1.send_update(&"a".repeat(64), "dGVzdA==", None);
     assert!(
         result.is_ok(),
         "send with current key K1 must succeed: {:?}",
@@ -575,7 +575,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
 
     // 5. Send with stale K1 — should STILL succeed (S10 grace period)
     let transport_stale = create_ohttp_transport(&ohttp_url, &key_k1);
-    let grace_result = transport_stale.send_update(&"b".repeat(64), "Z3JhY2U=");
+    let grace_result = transport_stale.send_update(&"b".repeat(64), "Z3JhY2U=", None);
     assert!(
         grace_result.is_ok(),
         "send with stale K1 must succeed via S10 grace period: {:?}",
@@ -602,7 +602,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
 
     // 8. Send with K1 — should FAIL (evicted after 2nd rotation)
     let transport_evicted = create_ohttp_transport(&ohttp_url, &key_k1);
-    let evicted_result = transport_evicted.send_update(&"c".repeat(64), "ZXZpY3RlZA==");
+    let evicted_result = transport_evicted.send_update(&"c".repeat(64), "ZXZpY3RlZA==", None);
     assert!(
         evicted_result.is_err(),
         "send with doubly-stale K1 must fail (key evicted after 2nd rotation)"
@@ -618,7 +618,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
         .await
         .expect("read fresh key");
     let transport_fresh = create_ohttp_transport(&ohttp_url, &key_fresh);
-    let fresh_result = transport_fresh.send_update(&"d".repeat(64), "ZnJlc2g=");
+    let fresh_result = transport_fresh.send_update(&"d".repeat(64), "ZnJlc2g=", None);
     assert!(
         fresh_result.is_ok(),
         "send with refetched key must succeed: {:?}",
@@ -652,7 +652,7 @@ async fn integration_ohttp_with_garbage_key_returns_error() {
     };
 
     let transport = create_ohttp_transport(&ohttp_url, &wrong_key);
-    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
 
     // Should fail — the relay can't decapsulate a blob encrypted with the wrong key
     assert!(result.is_err(), "wrong OHTTP key should produce an error");
@@ -692,7 +692,7 @@ async fn smoke_ohttp_key_bootstrap_and_send() {
 
     // 3. Send via OHTTP
     let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
-    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
     assert!(result.is_ok(), "send via OHTTP failed: {:?}", result.err());
 
     ohttp_mgr.stop().await;
@@ -711,7 +711,7 @@ async fn smoke_ohttp_fail_closed() {
         pinned_certs: vec![],
     };
     let transport = HttpTransport::new(config);
-    let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+    let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
     assert!(result.is_err());
     assert!(
         result
