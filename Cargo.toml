@@ -29,8 +29,8 @@ seed-contacts = ["dep:fake", "dep:rand"]
 
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", rev = "2c6321d525eca96e98cc958831be383bb944b02f" }
-vauchi-app = { git = "https://gitlab.com/vauchi/core.git", rev = "2c6321d525eca96e98cc958831be383bb944b02f", features = ["network-native-tls"] }
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", rev = "119e0479e5c602f26530da2e0433911e3f90c860" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", rev = "119e0479e5c602f26530da2e0433911e3f90c860", features = ["network-native-tls"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
