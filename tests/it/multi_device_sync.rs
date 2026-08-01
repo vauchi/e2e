@@ -1663,11 +1663,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
             .expect("A1 should permit Bob to receive the shared field");
     }
     let mut baseline_missing = Vec::new();
-    // DIAGNOSTIC (2026-07-27-f4-bounded-skew-convergence-regression): the round
-    // budget is raised and each round reported so a CI failure distinguishes
-    // "still converging when the budget ran out" (missing set shrinks) from
-    // "actively stuck" (missing set constant). Revert with the finding.
-    for round in 0..24 {
+    for _ in 0..8 {
         orch.sync_all()
             .await
             .expect("shared field should synchronize before competing edits");
@@ -1679,16 +1675,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
             "+12025551100",
         )
         .await;
-        eprintln!(
-            "[skew-probe] baseline round {round}: {} missing {baseline_missing:?}",
-            baseline_missing.len()
-        );
         if baseline_missing.is_empty() {
-            eprintln!("[skew-probe] baseline converged after round {round}");
-            assert!(
-                round < 8,
-                "PROBE RESULT: baseline converged only at round {round}; the original budget of 8 was too small — this is slow convergence, not a rejection"
-            );
             break;
         }
     }
@@ -1731,8 +1718,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
     }
 
     let mut missing = Vec::new();
-    // DIAGNOSTIC: same probe on the competing-edit convergence.
-    for round in 0..24 {
+    for _ in 0..6 {
         orch.sync_all()
             .await
             .expect("bounded-skew concurrent edits should synchronize");
@@ -1744,16 +1730,7 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
             "+12025551102",
         )
         .await;
-        eprintln!(
-            "[skew-probe] winner round {round}: {} missing {missing:?}",
-            missing.len()
-        );
         if missing.is_empty() {
-            eprintln!("[skew-probe] winner converged after round {round}");
-            assert!(
-                round < 6,
-                "PROBE RESULT: winner converged only at round {round}; the original budget of 6 was too small — this is slow convergence, not a rejection"
-            );
             orch.stop().await.expect("Failed to stop orchestrator");
             return;
         }
