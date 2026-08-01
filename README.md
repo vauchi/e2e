@@ -24,17 +24,27 @@ multi-device, cross-platform scenarios.
 | Requirement | Check Command | Install |
 |-------------|---------------|---------|
 | Rust toolchain | `rustc --version` | [rustup.rs](https://rustup.rs) |
-| CLI binary | `just build-cli` | Built from source |
-| Relay binary | `just build-relay` | Built from source |
+| CLI, relay, OHTTP relay binaries | `just e2e-build` | Built from source |
 
 ```bash
-# Build prerequisites
-just build-cli
-just build-relay
+# Build all three binaries into target/e2e-bin (SHA-cached, rebuilds
+# only what changed)
+just e2e-build
 
 # Run CLI-based tests
 just e2e-run test_cli_to_cli_exchange
 ```
+
+> **Use `just e2e-build`, not `just build cli`.** The harness drives
+> time-dependent scenarios (clock skew, deletion grace periods) through
+> `VAUCHI_TEST_CLOCK_EPOCH`, which the CLI only honors when compiled with
+> `--features e2e-test-clock`. `just e2e-build` passes it; a plain
+> `just build cli` does not, and the resulting binary ignores the test
+> clock — tests then fail on a real grace period
+> (`Grace period has not elapsed`) rather than on anything you changed.
+>
+> The harness looks for binaries in `$E2E_BIN_DIR`, then `target/e2e-bin`,
+> then `cli/target/debug` as a last resort. CI sets `E2E_BIN_DIR`.
 
 ### Phase 2: Mobile Testing (Maestro)
 
