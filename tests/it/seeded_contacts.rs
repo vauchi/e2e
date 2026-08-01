@@ -306,7 +306,7 @@ fn e2e_group_filter_shows_only_group_members() {
     // Find the Family group filter action
     let screen = engine.current_screen();
     let family_action = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id.starts_with("filter_group:") && a.label == "Family")
         .expect("Family group filter action should exist");
@@ -336,7 +336,7 @@ fn e2e_group_filter_clear_shows_all() {
     // Apply filter
     let screen = engine.current_screen();
     let family_action_id = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id.starts_with("filter_group:") && a.label == "Family")
         .map(|a| a.id.clone())
@@ -369,7 +369,7 @@ fn e2e_group_filter_combined_with_search() {
     // Apply Friends filter (indices 3..=6 → 4 per 10)
     let screen = engine.current_screen();
     let friends_action_id = screen
-        .actions
+        .contextual_actions
         .iter()
         .find(|a| a.id.starts_with("filter_group:") && a.label == "Friends")
         .map(|a| a.id.clone())
@@ -409,7 +409,7 @@ fn e2e_groups_appear_as_screen_actions() {
 
     let screen = engine.current_screen();
     let group_actions: Vec<&str> = screen
-        .actions
+        .contextual_actions
         .iter()
         .filter(|a| a.id.starts_with("filter_group:"))
         .map(|a| a.label.as_str())

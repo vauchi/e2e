@@ -29,8 +29,11 @@ seed-contacts = ["dep:fake", "dep:rand"]
 
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", rev = "05408d985fa31517f4c2e29c5685f5a2926be7f7" }
-vauchi-app = { git = "https://gitlab.com/vauchi/core.git", rev = "05408d985fa31517f4c2e29c5685f5a2926be7f7", features = ["network-native-tls"] }
+# Tracks the tag `cli` ships (cli/Cargo.toml), because CI builds the E2E
+# CLI binary from cli main — a pin behind it certifies a core the CLI
+# under test is not running.
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.0" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.0", features = ["network-native-tls"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
@@ -115,3 +118,4 @@ split-debuginfo = "unpacked"
 [profile.test]
 debug = "line-tables-only"
 split-debuginfo = "off"
+
