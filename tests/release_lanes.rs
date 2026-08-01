@@ -5,12 +5,14 @@
 const CI_CONFIG: &str = include_str!("../.gitlab-ci.yml");
 const RG3_TEST: &str =
     "orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay";
-const RG4_RG5_TEST_FILTER: &str = "multi_device_sync::integration_six_device_(exchange_and_update_convergence|single_exchange_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|personal_note_tombstone_converges_owner_only|replacement_and_revocation_preserve_active_convergence|lost_primary_continuity_certification)";
+const RG4_RG5_TEST_FILTER: &str = "multi_device_sync::integration_six_device_(exchange_and_update_convergence|single_exchange_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|replacement_and_revocation_preserve_active_convergence|lost_primary_continuity_certification)";
 const OHTTP_E2E_FAULT_BUILD: &str = "cargo build --release --features e2e-faults --manifest-path \"$BUILD_TMPDIR/ohttp-relay/Cargo.toml\"";
 const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=\"e2e-faults-v1\"";
 const RG6_TEST: &str =
     "ohttp_integration::integration_ohttp_relay_observations_exclude_update_content";
 const RG8_TEST: &str = "ohttp_fail_closed_matrix";
+const RG10_TEST: &str =
+    "multi_device_sync::integration_six_device_personal_note_tombstone_converges_owner_only";
 
 fn top_level_job(name: &str) -> &str {
     let marker = format!("{name}:\n");
@@ -138,6 +140,19 @@ fn rg8_release_lane_is_blocking_and_runs_the_fail_closed_matrix() {
 
 // @internal
 #[test]
+fn rg10_release_lane_is_blocking_and_runs_the_owner_private_state_journey() {
+    let job = top_level_job("test:release-rg10");
+
+    assert!(job.contains("allow_failure: false"));
+    assert!(job.contains("job: test:smoke"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"merge_request_event\""));
+    assert!(job.contains("$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+    assert!(job.contains(RG10_TEST));
+}
+
+// @internal
+#[test]
 fn native_binary_producer_and_consumers_share_linux_runner() {
     for job_name in [
         "test:smoke",
@@ -145,6 +160,7 @@ fn native_binary_producer_and_consumers_share_linux_runner() {
         "test:release-rg4-rg5",
         "test:release-rg6-observability",
         "test:release-rg8",
+        "test:release-rg10",
         "test:integration",
     ] {
         let job = top_level_job(job_name);
