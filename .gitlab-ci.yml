@@ -23,7 +23,7 @@
 # Shared templates + GitLab Ultimate Templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.07.11
+    ref: ci-templates-v2026.07.13
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -69,7 +69,7 @@ stages:
 
 variables:
   # Pin fetched helper scripts independently from the structural templates.
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.11"
+  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.13"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
