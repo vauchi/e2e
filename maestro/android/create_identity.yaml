@@ -25,6 +25,7 @@ name: Create Identity (Android)
 
 # ── default_name ──────────────────────────────────────────────
 - assertVisible: "What's your name?"
+- tapOn: "Display name input"
 - inputText: ${NAME}
 - hideKeyboard
 - tapOn: "Continue"

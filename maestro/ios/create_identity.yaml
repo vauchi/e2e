@@ -25,26 +25,21 @@ name: Create Identity
 
 # -- default_name ----------------------------------------------
 - assertVisible: "What's your name?"
-- tapOn:
-    id: "display_name"
+- tapOn: "Display name input"
 - inputText: ${NAME}
-- tapOn:
-    id: "continue"
+- tapOn: "Continue"
 
 # -- groups_setup: skip (fast-track) ----------------------------
 - assertVisible: "Choose your groups"
-- tapOn:
-    id: "skip"
+- tapOn: "Skip"
 
 # -- contact_info: skip (fast-track) ----------------------------
 - assertVisible: "Add contact info"
-- tapOn:
-    id: "skip"
+- tapOn: "Skip"
 
 # -- what_next: finish onboarding, go to main app ---------------
 - assertVisible: "What would you like to do?"
-- tapOn:
-    id: "start_app"
+- tapOn: "Start using the app"
 
 # Wait for identity generation and transition to main app
 - waitForAnimationToEnd:
