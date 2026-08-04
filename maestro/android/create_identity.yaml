@@ -49,3 +49,10 @@ name: Create Identity (Android)
 # Post-state — at the very least, the onboarding flow must have
 # advanced off the "What would you like to do?" screen.
 - assertNotVisible: "What would you like to do?"
+
+# Verify the name came from Core persistence, not only optimistic UI state.
+- stopApp
+- launchApp
+- waitForAnimationToEnd:
+    timeout: 15000
+- assertVisible: ${NAME}

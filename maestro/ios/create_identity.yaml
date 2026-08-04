@@ -48,3 +48,10 @@ name: Create Identity
 # Post-state: the onboarding flow must have advanced off the
 # "What would you like to do?" screen.
 - assertNotVisible: "What would you like to do?"
+
+# Verify the name came from Core persistence after a fresh app launch.
+- stopApp
+- launchApp
+- waitForAnimationToEnd:
+    timeout: 15000
+- assertVisible: ${NAME}
