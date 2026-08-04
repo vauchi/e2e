@@ -29,13 +29,13 @@ name: Create Identity
 - inputText: ${NAME}
 - tapOn: "Continue"
 
-# -- groups_setup: skip (fast-track) ----------------------------
+# -- groups_setup: continue without optional groups -------------
 - assertVisible: "Choose your groups"
-- tapOn: "Skip"
+- tapOn: "Continue"
 
-# -- contact_info: skip (fast-track) ----------------------------
+# -- contact_info: continue without optional fields -------------
 - assertVisible: "Add contact info"
-- tapOn: "Skip"
+- tapOn: "Continue"
 
 # -- what_next: finish onboarding, go to main app ---------------
 - assertVisible: "What would you like to do?"
