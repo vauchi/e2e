@@ -32,8 +32,11 @@ seed-contacts = ["dep:fake", "dep:rand"]
 # Tracks the tag `cli` ships (cli/Cargo.toml), because CI builds the E2E
 # CLI binary from cli main — a pin behind it certifies a core the CLI
 # under test is not running.
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.0" }
-vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.0", features = ["network-native-tls"] }
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.1-dev.3" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.1-dev.3", features = ["network-native-tls"] }
+# Force vauchi-relay's transitive protocol dependency to the same Core tag
+# so the relay and CLI agree on the wire format.
+vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.59.1-dev.3" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
@@ -118,4 +121,5 @@ split-debuginfo = "unpacked"
 [profile.test]
 debug = "line-tables-only"
 split-debuginfo = "off"
+
 
