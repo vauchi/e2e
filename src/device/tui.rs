@@ -127,10 +127,10 @@ exec "{}"
             })?;
         }
 
-        // Use `script` to provide a proper controlling terminal with /dev/tty
-        let script_cmd = format!("script -q -c '{}' /dev/null", script_path.display());
-
-        // Spawn PTY session with script wrapper
+        // Spawn the wrapper script directly inside an expectrl PTY. This is
+        // portable across Linux and macOS; the older `script -c` invocation
+        // works on Linux but is rejected by macOS `script`.
+        let script_cmd = script_path.to_string_lossy().to_string();
         let mut session = expectrl::spawn(&script_cmd)
             .map_err(|e| E2eError::device(format!("Failed to spawn TUI: {}", e)))?;
 
@@ -266,6 +266,12 @@ impl TuiSession {
         self.send_key(b'\t').await
     }
 
+    async fn send_alt(&self, c: char) -> E2eResult<()> {
+        // crossterm encodes Alt+<char> as ESC followed by the character.
+        self.send_escape().await?;
+        self.send_char(c).await
+    }
+
     async fn send_text(&self, text: &str) -> E2eResult<()> {
         let mut pty_guard = self.pty.lock().await;
         let pty = pty_guard
@@ -298,6 +304,59 @@ impl TuiSession {
             .as_mut()
             .ok_or_else(|| E2eError::device("TUI session not started"))?;
         pty.read_available()
+    }
+
+    /// Activate the primary contextual action (e.g. "Create new identity").
+    async fn activate_primary(&self) -> E2eResult<()> {
+        self.send_enter().await
+    }
+
+    /// Cycle contextual actions with Tab until the rendered command bar
+    /// contains `label`, then activate it with Enter.
+    async fn activate_context_action(&self, label: &str) -> E2eResult<()> {
+        for _ in 0..10 {
+            let screen = self.read_screen().await?;
+            // The command bar is the bottom "Commands" block.
+            if screen.contains(label) {
+                return self.send_enter().await;
+            }
+            self.send_tab().await?;
+        }
+        Err(E2eError::device(format!(
+            "Context action '{}' not found after cycling",
+            label
+        )))
+    }
+
+    /// Open the navigation overlay and select the item whose label contains
+    /// `label` by its 1-based position.
+    async fn navigate_to(&self, label: &str) -> E2eResult<()> {
+        self.send_alt('m').await?;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let screen = self.read_screen().await?;
+        // Overlay items are rendered as "1. Label" or "1.Label" depending on
+        // the terminal width; accept both forms.
+        let mut target_index = None;
+        for line in screen.lines() {
+            let trimmed = line.trim();
+            let parts = trimmed.split_once(". ").or_else(|| trimmed.split_once('.'));
+            if let Some((num, rest)) = parts {
+                let rest = rest.trim();
+                if rest.contains(label) || rest.to_lowercase().contains(&label.to_lowercase()) {
+                    if let Ok(n) = num.parse::<usize>() {
+                        target_index = Some(n);
+                        break;
+                    }
+                }
+            }
+        }
+        let index = target_index.ok_or_else(|| {
+            E2eError::device(format!("Navigation item '{}' not found in overlay", label))
+        })?;
+        let digit = char::from_digit(index as u32, 10).ok_or_else(|| {
+            E2eError::device(format!("Navigation index {} out of digit range", index))
+        })?;
+        self.send_char(digit).await
     }
 
     async fn stop(&self) -> E2eResult<()> {
@@ -360,52 +419,53 @@ impl Device for TuiDevice {
     }
 
     async fn create_identity(&self, name: &str) -> E2eResult<()> {
-        // Start session if not running
         self.session.ensure_started().await?;
 
-        // Wait for setup screen - look for key text in the TUI output
-        // The TUI uses Ratatui which includes ANSI escape codes mixed with text
-        // Look for the setup screen indicators
+        // Wait for the generic onboarding screen rendered by Core.
         self.session
-            .expect_timeout("Setup|Create New Identity|Welcome", Duration::from_secs(15))
+            .expect_timeout(
+                "Welcome to Vauchi|Create new identity",
+                Duration::from_secs(15),
+            )
             .await?;
 
-        // Press 'c' to create identity
-        self.session.send_char('c').await?;
+        // Primary action is "Create new identity".
+        self.session.activate_primary().await?;
 
-        // Wait for home screen - TUI goes directly to home after identity creation
-        // Look for common home screen elements
+        // default_name screen: type the display name.
         self.session
-            .expect_timeout("Contacts|Search|Press", Duration::from_secs(10))
+            .expect_timeout("What's your name?|Display name", Duration::from_secs(10))
             .await?;
-
-        // Now go to settings to update the name
-        self.session.send_char('s').await?;
-
-        // Press 'n' to edit name
-        self.session.send_char('n').await?;
-
-        // Clear existing text (multiple backspaces)
-        // The default name is "New User" (8 chars)
-        for _ in 0..20 {
-            self.session.send_backspace().await?;
-        }
-
-        // Type the new name
         self.session.send_text(name).await?;
+        self.session.activate_primary().await?;
 
-        // Submit with Enter
-        self.session.send_enter().await?;
+        // groups_setup: continue without selecting groups.
+        self.session
+            .expect_timeout("Choose groups|Suggested groups", Duration::from_secs(10))
+            .await?;
+        self.session.activate_primary().await?;
 
-        // Go back to home
-        self.session.send_escape().await?;
+        // contact_info: continue without adding fields.
+        self.session
+            .expect_timeout("Add contact|contact info", Duration::from_secs(10))
+            .await?;
+        self.session.activate_primary().await?;
+
+        // what_next: start using the app.
+        self.session
+            .expect_timeout("What would you like|Start using", Duration::from_secs(10))
+            .await?;
+        self.session.activate_primary().await?;
+
+        // Wait for the main screen to settle.
+        tokio::time::sleep(Duration::from_millis(500)).await;
 
         Ok(())
     }
 
     async fn has_identity(&self) -> bool {
-        // Check if identity file exists in data directory
-        let identity_path = self.data_dir.path().join("identity.json");
+        // The TUI persists identity data in a SQLite database.
+        let identity_path = self.data_dir.path().join("vauchi.db");
         identity_path.exists()
     }
 
@@ -424,20 +484,64 @@ impl Device for TuiDevice {
     async fn generate_qr(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
 
-        // Navigate to Exchange screen from Home (press 'e' when on field, otherwise use menu)
-        // Actually, from looking at the input handler, 'e' edits a field if fields exist
-        // We need a different approach - maybe there's a direct exchange key
+        // Navigate to the Exchange tab via the navigation overlay.
+        self.session.navigate_to("Exchange").await?;
+        self.session
+            .expect_timeout("Exchange Mode|Pick a way", Duration::from_secs(10))
+            .await?;
 
-        // For now, return error - TUI QR extraction is complex
-        Err(E2eError::DeviceNotSupported(
-            "TUI QR extraction not yet implemented - requires screen OCR or data export".into(),
-        ))
+        // Select Glance (the one-sided QR display mode). It is the hero row.
+        self.session.send_char('1').await?;
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Wait for the QR display screen. The payload is rendered below the QR.
+        self.session
+            .expect_timeout("Show this to exchange|QR", Duration::from_secs(10))
+            .await?;
+
+        let screen = self.session.read_screen().await?;
+        // The renderer emits "[QR] <label>" followed by "  <payload>".
+        let mut lines = screen.lines().peekable();
+        while let Some(line) = lines.next() {
+            if line.contains("[QR]") {
+                if let Some(next_line) = lines.next() {
+                    let payload = next_line.trim().trim_start_matches("  ").to_string();
+                    if !payload.is_empty() && payload.len() >= 20 {
+                        return Ok(payload);
+                    }
+                }
+            }
+        }
+
+        Err(E2eError::device("Could not extract QR payload from TUI"))
     }
 
-    async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "TUI cannot scan QR codes. Use CLI for programmatic exchange.".into(),
-        ))
+    async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
+        self.session.ensure_started().await?;
+
+        // Navigate to Contacts tab and use "Add Contact" to trigger QR scan.
+        self.session.navigate_to("Contacts").await?;
+        self.session
+            .expect_timeout("Contacts|Add Contact", Duration::from_secs(10))
+            .await?;
+        self.session.activate_context_action("Add Contact").await?;
+
+        // Wait for the QR scan effect prompt and input the peer's data.
+        self.session
+            .expect_timeout("Paste QR data|Core request", Duration::from_secs(10))
+            .await?;
+        self.session.send_text(qr_data).await?;
+        self.session.send_enter().await?;
+
+        // Wait for the exchange to complete and return to a stable screen.
+        self.session
+            .expect_timeout(
+                "Contact added|Exchange complete|Contacts",
+                Duration::from_secs(30),
+            )
+            .await?;
+
+        Ok(())
     }
 
     async fn start_device_link(&self) -> E2eResult<String> {

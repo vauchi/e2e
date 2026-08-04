@@ -423,6 +423,74 @@ impl Orchestrator {
         Ok(user)
     }
 
+    /// Add a user whose primary device is an iOS Simulator controlled by Maestro.
+    ///
+    /// Does not inject CLI OHTTP overrides; the simulator app connects to the
+    /// relay directly. Skips gracefully in tests when no simulator is booted.
+    pub fn add_user_with_maestro_ios(
+        &mut self,
+        name: impl Into<String>,
+        simulator_name: impl Into<String>,
+    ) -> E2eResult<Arc<RwLock<User>>> {
+        let name = name.into();
+        let simulator_name = simulator_name.into();
+        let relay_url = self.primary_relay_url()?;
+
+        info!(
+            "Adding Maestro iOS user '{}' on simulator '{}' (relay: {})",
+            name, simulator_name, relay_url
+        );
+
+        let mut user = User::with_relay(&name, &relay_url);
+        user.add_maestro_ios_device(&simulator_name, &relay_url)?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+        Ok(user)
+    }
+
+    /// Add a user whose primary device is an Android Emulator controlled by Maestro.
+    ///
+    /// Does not inject CLI OHTTP overrides; the emulator app connects to the
+    /// relay directly. Skips gracefully in tests when no emulator is connected.
+    pub fn add_user_with_maestro_android(
+        &mut self,
+        name: impl Into<String>,
+        emulator_name: impl Into<String>,
+    ) -> E2eResult<Arc<RwLock<User>>> {
+        let name = name.into();
+        let emulator_name = emulator_name.into();
+        let relay_url = self.primary_relay_url()?;
+
+        info!(
+            "Adding Maestro Android user '{}' on emulator '{}' (relay: {})",
+            name, emulator_name, relay_url
+        );
+
+        let mut user = User::with_relay(&name, &relay_url);
+        user.add_maestro_android_device(&emulator_name, &relay_url)?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+        Ok(user)
+    }
+
+    /// Add a user whose primary device is the TUI controlled via PTY automation.
+    #[cfg(feature = "tui")]
+    pub fn add_user_with_tui(&mut self, name: impl Into<String>) -> E2eResult<Arc<RwLock<User>>> {
+        let name = name.into();
+        let relay_url = self.primary_cli_relay_url()?;
+
+        info!("Adding TUI user '{}' (relay: {})", name, relay_url);
+
+        let mut user = User::with_relay(&name, &relay_url);
+        user.add_tui_device(&relay_url)?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+        Ok(user)
+    }
+
     /// Add a split-OHTTP user whose devices each receive their own test-only
     /// environment values, while the outer relay route remains fixed.
     pub fn add_user_split_ohttp_with_device_envs(

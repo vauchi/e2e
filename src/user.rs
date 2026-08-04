@@ -12,7 +12,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use crate::device::{CliDevice, Contact, ContactCard, Device, DeviceType};
+#[cfg(feature = "tui")]
+use crate::device::TuiDevice;
+use crate::device::{CliDevice, Contact, ContactCard, Device, DeviceType, MaestroDevice};
 use crate::error::{E2eError, E2eResult};
 
 /// A Vauchi user with one or more devices.
@@ -119,10 +121,85 @@ impl User {
         match device_type {
             DeviceType::Cli => self.add_cli_device(relay_url),
             _ => Err(E2eError::device(format!(
-                "Device type {:?} not yet implemented",
+                "Device type {:?} requires device-specific parameters; use add_maestro_ios_device, add_maestro_android_device, or add_tui_device",
                 device_type
             ))),
         }
+    }
+
+    /// Add an iOS Simulator device controlled via Maestro.
+    pub fn add_maestro_ios_device(
+        &mut self,
+        simulator_name: &str,
+        relay_url: &str,
+    ) -> E2eResult<usize> {
+        let device_name = format!("device_{}", self.devices.len());
+        let full_name = format!("{}_{}", self.name, device_name);
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
+
+        info!(
+            "Adding iOS simulator device '{}' for user '{}' (relay: {})",
+            device_name, self.name, url
+        );
+
+        let device = MaestroDevice::ios(&full_name, simulator_name, url)?;
+        let device: Box<dyn Device> = Box::new(device);
+        self.devices.push(Arc::new(RwLock::new(device)));
+
+        Ok(self.devices.len() - 1)
+    }
+
+    /// Add an Android Emulator device controlled via Maestro.
+    pub fn add_maestro_android_device(
+        &mut self,
+        emulator_name: &str,
+        relay_url: &str,
+    ) -> E2eResult<usize> {
+        let device_name = format!("device_{}", self.devices.len());
+        let full_name = format!("{}_{}", self.name, device_name);
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
+
+        info!(
+            "Adding Android emulator device '{}' for user '{}' (relay: {})",
+            device_name, self.name, url
+        );
+
+        let device = MaestroDevice::android(&full_name, emulator_name, url)?;
+        let device: Box<dyn Device> = Box::new(device);
+        self.devices.push(Arc::new(RwLock::new(device)));
+
+        Ok(self.devices.len() - 1)
+    }
+
+    /// Add a TUI device controlled via PTY automation.
+    #[cfg(feature = "tui")]
+    pub fn add_tui_device(&mut self, relay_url: &str) -> E2eResult<usize> {
+        let device_name = format!("device_{}", self.devices.len());
+        let full_name = format!("{}_{}", self.name, device_name);
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
+
+        info!(
+            "Adding TUI device '{}' for user '{}' (relay: {})",
+            device_name, self.name, url
+        );
+
+        let device = TuiDevice::new(&full_name, url)?;
+        let device: Box<dyn Device> = Box::new(device);
+        self.devices.push(Arc::new(RwLock::new(device)));
+
+        Ok(self.devices.len() - 1)
     }
 
     /// Add multiple CLI devices at once.

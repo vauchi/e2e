@@ -193,15 +193,16 @@ tests use `#[ignore]`.
 |------|-------|--------|-------|
 | CLI-to-CLI exchange | 1 | Working | Basic contact exchange |
 | Multi-device linking | 1 | Working | Device pairing |
-| Contact sync across devices | 1 | Failing | Multi-device sync issue |
-| Five user exchange | 1 | Failing | Multi-device sync issue |
-| Visibility labels | 1 | New | Label CRUD, field visibility per label |
-| Recovery flow | 1 | New | Social recovery with vouchers |
-| Per-contact visibility | 1 | New | Hide/show fields per contact |
-| Backup & restore | 1 | New | Identity export/import |
-| iOS Simulator | 2 | Placeholder | Maestro flows for device linking, labels |
-| Android Emulator | 2 | Placeholder | Requires Maestro flows |
-| TUI | 3 | Placeholder | Requires expectrl |
+| Contact sync across devices | 1 | Working | Added device-link + exchange + sync certification |
+| Five user exchange | 1 | Working | Full mesh exchange between five users |
+| Visibility labels | 1 | Working | Label CRUD, field visibility per label |
+| Recovery flow | 1 | Working | Social recovery with vouchers |
+| Per-contact visibility | 1 | Working | Hide/show fields per contact |
+| Backup & restore | 1 | New | Identity export/import — test not added yet |
+| iOS Simulator | 2 | Skips gracefully | Detects booted simulator; full exchange needs built app |
+| Android Emulator | 2 | Skips gracefully | Detects any device/emulator; full exchange needs APK install |
+| TUI create identity | 3 | Working | PTY onboarding via expectrl |
+| TUI exchange / device link | 3 | Blocked | Exchange Mode keyboard navigation not drivable |
 
 ## Architecture
 
