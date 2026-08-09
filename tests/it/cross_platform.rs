@@ -424,14 +424,32 @@ async fn test_tui_create_identity() {
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Integration test: CLI user shares their card with an Android device user.
 ///
-/// Works with both emulators and physical devices. Skips gracefully when no
-/// Android device is connected or Maestro is not installed, keeping the full
-/// `--include-ignored` suite green on machines without the mobile harness.
+/// Ignored: the flow it drives has no counterpart in the app. The Maestro
+/// steps after the first tap reference strings absent from `en.json`
+/// entirely — the manual QR-entry affordance was deleted, and core emits
+/// none of the `qr.paste_*` keys still sitting in the catalogues. Neither
+/// the `vauchi://` deep link (which rejects the payload's path form) nor
+/// the CLI (which has no link mode) offers another way in, so a
+/// CLI-generated payload currently cannot reach the app at all. Re-pointing
+/// the flow has nothing to point at; restoring the affordance is a product
+/// decision, not a test fix.
+///
+/// Investigation, including the three routes checked and closed:
+/// `_private/docs/backlog/2026-08-09-cli-to-android-exchange-automation-unreachable.md`
+///
+/// The device guard below stays for `--include-ignored` runs on machines
+/// without the harness. It is deliberately no longer the *only* thing
+/// gating this test: because CI has no phone attached, that guard alone
+/// meant CI never executed the test, so the flow drifted out of step with
+/// the app unnoticed. An `#[ignore]` states the disabled state in source
+/// where it can be read; hardware detection hid it.
 ///
 /// Tags: integration, exchange, cross-platform, android
 /// Feature: contact_exchange.feature
 // @internal
 #[tokio::test]
+#[ignore = "drives a manual-entry affordance the app no longer has — see \
+            backlog/2026-08-09-cli-to-android-exchange-automation-unreachable.md"]
 async fn integration_cli_to_android_exchange() {
     let device_name = match detect_android_device() {
         Some(name) => name,
