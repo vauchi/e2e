@@ -10,6 +10,15 @@ name: List Contacts
 #
 # Format: One contact name per line
 
+# Fail on an unset input before touching the app. Maestro interpolates
+# ${VAR} as JavaScript, so an unset variable is typed as the literal
+# string "undefined" and the flow's own assertions then confirm it —
+# a device was found carrying an identity named exactly that.
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof MAESTRO_OUTPUT_PATH !== 'undefined' && String(MAESTRO_OUTPUT_PATH) !== 'undefined' && String(MAESTRO_OUTPUT_PATH).length > 0}
+    label: "MAESTRO_OUTPUT_PATH must be set (unset becomes the literal string \"undefined\")"
+
 - launchApp
 
 # Wait for app to be ready

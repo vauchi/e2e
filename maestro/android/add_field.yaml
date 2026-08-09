@@ -11,6 +11,21 @@ name: Add Card Field (Android)
 #   FIELD_LABEL - Display label for the field (e.g., "Work", "Personal")
 #   FIELD_VALUE - Value of the field
 
+# Fail on an unset input before touching the app. Maestro interpolates
+# ${VAR} as JavaScript, so an unset variable is typed as the literal
+# string "undefined" and the flow's own assertions then confirm it —
+# a device was found carrying an identity named exactly that.
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof FIELD_LABEL !== 'undefined' && String(FIELD_LABEL) !== 'undefined' && String(FIELD_LABEL).length > 0}
+    label: "FIELD_LABEL must be set (unset becomes the literal string \"undefined\")"
+- assertTrue:
+    condition: ${typeof FIELD_TYPE !== 'undefined' && String(FIELD_TYPE) !== 'undefined' && String(FIELD_TYPE).length > 0}
+    label: "FIELD_TYPE must be set (unset becomes the literal string \"undefined\")"
+- assertTrue:
+    condition: ${typeof FIELD_VALUE !== 'undefined' && String(FIELD_VALUE) !== 'undefined' && String(FIELD_VALUE).length > 0}
+    label: "FIELD_VALUE must be set (unset becomes the literal string \"undefined\")"
+
 - launchApp
 
 # Wait for app to be ready
