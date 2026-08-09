@@ -3020,8 +3020,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.59.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.59.1-dev.3#f95155824f145bdbb5d301944bc6e7544e29675f"
+version = "0.60.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.60.1-dev.8#a438883265ef87682b1aa9847f8830449a2a14d9"
 dependencies = [
  "base64",
  "hex",
@@ -3039,8 +3039,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.59.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.59.1-dev.3#f95155824f145bdbb5d301944bc6e7544e29675f"
+version = "0.60.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.60.1-dev.8#a438883265ef87682b1aa9847f8830449a2a14d9"
 dependencies = [
  "argon2",
  "base64",
@@ -3073,7 +3073,7 @@ dependencies = [
  "ureq",
  "url",
  "uuid",
- "vauchi-protocol 0.59.1 (git+https://gitlab.com/vauchi/core.git?tag=v0.59.1-dev.3)",
+ "vauchi-protocol 0.60.1",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -3111,14 +3111,14 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.59.1 (git+https://gitlab.com/vauchi/core.git?tag=v0.59.1-dev.3)",
+ "vauchi-protocol 0.60.1",
  "vauchi-relay",
 ]
 
 [[package]]
 name = "vauchi-protocol"
 version = "0.59.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.59.1-dev.3#f95155824f145bdbb5d301944bc6e7544e29675f"
+source = "git+https://gitlab.com/vauchi/core.git?branch=main#bffcdaa7d9ad79985e7f379202ddc6ff98814771"
 dependencies = [
  "serde",
  "serde_json",
@@ -3127,8 +3127,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.59.1"
-source = "git+https://gitlab.com/vauchi/core.git?branch=main#bffcdaa7d9ad79985e7f379202ddc6ff98814771"
+version = "0.60.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.60.1-dev.8#a438883265ef87682b1aa9847f8830449a2a14d9"
 dependencies = [
  "serde",
  "serde_json",
@@ -3162,7 +3162,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol 0.59.1 (git+https://gitlab.com/vauchi/core.git?branch=main)",
+ "vauchi-protocol 0.59.1",
  "x25519-dalek",
  "zeroize",
 ]
