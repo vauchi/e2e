@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: Duress PIN rejects an invalid value (Android)
+---
+# The device-level half of CC-27 for duress PIN validation.
+#
+# A sibling flow once typed the literal string "undefined" into both PIN
+# fields, the app accepted it, and the flow reported Enabled — a green
+# test that had configured a security control to a well-known string.
+# This asserts the app now refuses it, on a real device, through the same
+# input path that produced the original defect.
+#
+# INVALID_PIN is deliberately supplied by the caller rather than hardcoded
+# so the same flow can be pointed at any rejected shape.
+#
+# Environment variables:
+#   INVALID_PIN - a value the app must refuse (e.g. "undefined", "123")
+
+- assertTrue:
+    condition: ${typeof INVALID_PIN !== 'undefined' && String(INVALID_PIN) !== 'undefined' && String(INVALID_PIN).length > 0}
+    label: "INVALID_PIN must be set (unset becomes the literal string \"undefined\")"
+
+- tapOn:
+    id: "tab_my_info"
+- tapOn:
+    id: "home.settings"
+
+- swipe:
+    direction: UP
+    duration: 300
+
+- assertVisible: "Not set"
+- tapOn: "Set Duress PIN"
+- assertVisible: "Set Duress PIN"
+
+- tapOn:
+    id: "duress_pin_field"
+- inputText: ${INVALID_PIN}
+- hideKeyboard
+
+# The reducer filters to ASCII digits and truncates, so a non-numeric
+# value leaves the field empty and a short one stays short. Either way the
+# flow must not reach an enabled duress PIN.
+- tapOn: "Set"
+- waitForAnimationToEnd
+
+# The assertion that matters: duress must NOT have been enabled. Checking
+# for the absence of success rather than the presence of a specific error
+# keeps this flow independent of the copy.
+- assertNotVisible: "Enabled"
