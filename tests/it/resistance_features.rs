@@ -34,7 +34,7 @@ fn test_duress_pin_requires_app_password_first() {
     vauchi.create_identity("Alice").unwrap();
 
     // Setup duress without app password should fail
-    let result = vauchi.setup_duress_password("6789");
+    let result = vauchi.setup_duress_password("678901");
     assert!(
         result.is_err(),
         "Setting up duress PIN without app password must fail"
@@ -52,7 +52,7 @@ fn test_duress_pin_setup_after_app_password() {
     assert!(vauchi.is_password_enabled().unwrap());
 
     // Setup duress PIN
-    vauchi.setup_duress_password("6789").unwrap();
+    vauchi.setup_duress_password("678901").unwrap();
     assert!(vauchi.is_duress_enabled().unwrap());
 }
 
@@ -62,7 +62,7 @@ fn test_authenticate_with_normal_password_enters_normal_mode() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
-    vauchi.setup_duress_password("6789").unwrap();
+    vauchi.setup_duress_password("678901").unwrap();
 
     let mode = vauchi.authenticate("1234").unwrap();
     assert_eq!(mode, AuthMode::Normal);
@@ -74,9 +74,9 @@ fn test_authenticate_with_duress_pin_enters_duress_mode() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
-    vauchi.setup_duress_password("6789").unwrap();
+    vauchi.setup_duress_password("678901").unwrap();
 
-    let mode = vauchi.authenticate("6789").unwrap();
+    let mode = vauchi.authenticate("678901").unwrap();
     assert_eq!(mode, AuthMode::Duress);
 }
 
@@ -100,7 +100,7 @@ fn test_duress_alert_queued_on_duress_auth() {
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
     alice.setup_app_password("1234").unwrap();
-    alice.setup_duress_password("6789").unwrap();
+    alice.setup_duress_password("678901").unwrap();
 
     // Configure duress alert settings (no recipients yet)
     let settings = DuressSettings {
@@ -111,7 +111,7 @@ fn test_duress_alert_queued_on_duress_auth() {
     alice.save_duress_settings(&settings).unwrap();
 
     // Authenticate with duress PIN
-    let mode = alice.authenticate("6789").unwrap();
+    let mode = alice.authenticate("678901").unwrap();
     assert_eq!(mode, AuthMode::Duress);
 
     // ADR-032: duress alerts are covert card-update sends to configured
@@ -156,7 +156,7 @@ fn test_disable_duress() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("1234").unwrap();
-    vauchi.setup_duress_password("6789").unwrap();
+    vauchi.setup_duress_password("678901").unwrap();
 
     assert!(vauchi.is_duress_enabled().unwrap());
 
@@ -302,10 +302,10 @@ fn test_duress_mode_shows_decoy_contacts_only() {
 
     // Setup password and duress
     vauchi.setup_app_password("1234").unwrap();
-    vauchi.setup_duress_password("6789").unwrap();
+    vauchi.setup_duress_password("678901").unwrap();
 
     // Authenticate with duress PIN
-    vauchi.authenticate("6789").unwrap();
+    vauchi.authenticate("678901").unwrap();
 
     // List in Duress mode
     let duress_contacts = vauchi.list_contacts().unwrap();
@@ -484,10 +484,10 @@ fn test_duress_full_workflow() {
 
     // Setup passwords
     alice.setup_app_password("1234").unwrap();
-    alice.setup_duress_password("6789").unwrap();
+    alice.setup_duress_password("678901").unwrap();
 
     // Enter duress mode
-    let mode = alice.authenticate("6789").unwrap();
+    let mode = alice.authenticate("678901").unwrap();
     assert_eq!(mode, AuthMode::Duress);
 
     // Verify: decoys shown, real contacts hidden
