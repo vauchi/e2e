@@ -288,11 +288,31 @@ impl MaestroDevice {
 
         let mut cmd = Command::new("maestro");
         cmd.arg("test")
-            .arg(&flow_path)
             .arg("--platform")
             .arg(self.platform_flag())
             .arg("--device")
-            .arg(&self.device_name)
+            .arg(&self.device_name);
+
+        // `-e`, not the process environment. Maestro resolves `${VAR}` in a
+        // flow from parameters passed with `-e` only; an exported variable
+        // of the same name is invisible to it, and an unresolved `${VAR}`
+        // is not an error — it interpolates to the literal string
+        // "undefined" and gets typed into the app.
+        //
+        // Passing these as `cmd.env` therefore did nothing for years: every
+        // harness-driven flow ran with every variable unset. A device was
+        // found carrying an identity named `undefined`, which is this
+        // (`backlog/2026-08-09-maestro-flows-accept-unset-inputs.md`).
+        //
+        // Kept in the environment as well because Maestro reads
+        // MAESTRO_APP_ID from there itself.
+        cmd.arg("-e")
+            .arg(format!("VAUCHI_RELAY_URL={}", self.relay_url));
+        for (key, value) in env_vars {
+            cmd.arg("-e").arg(format!("{key}={value}"));
+        }
+
+        cmd.arg(&flow_path)
             .env("MAESTRO_APP_ID", &self.app_id)
             .env("VAUCHI_RELAY_URL", &self.relay_url)
             .stdout(Stdio::piped())

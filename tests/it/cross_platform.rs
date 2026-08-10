@@ -521,14 +521,28 @@ async fn integration_cli_to_android_exchange() {
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Integration test: CLI user shares their card with an iOS simulator user.
 ///
-/// Skips gracefully when no iOS simulator is booted or Maestro is not
-/// installed, keeping the full `--include-ignored` suite green on machines
-/// without the mobile harness.
+/// Ignored for the same reason as its Android sibling: the flow drives a
+/// manual QR-entry affordance the app no longer has. `complete_exchange`
+/// taps "Add Contact", which the app renders as "Exchange Now", and the
+/// two steps after it reference strings absent from `en.json` entirely.
+/// Re-pointing it has nothing to point at; restoring the affordance is a
+/// product decision.
+///
+/// Confirmed on iPhone 17 Pro on 2026-08-10, which answers open question 4
+/// of
+/// `_private/docs/backlog/2026-08-09-cli-to-android-exchange-automation-unreachable.md`
+/// — the iOS flow is a copy of the android one and has the same defect.
+///
+/// This only became visible once the harness started passing variables to
+/// Maestro at all. Until then every flow ran with every variable unset, so
+/// the run died earlier, on a garbage identity name.
 ///
 /// Tags: integration, exchange, cross-platform, ios
 /// Feature: contact_exchange.feature
 // @internal
 #[tokio::test]
+#[ignore = "drives a manual-entry affordance the app no longer has — see \
+            backlog/2026-08-09-cli-to-android-exchange-automation-unreachable.md"]
 async fn integration_cli_to_ios_exchange() {
     let udid = match detect_booted_ios_simulator() {
         Some(u) => u,
