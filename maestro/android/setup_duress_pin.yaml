@@ -20,11 +20,10 @@ appId: app.vauchi
     condition: ${typeof DURESS_PIN !== 'undefined' && String(DURESS_PIN) !== 'undefined' && String(DURESS_PIN).length > 0}
     label: "DURESS_PIN must be set (unset becomes the literal string \"undefined\")"
 
-# Ensure we are on the home screen, then open Settings via the gear icon.
-- tapOn:
-    id: "tab_my_info"
-- tapOn:
-    id: "home.settings"
+# Open Settings through the context bar's navigation overlay.
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Settings"
 
 # Scroll to Duress PIN section
 - swipe:

@@ -7,11 +7,32 @@ This directory contains Maestro YAML flows for automated mobile testing.
 
 ## Flow Maintenance Rules (learned 2026-07-18 flow-rot sweep)
 
-- **Navigation**: Settings is reached via `id: "tab.more"` →
-  `tapOn: "Settings"` — there is no top-level "Settings" tab. Destructive
+- **Address elements by Core's accessibility label, never by a test id.**
+  ADR-066 left no stable id to target. Core mints interaction and binding
+  ids per surface revision (`surface.{revision}.interaction.{n}`), so they
+  change whenever the surface does; and the shell cannot mint a semantic
+  id like `home.settings` of its own, because naming a node "settings"
+  means knowing domain vocabulary ADR-066 denies it. The label is the only
+  stable, shell-visible handle. The ids that used to work
+  (`tab_my_info`, `home.settings`, `card_view`, …) predate ADR-066, when
+  the shell owned its screens; on 2026-08-12 none of the twelve still
+  existed in the app, whose only test tags are `error.retry`,
+  `recovery.restore_backup` and `recovery.start_fresh`.
+  Caveat: this couples flows to copy, so it holds only while the app is
+  unlocalized. Localizing the shell requires Core to supply stable
+  revision-independent identifiers first — a protocol addition, not a
+  flow change.
+- **Navigation (Android, ADR-066)**: the app opens on the card surface and
+  destinations live behind the context bar's navigation role button —
+  `tapOn: "More"` then the destination (`My Card`, `Contacts`,
+  `Exchange`, `Groups`, `Settings`, `Recovery`, `Devices`, `Backup`,
+  `Privacy`, `Support`). Surface-specific actions such as `Add Entry` are
+  under the secondary role button: `tapOn: "Actions"` first. Destructive
   actions live under **Settings → Advanced** (Danger Zone: Emergency
   Wipe, Wipe All Data); **Delete Identity** lives under **More → Privacy**
-  (GDPR screen).
+  (GDPR screen). The iOS flows still use `tab.*` ids and have not been
+  re-pointed — the iOS gate has never run against a connected device, so
+  their state is unverified rather than known-good.
 - **Never use `hideKeyboard` on iOS** — it fires a phantom action
   equivalent to a second submit (onboarding skipped `groups_setup`).
   Android tolerates it. The action footer is tappable with the keyboard

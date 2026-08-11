@@ -33,6 +33,11 @@ name: Add Custom Group During Onboarding (Android)
 - tapOn: "Create new identity"
 
 - assertVisible: "What's your name?"
+# Focus the field before typing. Without it the text goes nowhere and
+# `hideKeyboard` presses Back with no keyboard up, leaving the welcome
+# screen — so this flow failed here rather than at the commit affordance
+# it exists to guard. `create_identity` already taps first.
+- tapOn: "Display name input"
 - inputText: "Maestro Test"
 - hideKeyboard
 - tapOn: "Continue"
@@ -44,17 +49,19 @@ name: Add Custom Group During Onboarding (Android)
 
 # ── First custom group ───────────────────────────────────────
 
-- tapOn:
-    id: "custom_group"
+- tapOn: "Custom group name input"
 - inputText: "MyCustomGroup"
 - hideKeyboard
 
-# Commit affordance — expected to exist post-fix. The exact id
-# here tracks the `submit_custom_group` action_id the handler
-# already consumes (`core/vauchi-app/src/ui/onboarding.rs:606`),
-# so the a11y identifier should land as `submit_custom_group`
-# when the fix lands. If the fix uses a different id, update
-# this `tapOn` line in the same MR.
+# Commit affordance — does not exist yet; this is the step the flow
+# exists to guard, and the only one that should still be red.
+#
+# It is left as an id deliberately: nothing is there to label. When the
+# fix lands, re-point this at the affordance's Core-supplied accessibility
+# label rather than an id — no shell-minted id survives a surface
+# revision (see maestro/README.md). The handler already consumes the
+# `submit_custom_group` action_id
+# (`core/vauchi-app/src/ui/onboarding.rs:606`).
 - tapOn:
     id: "submit_custom_group"
 
@@ -67,8 +74,7 @@ name: Add Custom Group During Onboarding (Android)
 
 # ── Second custom group (proves the flow handles multiple) ───
 
-- tapOn:
-    id: "custom_group"
+- tapOn: "Custom group name input"
 - inputText: "AnotherGroup"
 - hideKeyboard
 - tapOn:

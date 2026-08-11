@@ -45,9 +45,10 @@ appId: app.vauchi
 - waitForAnimationToEnd:
     timeout: 15000
 
-# Navigate to contacts
-- tapOn:
-    id: "tab_contacts"
+# Navigate to contacts.
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Contacts"
 
 # Verify decoy contact IS visible
 - assertVisible: ${DECOY_NAME}

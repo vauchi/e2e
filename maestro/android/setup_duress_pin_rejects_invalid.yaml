@@ -23,10 +23,9 @@ name: Duress PIN rejects an invalid value (Android)
     condition: ${typeof INVALID_PIN !== 'undefined' && String(INVALID_PIN) !== 'undefined' && String(INVALID_PIN).length > 0}
     label: "INVALID_PIN must be set (unset becomes the literal string \"undefined\")"
 
-- tapOn:
-    id: "tab_my_info"
-- tapOn:
-    id: "home.settings"
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Settings"
 
 - swipe:
     direction: UP

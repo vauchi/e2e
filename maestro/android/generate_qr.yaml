@@ -19,8 +19,9 @@ name: Generate QR Code (Android)
 # Navigate to the exchange mode picker.
 # Phase 1.E (2026-05-11) moved QR generation behind the core-driven
 # mode selection screen; Glance is the default hero action.
-- tapOn:
-    id: "tab_exchange"
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Exchange"
 - assertVisible: "Exchange Mode"
 - tapOn: "Glance"
 

@@ -21,11 +21,10 @@ appId: app.vauchi
     condition: ${typeof DECOY_NAME !== 'undefined' && String(DECOY_NAME) !== 'undefined' && String(DECOY_NAME).length > 0}
     label: "DECOY_NAME must be set (unset becomes the literal string \"undefined\")"
 
-# Ensure we are on the home screen, then open Settings via the gear icon.
-- tapOn:
-    id: "tab_my_info"
-- tapOn:
-    id: "home.settings"
+# Open Settings through the context bar's navigation overlay.
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Settings"
 
 # Scroll to Decoy Contacts section
 - swipe:

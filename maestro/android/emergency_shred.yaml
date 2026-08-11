@@ -15,12 +15,11 @@ appId: app.vauchi
 
 ---
 
-# Ensure we are on the home screen, then open Settings via the gear icon.
-- tapOn:
-    id: "tab_my_info"
+# Open Settings through the context bar's navigation overlay.
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
 - waitForAnimationToEnd
-- tapOn:
-    id: "home.settings"
+- tapOn: "Settings"
 - waitForAnimationToEnd
 
 # Scroll to Emergency Shred

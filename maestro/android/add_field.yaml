@@ -31,14 +31,15 @@ name: Add Card Field (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to own card using locale-independent test id.
-- tapOn:
-    id: "tab_my_info"
+# Navigate to own card. ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "My Card"
 
 # Wait for card to load
 - waitForAnimationToEnd
 
-# Start adding a new entry
+# Start adding a new entry — the action lives in the secondary overlay.
+- tapOn: "Actions"
 - tapOn: "Add Entry"
 
 # Select field type
@@ -72,9 +73,7 @@ name: Add Card Field (Android)
     timeout: 5000
 
 # Post-state: we must be back on the card view after the save completed.
-# The persisted value may not be visible in the collapsed entry list, so we
-# only assert on the navigation state and affordances.
-- assertVisible:
-    id: "tab_my_info"
-- assertVisible: "Add Entry"
+# "Add Entry" now lives in the secondary overlay rather than on the surface,
+# so the card itself is identified by its own exchange affordance.
+- assertVisible: "Exchange Now"
 - assertNotVisible: "Add ${FIELD_TYPE}"

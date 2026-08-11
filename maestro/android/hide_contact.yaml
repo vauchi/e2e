@@ -20,7 +20,7 @@ appId: app.vauchi
     condition: ${typeof CONTACT_NAME !== 'undefined' && String(CONTACT_NAME) !== 'undefined' && String(CONTACT_NAME).length > 0}
     label: "CONTACT_NAME must be set (unset becomes the literal string \"undefined\")"
 
-# Navigate to contacts
+# Navigate to contacts.
 - tapOn: "Contacts"
 - waitForAnimationToEnd
 

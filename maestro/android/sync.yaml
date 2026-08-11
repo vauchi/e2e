@@ -13,7 +13,11 @@ name: Sync with Relay (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Pull to refresh on the main contacts list
+# Pull to refresh on the contacts list; the app opens on the card surface.
+# ADR-066 navigation, addressed by label — see maestro/README.md.
+- tapOn: "More"
+- tapOn: "Contacts"
+- waitForAnimationToEnd
 - assertVisible: "Contacts"
 - swipe:
     direction: DOWN
