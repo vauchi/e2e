@@ -27,23 +27,27 @@ name: Duress PIN rejects an invalid value (Android)
 - tapOn: "More"
 - tapOn: "Settings"
 
-- swipe:
-    direction: UP
-    duration: 300
+# visibilityPercentage below 100: the context bar overlays the bottom of
+# the list, so a row can be reachable without ever being fully clear of it.
+- scrollUntilVisible:
+    element: "Duress PIN"
+    direction: DOWN
+    visibilityPercentage: 40
+    timeout: 30000
+- tapOn: "Duress PIN"
 
-- assertVisible: "Not set"
-- tapOn: "Set Duress PIN"
+- assertVisible: "Duress PIN not set up"
+- tapOn: "Set Up PIN"
 - assertVisible: "Set Duress PIN"
 
-- tapOn:
-    id: "duress_pin_field"
+- tapOn: "Enter Duress PIN"
 - inputText: ${INVALID_PIN}
 - hideKeyboard
 
 # The reducer filters to ASCII digits and truncates, so a non-numeric
 # value leaves the field empty and a short one stays short. Either way the
 # flow must not reach an enabled duress PIN.
-- tapOn: "Set"
+- tapOn: "Continue"
 - waitForAnimationToEnd
 
 # The assertion that matters: duress must NOT have been enabled. Checking
