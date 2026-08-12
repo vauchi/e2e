@@ -3,13 +3,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Android Maestro Flow: Setup Duress PIN
-# Enables duress PIN (requires app password to be set first).
+#
+# Must run after `setup_app_password`. Core rejects the save otherwise with
+# "invalid state: app password must be set before duress PIN", and because
+# that arrives as a generic Error dialog at the very last step, the flow
+# looks like a UI regression rather than a missing precondition.
+#
 # Environment variables:
 #   DURESS_PIN - 6-digit duress PIN (required, must differ from app password)
 
 appId: app.vauchi
 
 ---
+
 
 # Fail on an unset input before touching the app. Maestro interpolates
 # ${VAR} as JavaScript, so an unset variable is typed as the literal
@@ -19,6 +25,13 @@ appId: app.vauchi
 - assertTrue:
     condition: ${typeof DURESS_PIN !== 'undefined' && String(DURESS_PIN) !== 'undefined' && String(DURESS_PIN).length > 0}
     label: "DURESS_PIN must be set (unset becomes the literal string \"undefined\")"
+
+# Bring the app to the front, after the input guards above so an unset
+# variable still fails before the app is touched. Flows end with back
+# presses that can exit to the launcher, so a flow that assumed the
+# previous one left it foregrounded failed on its first tap.
+- launchApp
+- waitForAnimationToEnd
 
 # Open Settings through the context bar's navigation overlay.
 # ADR-066 navigation, addressed by label — see maestro/README.md.
@@ -62,11 +75,19 @@ appId: app.vauchi
 - waitForAnimationToEnd:
     timeout: 15000
 
-# Post-state. Unverified against the current UI: the walkthrough that
-# supplied every label above stopped before committing a PIN to the test
-# device, so this wording is inherited from the pre-ADR-066 flow. If it
-# fails, read the screen and correct it here rather than assuming rot.
-- assertVisible: "Enabled"
+# Committing the PIN advances to alert configuration — the wizard's next
+# step. There is no standalone "enabled" confirmation, which is what the
+# previous `assertVisible: "Enabled"` looked for and never found.
+- assertVisible: "Configure Alerts"
+
+# Finish the wizard.
+- tapOn: "Save"
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# Asserting the absence of the error keeps this independent of the success
+# copy, and catches the missing-app-password rejection described above.
+- assertNotVisible: "Error"
 
 # Return to the home screen so the next flow starts from a known state.
 - pressKey: back

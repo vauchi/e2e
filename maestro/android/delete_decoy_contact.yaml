@@ -12,6 +12,7 @@ appId: app.vauchi
 
 ---
 
+
 # Fail on an unset input before touching the app. Maestro interpolates
 # ${VAR} as JavaScript, so an unset variable is typed as the literal
 # string "undefined" and the flow's own assertions then confirm it —
@@ -20,6 +21,13 @@ appId: app.vauchi
 - assertTrue:
     condition: ${typeof DECOY_NAME !== 'undefined' && String(DECOY_NAME) !== 'undefined' && String(DECOY_NAME).length > 0}
     label: "DECOY_NAME must be set (unset becomes the literal string \"undefined\")"
+
+# Bring the app to the front, after the input guards above so an unset
+# variable still fails before the app is touched. Flows end with back
+# presses that can exit to the launcher, so a flow that assumed the
+# previous one left it foregrounded failed on its first tap.
+- launchApp
+- waitForAnimationToEnd
 
 # Open Settings through the context bar's navigation overlay.
 # ADR-066 navigation, addressed by label — see maestro/README.md.

@@ -10,6 +10,14 @@ appId: app.vauchi
 
 ---
 
+# Bring the app to the front, after the input guards above so an unset
+# variable still fails before the app is touched. Flows end with back
+# presses that can exit to the launcher, so a flow that assumed the
+# previous one left it foregrounded failed on its first tap.
+- launchApp
+- waitForAnimationToEnd
+
+
 # Open Settings through the context bar's navigation overlay.
 # ADR-066 navigation, addressed by label — see maestro/README.md.
 - tapOn: "More"
