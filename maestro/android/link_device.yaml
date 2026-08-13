@@ -8,7 +8,6 @@
 appId: app.vauchi
 
 ---
-
 # Bring the app to the front, after the input guards above so an unset
 # variable still fails before the app is touched. Flows end with back
 # presses that can exit to the launcher, so a flow that assumed the
@@ -16,25 +15,22 @@ appId: app.vauchi
 - launchApp
 - waitForAnimationToEnd
 
-
-# Navigate to Devices screen
-- tapOn: "Settings"
-- tapOn: "Linked Devices"
-
-# Generate link QR
+# Devices is a top-level destination behind the nav overlay, not a row
+# inside Settings. ADR-066 replaced the tab strip with one Core-driven
+# surface plus the context bar, so the old path — Settings → Linked
+# Devices — named two affordances that no longer exist anywhere in the
+# app. Addressing is settled in ../README.md.
+- tapOn: "More"
+- tapOn: "Devices"
 - tapOn: "Link New Device"
-- waitForAnimationToEnd:
-    timeout: 5000
-- hideKeyboard
 
-# Verify QR code is displayed
-- assertVisible: "Scan this QR"
-
-# Copy the link data for automation
-- runFlow:
-    when:
-      visible: "Copy Link Data"
-    commands:
-      - tapOn: "Copy Link Data"
-      - copyTextFrom:
-          id: "device_link_data"
+# Assert the in-progress state clears rather than asserting success copy.
+# The success wording has never been observed on device: generation is
+# currently stuck at "Generating link..." with a frozen progress bar
+# (problems/2026-08-13-device-link-generation-never-completes). Asserting
+# a string nobody has seen would make this flow fail for the wrong reason,
+# and asserting only that the screen opened would let it pass while the
+# feature is broken.
+- extendedWaitUntil:
+    notVisible: "Generating link..."
+    timeout: 30000
