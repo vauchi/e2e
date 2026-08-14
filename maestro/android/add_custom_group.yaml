@@ -62,8 +62,10 @@ name: Add Custom Group During Onboarding (Android)
 # revision (see maestro/README.md). The handler already consumes the
 # `submit_custom_group` action_id
 # (`core/vauchi-app/src/ui/onboarding.rs:606`).
-- tapOn:
-    id: "submit_custom_group"
+# "Add group" is a secondary action, so the context bar collapses it into
+# the "Actions" overflow — only the primary ("Continue") stays on the bar.
+- tapOn: "Actions"
+- tapOn: "Add group"
 
 - waitForAnimationToEnd
 
@@ -77,8 +79,10 @@ name: Add Custom Group During Onboarding (Android)
 - tapOn: "Custom group name input"
 - inputText: "AnotherGroup"
 - hideKeyboard
-- tapOn:
-    id: "submit_custom_group"
+# "Add group" is a secondary action, so the context bar collapses it into
+# the "Actions" overflow — only the primary ("Continue") stays on the bar.
+- tapOn: "Actions"
+- tapOn: "Add group"
 
 - waitForAnimationToEnd
 
