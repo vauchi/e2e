@@ -3,7 +3,7 @@
 
 > **Mirror:** This repo is a read-only mirror of [gitlab.com/vauchi/e2e](https://gitlab.com/vauchi/e2e). Please open issues and merge requests there.
 
-[![Pipeline](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/e2e/badges/pipeline.json&label=pipeline)](https://gitlab.com/vauchi/e2e/-/pipelines)
+[![Pipeline](https://img.shields.io/endpoint?url=https://vauchi.gitlab.io/e2e/badges/pipeline.json&label=pipeline)](https://gitlab.com/vauchi/e2e)
 [![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/e2e)](https://api.reuse.software/info/gitlab.com/vauchi/e2e)
 
 > [!NOTE]
