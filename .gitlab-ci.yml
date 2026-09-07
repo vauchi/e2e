@@ -70,6 +70,13 @@ stages:
 variables:
   # Pin fetched helper scripts independently from the structural templates.
   VAUCHI_SCRIPTS_REF: "ci-templates-v2026.07.13"
+  # cargo audit runs with --deny warnings; the one entry here is an
+  # advisory with no fix available to us, not one we chose to skip.
+  #   RUSTSEC-2026-0253  unsound lru, reached through vauchi-core's
+  #                      rqrr 0.10. Clears when a core tag carrying
+  #                      rqrr 0.11 lands. Record:
+  #                      problems/2026-09-07-core-rqrr-patch-does-not-reach-consumers
+  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0253"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
