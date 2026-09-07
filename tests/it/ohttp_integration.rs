@@ -600,12 +600,22 @@ async fn integration_ohttp_key_rotation_grace_period() {
         "key must have rotated a second time"
     );
 
-    // 8. Send with K1 — should FAIL (evicted after 2nd rotation)
+    // 8. Send with K1 — evicted after the 2nd rotation, so the relay refuses
+    //    it. Since core 831893df the client recovers on that refusal instead
+    //    of surfacing it: evict, refetch, retry once. This asserted
+    //    `is_err()` up to core v0.61.0, the pre-recovery contract.
     let transport_evicted = create_ohttp_transport(&ohttp_url, &key_k1);
     let evicted_result = transport_evicted.send_update(&"c".repeat(64), "ZXZpY3RlZA==", None);
+    let evicted_message_id =
+        evicted_result.expect("doubly-stale K1 must recover via refetch-and-retry");
     assert!(
-        evicted_result.is_err(),
-        "send with doubly-stale K1 must fail (key evicted after 2nd rotation)"
+        !evicted_message_id.is_empty(),
+        "recovered send must return a message id"
+    );
+    assert_eq!(
+        transport_evicted.direct_fallback_count(),
+        0,
+        "recovery must not fall back to direct HTTP"
     );
 
     // 9. Refetch key and send — should succeed (client recovery)
@@ -633,7 +643,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
 
 // @scenario: sync:OHTTP stale key
 #[tokio::test]
-async fn integration_ohttp_with_garbage_key_returns_error() {
+async fn integration_ohttp_with_garbage_key_recovers_via_refetch() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // Use a valid-format but wrong key (generate a fresh one not matching the relay)
@@ -654,8 +664,25 @@ async fn integration_ohttp_with_garbage_key_returns_error() {
     let transport = create_ohttp_transport(&ohttp_url, &wrong_key);
     let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
 
-    // Should fail — the relay can't decapsulate a blob encrypted with the wrong key
-    assert!(result.is_err(), "wrong OHTTP key should produce an error");
+    // The relay cannot decapsulate a blob sealed with the wrong key, so it
+    // answers 400. Since core 831893df that is read as a rotated key —
+    // evict, refetch `/v2/ohttp-key`, retry once — so the send succeeds.
+    // This asserted `is_err()` up to core v0.61.0, the pre-recovery contract.
+    let message_id = result.expect("wrong OHTTP key must recover via refetch-and-retry");
+    assert!(
+        !message_id.is_empty(),
+        "recovered send must return a message id"
+    );
+
+    // Recovery must stay inside OHTTP. `allow_direct` is false on this
+    // transport, so a direct attempt would fail rather than leak — this
+    // counter asserts none was even made, which is the ADR-037 property
+    // the old `is_err()` was standing in for.
+    assert_eq!(
+        transport.direct_fallback_count(),
+        0,
+        "recovery must not fall back to direct HTTP"
+    );
 
     ohttp_mgr.stop().await;
     relay_mgr.stop_all().await;
