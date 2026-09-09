@@ -2070,17 +2070,17 @@ async fn integration_six_device_owner_private_state_converges() {
     let expected = OwnerPrivateState {
         card_fields: vec![
             (
-                "Email".to_string(),
+                "email".to_string(),
                 RG10_HIDDEN_FIELD.to_string(),
                 RG10_HIDDEN_VALUE.to_string(),
             ),
             (
-                "Email".to_string(),
+                "email".to_string(),
                 RG10_PERMITTED_FIELD.to_string(),
                 RG10_PERMITTED_VALUE.to_string(),
             ),
             (
-                "Email".to_string(),
+                "email".to_string(),
                 RG10_GROUP_FIELD.to_string(),
                 RG10_GROUP_VALUE.to_string(),
             ),
@@ -2131,12 +2131,12 @@ async fn integration_six_device_owner_private_state_converges() {
             view.alice_fields,
             vec![
                 (
-                    "Email".to_string(),
+                    "email".to_string(),
                     RG10_PERMITTED_FIELD.to_string(),
                     RG10_PERMITTED_VALUE.to_string()
                 ),
                 (
-                    "Email".to_string(),
+                    "email".to_string(),
                     RG10_GROUP_FIELD.to_string(),
                     RG10_GROUP_VALUE.to_string()
                 ),
