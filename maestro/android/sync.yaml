@@ -19,29 +19,15 @@ name: Sync with Relay (Android)
 - tapOn: "Contacts"
 - waitForAnimationToEnd
 - assertVisible: "Contacts"
-- swipe:
-    direction: DOWN
-    duration: 500
-
-# Wait for sync to complete
+# The shell has no pull-to-refresh; the core-driven Sync chip on the
+# bottom bar is the only sync trigger. Its label follows the last
+# outcome ("Sync", "Synced", "Sync failed"), so match all three. Core
+# throttles syncs to one per minute; a tap inside that window is a
+# silent no-op, so callers pace consecutive syncs at least 75 s apart.
+- tapOn: "Sync(ed| failed)?"
 - waitForAnimationToEnd:
-    timeout: 10000
-
-# Verify sync indicator disappears (or shows success)
-- extendedWaitUntil:
-    notVisible: "Syncing..."
     timeout: 15000
-
-# Post-state assertions — Layer 3 gate (plan Task 3.2). After
-# sync completes, the Contacts list view must still be the
-# active screen (no error page, no unexpected modal). Weaker
-# than a content-based assertion but catches the common
-# "spinner hid because of error" failure mode.
 - assertVisible: "Contacts"
+- assertNotVisible: "Sync failed"
 - assertNotVisible: "Connection failed"
 - assertNotVisible: "Error"
-
-# Sync status is surfaced on the My Card caption, not in Settings.
-# The pull-to-refresh above is sufficient to exercise the sync path;
-# staying on the Contacts list without an error modal is the Layer 3
-# post-condition we can assert from a single-device flow.
