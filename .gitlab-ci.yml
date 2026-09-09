@@ -519,6 +519,9 @@ test:tui-journey:
       # find_tui_binary() (src/device/tui.rs) looks for the binary at
       # ../tui/target/{release,debug}/vauchi-tui relative to this crate,
       # so the clone must land as a sibling of the e2e checkout.
+      # Self-hosted runners keep the workspace between jobs, so a previous
+      # run's sibling clone must go before this one lands.
+      rm -rf ../tui
       git clone --depth=1 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" ../tui
       cargo build --release --manifest-path ../tui/Cargo.toml
