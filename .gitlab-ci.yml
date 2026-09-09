@@ -455,8 +455,11 @@ test:release-rg8:
 
 # RG-10 release certification — owner-private-state convergence. Scope includes
 # MyInfo, presentation cards, groups, visibility, tags, contacts, and notes.
-# Currently covers the personal-note tombstone slice; expand the filter as
-# additional RG-10 scenarios land.
+# Covers the personal-note tombstone slice and the full owner-private state
+# scenario (MyInfo, group identity/membership/visibility/overrides, tags,
+# notes, Bob-side and relay-side leak checks). The CLI is built from cli main
+# by test:smoke, so a scenario driving new cli grammar lands only after the
+# cli MR that adds it has merged.
 test:release-rg10:
   extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
@@ -475,7 +478,7 @@ test:release-rg10:
       test -x "$E2E_BIN_DIR/vauchi"
       test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
       cargo nextest run --profile ci --run-ignored default -j 1 \
-        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_personal_note_tombstone_converges_owner_only/)' \
+        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_(personal_note_tombstone_converges_owner_only|owner_private_state_converges|visibility_override_removal_converges)/)' \
         2>&1 | tee rg10-release-results.txt
   artifacts:
     when: always

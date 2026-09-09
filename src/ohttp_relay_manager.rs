@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
 use crate::relay_manager::find_available_port;
+use crate::subprocess_log::OutputCapture;
 
 /// Timeout for vauchi-ohttp-relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
@@ -40,6 +41,9 @@ pub struct OhttpRelayConfig {
     /// TTL for caching upstream `/v2/ohttp-key` responses (seconds).
     /// Set to 0 to disable caching. Default: 300.
     pub key_cache_ttl_secs: u64,
+    /// `RUST_LOG` for the spawned process; `None` inherits the parent's
+    /// `RUST_LOG` and otherwise defaults to `warn`.
+    pub log_filter: Option<String>,
 }
 
 impl Default for OhttpRelayConfig {
@@ -49,6 +53,7 @@ impl Default for OhttpRelayConfig {
             rate_limit_per_sec: 100,
             request_timeout_secs: 30,
             key_cache_ttl_secs: 300,
+            log_filter: None,
         }
     }
 }
@@ -61,9 +66,15 @@ pub struct OhttpRelayInstance {
     pub gateway_url: String,
     /// The child process handle.
     process: Option<Child>,
+    output_capture: OutputCapture,
 }
 
 impl OhttpRelayInstance {
+    /// Returns a snapshot of all stdout and stderr lines captured so far.
+    pub fn captured_output(&self) -> Vec<String> {
+        self.output_capture.snapshot()
+    }
+
     /// Returns the base URL clients should use for OHTTP requests.
     pub fn url(&self) -> String {
         format!("http://127.0.0.1:{}", self.port)
@@ -199,7 +210,10 @@ impl OhttpRelayManager {
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging. Default to `warn` for quiet
         // happy-path runs.
-        let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+        let log_level =
+            self.config.log_filter.clone().unwrap_or_else(|| {
+                std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string())
+            });
         env_vars.insert("RUST_LOG".to_string(), log_level);
         // Strip ANSI colour codes — see relay_manager comment.
         env_vars.insert("NO_COLOR".to_string(), "1".to_string());
@@ -218,25 +232,26 @@ impl OhttpRelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn vauchi-ohttp-relay: {}", e)))?;
 
+        let output_capture = OutputCapture::default();
         if let Some(stdout) = child.stdout.take() {
             let fd = stdout
                 .into_owned_fd()
                 .expect("ChildStdout → OwnedFd (Unix only)");
-            crate::subprocess_log::drain_pipe(
-                fd,
-                "ohttp-relay-stdout".to_string(),
-                |line| warn!(target: "ohttp-relay", "{}", line),
-            );
+            let capture = output_capture.clone();
+            crate::subprocess_log::drain_pipe(fd, "ohttp-relay-stdout".to_string(), move |line| {
+                capture.record(line);
+                warn!(target: "ohttp-relay", "{}", line);
+            });
         }
         if let Some(stderr) = child.stderr.take() {
             let fd = stderr
                 .into_owned_fd()
                 .expect("ChildStderr → OwnedFd (Unix only)");
-            crate::subprocess_log::drain_pipe(
-                fd,
-                "ohttp-relay-stderr".to_string(),
-                |line| warn!(target: "ohttp-relay", "{}", line),
-            );
+            let capture = output_capture.clone();
+            crate::subprocess_log::drain_pipe(fd, "ohttp-relay-stderr".to_string(), move |line| {
+                capture.record(line);
+                warn!(target: "ohttp-relay", "{}", line);
+            });
         }
 
         self.wait_for_health(port, &mut child).await?;
@@ -245,6 +260,7 @@ impl OhttpRelayManager {
             port,
             gateway_url: gateway_url.to_string(),
             process: Some(child),
+            output_capture,
         });
 
         info!("vauchi-ohttp-relay started on port {}", port);

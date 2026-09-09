@@ -306,6 +306,33 @@ impl Orchestrator {
         self.ohttp_relay_manager.as_ref().and_then(|m| m.url())
     }
 
+    /// Prometheus metrics URL of the primary application relay.
+    pub fn primary_relay_metrics_url(&self) -> E2eResult<String> {
+        self.relay_manager
+            .as_ref()
+            .and_then(|manager| manager.relay(0))
+            .map(|relay| relay.metrics_url())
+            .ok_or_else(|| E2eError::scenario("No relay available"))
+    }
+
+    /// Stdout/stderr lines captured from application relay `index` so far.
+    pub fn relay_captured_output(&self, index: usize) -> E2eResult<Vec<String>> {
+        self.relay_manager
+            .as_ref()
+            .and_then(|manager| manager.relay(index))
+            .map(|relay| relay.captured_output())
+            .ok_or_else(|| E2eError::scenario(format!("No relay at index {index}")))
+    }
+
+    /// Stdout/stderr lines captured from the outer OHTTP relay so far.
+    pub fn ohttp_relay_captured_output(&self) -> E2eResult<Vec<String>> {
+        self.ohttp_relay_manager
+            .as_ref()
+            .and_then(|manager| manager.instance())
+            .map(|instance| instance.captured_output())
+            .ok_or_else(|| E2eError::scenario("No OHTTP relay available"))
+    }
+
     /// Arm the E2E-only outer-relay duplicate-delivery controller.
     pub async fn arm_ohttp_duplicate_next_forward(&self) -> E2eResult<()> {
         let manager = self.ohttp_relay_manager.as_ref().ok_or_else(|| {
