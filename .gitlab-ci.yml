@@ -488,6 +488,53 @@ test:release-rg10:
       - rg10-release-results.txt
     expire_in: 1 week
 
+# RG-1 TUI onboarding journey — drives the real vauchi-tui binary over a PTY
+# (src/device/tui.rs) through `--features tui`, which no other lane compiles
+# or runs. Without this job the harness's TUI tests go dark silently: that is
+# exactly what happened for weeks before tui !554 / e2e !187 repaired the
+# driver (problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload).
+# Only test_tui_create_identity is selected today. Add
+# integration_cli_to_tui_exchange to the filter once core !1580 ships
+# camera-less code entry and the CLI/TUI pins move to a release carrying it —
+# today it fails because the TUI's Contacts screen has no Add Contact /
+# QrRequestScan route for a camera-less device.
+test:tui-journey:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "src/device/tui*.rs"
+          - "tests/it/cross_platform.rs"
+          - ".gitlab-ci.yml"
+          - "Cargo.toml"
+          - "Cargo.lock"
+  allow_failure: false
+  script:
+    - |
+      # find_tui_binary() (src/device/tui.rs) looks for the binary at
+      # ../tui/target/{release,debug}/vauchi-tui relative to this crate,
+      # so the clone must land as a sibling of the e2e checkout.
+      git clone --depth=1 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" ../tui
+      cargo build --release --manifest-path ../tui/Cargo.toml
+      test -x ../tui/target/release/vauchi-tui
+
+      cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
+        -E 'test(/cross_platform::test_tui_create_identity/)' \
+        2>&1 | tee tui-journey-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - tui-journey-results.txt
+    expire_in: 1 week
+
 # Integration tests — full E2E suite on main and schedule.
 # Gets relay+CLI binaries from test:smoke artifacts; cache is fallback for scheduled runs.
 # Blocking comprehensive coverage; the named RG-3 lane above provides the
