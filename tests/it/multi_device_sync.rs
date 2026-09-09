@@ -1921,6 +1921,378 @@ async fn integration_six_device_personal_note_tombstone_converges_owner_only() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// @scenario: release_privacy_multidevice_certification.feature:Complete owner-private state converges across linked devices
+/// Release certification (RG-10): every owner-private mutation Alice makes
+/// on A1, A2, or A3 — MyInfo update and removal, group identity, membership,
+/// visibility and presentation overrides, tag change and deletion, contact
+/// permission and private note — converges byte-exactly on her other two
+/// devices, while Bob's devices receive only the permitted presentation
+/// state and neither relay hop observes any of it.
+///
+/// Stated boundary (owner decision 2026-09-09): the pinned core keeps label
+/// presentation overrides owner-side, so Bob still sees Alice's base name;
+/// the override markers are therefore asserted absent from Bob like every
+/// other owner-private value. ADR-020 deterministic convergence under
+/// concurrent and clock-skewed edits is certified by
+/// `integration_six_device_concurrent_field_edits_converge` and
+/// `integration_six_device_bounded_clock_skew_converges_to_later_update`;
+/// this scenario serializes its device batches through sync rounds so it
+/// certifies state convergence, not conflict resolution.
+// @internal
+#[tokio::test]
+async fn integration_six_device_owner_private_state_converges() {
+    let mut orch = Orchestrator::with_config(owner_private_state_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    let (alice, bob) = exchanged_six_device_pair(&mut orch).await;
+    let alice_bob_contact_id = contact_id_on_device(&alice, 0, "Bob").await;
+    let avatar_fixture =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/avatar-1x1.png");
+
+    // A1: MyInfo update + permission, then removal (myinfo update/removal,
+    // contacts).
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").read().await;
+        a1.add_field("email", RG10_PERMITTED_FIELD, RG10_PERMITTED_VALUE)
+            .await
+            .expect("A1 should add the permitted field");
+        a1.unhide_field_to_contact(&alice_bob_contact_id, RG10_PERMITTED_FIELD)
+            .await
+            .expect("A1 should permit Bob to see the field");
+        a1.add_field("email", RG10_REMOVED_FIELD, RG10_REMOVED_VALUE)
+            .await
+            .expect("A1 should add the field that is later removed");
+        a1.unhide_field_to_contact(&alice_bob_contact_id, RG10_REMOVED_FIELD)
+            .await
+            .expect("A1 should permit Bob to see the removed-later field");
+    }
+    let bob_saw_removed_field = sync_until(&orch, 6, || {
+        let bob = bob.clone();
+        async move {
+            bob_views(&bob).await.iter().all(|view| {
+                view.alice_fields
+                    .iter()
+                    .any(|(_, label, _)| label == RG10_REMOVED_FIELD)
+            })
+        }
+    })
+    .await;
+    assert!(
+        bob_saw_removed_field,
+        "myinfo removal needs Bob to hold the field first; Bob views: {:?}",
+        bob_views(&bob).await
+    );
+    {
+        let alice = alice.read().await;
+        alice
+            .device(0)
+            .expect("A1 should exist")
+            .read()
+            .await
+            .remove_field(RG10_REMOVED_FIELD)
+            .await
+            .expect("A1 should remove the field");
+    }
+    sync_rounds(&orch, 2).await;
+
+    // A2: group identity, membership, visibility, and presentation
+    // overrides (presentation cards, group identity/membership/visibility/overrides).
+    let avatar_override_bytes = {
+        let alice = alice.read().await;
+        let a2 = alice.device(1).expect("A2 should exist").read().await;
+        a2.add_field("email", RG10_GROUP_FIELD, RG10_GROUP_VALUE)
+            .await
+            .expect("A2 should add the group-audience field");
+        a2.add_field("email", RG10_HIDDEN_FIELD, RG10_HIDDEN_VALUE)
+            .await
+            .expect("A2 should add the field hidden again from the group");
+        a2.create_label(RG10_LABEL)
+            .await
+            .expect("A2 should create the label");
+        a2.add_contact_to_label(RG10_LABEL, "Bob")
+            .await
+            .expect("A2 should add Bob to the label");
+        a2.show_field_to_label(RG10_LABEL, RG10_GROUP_FIELD)
+            .await
+            .expect("A2 should show the group field to the label");
+        a2.show_field_to_label(RG10_LABEL, RG10_HIDDEN_FIELD)
+            .await
+            .expect("A2 should show the hidden-later field to the label");
+        a2.hide_field_from_label(RG10_LABEL, RG10_HIDDEN_FIELD)
+            .await
+            .expect("A2 should hide the field from the label again");
+        a2.set_label_name_override(RG10_LABEL, Some(RG10_NAME_OVERRIDE))
+            .await
+            .expect("A2 should set the name override");
+        a2.set_label_bio_override(RG10_LABEL, Some(RG10_BIO_OVERRIDE))
+            .await
+            .expect("A2 should set the bio override");
+        a2.set_label_avatar_override(RG10_LABEL, Some(&avatar_fixture))
+            .await
+            .expect("A2 should set the avatar override");
+        let stored = a2
+            .label_state(RG10_LABEL)
+            .await
+            .expect("A2 should read the label back")
+            .avatar_override_bytes
+            .expect("A2 must store the normalized avatar override");
+        assert!(stored > 0, "stored avatar override must not be empty");
+        stored
+    };
+    sync_rounds(&orch, 2).await;
+
+    // A3: tag change + deletion, private note (tag change/deletion,
+    // contacts/private notes).
+    {
+        let alice = alice.read().await;
+        let a3 = alice.device(2).expect("A3 should exist").read().await;
+        a3.create_tag(RG10_TAG)
+            .await
+            .expect("A3 should create the kept tag");
+        a3.add_contact_to_tag(RG10_TAG, "Bob")
+            .await
+            .expect("A3 should tag Bob");
+        a3.create_tag(RG10_DELETED_TAG)
+            .await
+            .expect("A3 should create the deleted-later tag");
+        a3.delete_tag(RG10_DELETED_TAG)
+            .await
+            .expect("A3 should delete the tag");
+        a3.add_personal_note("Bob", RG10_NOTE)
+            .await
+            .expect("A3 should add the private note");
+    }
+
+    let expected = OwnerPrivateState {
+        card_fields: vec![
+            (
+                "Email".to_string(),
+                RG10_HIDDEN_FIELD.to_string(),
+                RG10_HIDDEN_VALUE.to_string(),
+            ),
+            (
+                "Email".to_string(),
+                RG10_PERMITTED_FIELD.to_string(),
+                RG10_PERMITTED_VALUE.to_string(),
+            ),
+            (
+                "Email".to_string(),
+                RG10_GROUP_FIELD.to_string(),
+                RG10_GROUP_VALUE.to_string(),
+            ),
+        ],
+        labels: vec![LabelState {
+            name: RG10_LABEL.to_string(),
+            members: vec!["Bob".to_string()],
+            visible_fields: vec![RG10_GROUP_FIELD.to_string()],
+            name_override: Some(RG10_NAME_OVERRIDE.to_string()),
+            bio_override: Some(RG10_BIO_OVERRIDE.to_string()),
+            avatar_override_bytes: Some(avatar_override_bytes),
+        }],
+        tags: vec![TagState {
+            name: RG10_TAG.to_string(),
+            members: vec![alice_bob_contact_id.clone()],
+        }],
+        contacts: vec!["Bob".to_string()],
+        bob_note: Some(RG10_NOTE.to_string()),
+    };
+    let converged = sync_until(&orch, 8, || {
+        let alice = alice.clone();
+        let expected = expected.clone();
+        async move {
+            owner_private_states(&alice)
+                .await
+                .iter()
+                .all(|state| *state == expected)
+        }
+    })
+    .await;
+    let states = owner_private_states(&alice).await;
+    assert!(
+        converged,
+        "all six devices synchronized: owner-private state did not converge; A1..A3 = {states:#?}"
+    );
+    for (index, state) in states.iter().enumerate() {
+        assert_eq!(
+            *state,
+            expected,
+            "canonical owner-private state: A{} diverges",
+            index + 1
+        );
+    }
+
+    let views = bob_views(&bob).await;
+    for (index, view) in views.iter().enumerate() {
+        assert_eq!(
+            view.alice_fields,
+            vec![
+                (
+                    "Email".to_string(),
+                    RG10_PERMITTED_FIELD.to_string(),
+                    RG10_PERMITTED_VALUE.to_string()
+                ),
+                (
+                    "Email".to_string(),
+                    RG10_GROUP_FIELD.to_string(),
+                    RG10_GROUP_VALUE.to_string()
+                ),
+            ],
+            "permitted presentation state only: B{} must hold exactly the permitted fields",
+            index + 1
+        );
+        assert_eq!(
+            view.alice_name,
+            "Alice",
+            "B{} sees Alice's base name",
+            index + 1
+        );
+        assert_eq!(
+            view.labels,
+            Vec::<String>::new(),
+            "B{} must own no labels",
+            index + 1
+        );
+        assert_eq!(
+            view.tags,
+            Vec::<TagState>::new(),
+            "B{} must own no tags",
+            index + 1
+        );
+        assert_eq!(view.note, None, "B{} must not receive the note", index + 1);
+        let rendered = format!("{view:?}");
+        for marker in RG10_PRIVATE_MARKERS {
+            assert!(
+                !rendered.contains(marker),
+                "no private state leaked to bob: B{} exposes {marker:?} in {rendered}",
+                index + 1
+            );
+        }
+    }
+
+    let relay_output = orch
+        .relay_captured_output(0)
+        .expect("application relay output should be captured")
+        .join("\n");
+    let ohttp_output = orch
+        .ohttp_relay_captured_output()
+        .expect("ohttp relay output should be captured")
+        .join("\n");
+    let metrics = reqwest::get(orch.primary_relay_metrics_url().expect("metrics url"))
+        .await
+        .expect("fetch relay metrics")
+        .text()
+        .await
+        .expect("read relay metrics");
+    assert!(
+        relay_output.contains("OHTTP gateway enabled"),
+        "relay output capture must observe the live process"
+    );
+    assert!(
+        ohttp_output.contains("vauchi-ohttp-relay starting"),
+        "ohttp relay output capture must observe the live process"
+    );
+    for marker in RG10_ALL_MARKERS {
+        for (hop, output) in [
+            ("application relay output", &relay_output),
+            ("application relay metrics", &metrics),
+            ("ohttp relay output", &ohttp_output),
+        ] {
+            assert!(
+                !output.contains(marker),
+                "no private state leaked to relay: {hop} exposes {marker:?}"
+            );
+        }
+    }
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Complete owner-private state converges across linked devices
+/// A per-contact visibility override set on A1, flipped on A2, and flipped
+/// back on A3 converges on every owner device and on Bob's stored card. The
+/// cli's `contacts hide|unhide` writes an explicit override each way — the
+/// override *tombstone* (`remove_contact_visibility_override`) is not
+/// reachable through the pinned cli, so this covers the override lifecycle
+/// the cli can express.
+// @internal
+#[tokio::test]
+async fn integration_six_device_visibility_override_removal_converges() {
+    const FIELD: &str = "Direct";
+    const VALUE: &str = "alice-direct@example.com";
+
+    let mut orch = Orchestrator::with_config(owner_private_state_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    let (alice, bob) = exchanged_six_device_pair(&mut orch).await;
+    let alice_bob_contact_id = contact_id_on_device(&alice, 0, "Bob").await;
+
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").read().await;
+        a1.add_field("email", FIELD, VALUE)
+            .await
+            .expect("A1 should add the field");
+        a1.unhide_field_to_contact(&alice_bob_contact_id, FIELD)
+            .await
+            .expect("A1 should permit Bob");
+    }
+    let bob_holds = |expected: bool| {
+        let bob = bob.clone();
+        async move {
+            bob_views(&bob).await.iter().all(|view| {
+                view.alice_fields
+                    .iter()
+                    .any(|(_, label, value)| label == FIELD && value == VALUE)
+                    == expected
+            })
+        }
+    };
+    assert!(
+        sync_until(&orch, 6, || bob_holds(true)).await,
+        "Bob's devices must receive the permitted field: {:?}",
+        bob_views(&bob).await
+    );
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(1)
+            .expect("A2 should exist")
+            .read()
+            .await
+            .hide_field_from_contact(&alice_bob_contact_id, FIELD)
+            .await
+            .expect("A2 should hide the field from Bob");
+    }
+    assert!(
+        sync_until(&orch, 6, || bob_holds(false)).await,
+        "hiding on A2 must withdraw the field from every Bob device: {:?}",
+        bob_views(&bob).await
+    );
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(2)
+            .expect("A3 should exist")
+            .read()
+            .await
+            .unhide_field_to_contact(&alice_bob_contact_id, FIELD)
+            .await
+            .expect("A3 should permit Bob again");
+    }
+    assert!(
+        sync_until(&orch, 6, || bob_holds(true)).await,
+        "permitting again on A3 must restore the field on every Bob device: {:?}",
+        bob_views(&bob).await
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
 // @scenario: release_privacy_multidevice_certification.feature:Revocation and replacement preserve continuity
 /// Release certification: after an exchanged three-device topology gains A4
 /// and revokes A2, the active devices retain the exact permitted update.
@@ -2371,4 +2743,270 @@ async fn missing_active_replacement_phone_cards(
         }
     }
     missing
+}
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+const RG10_PERMITTED_FIELD: &str = "Personal";
+const RG10_PERMITTED_VALUE: &str = "alice-personal@example.com";
+const RG10_REMOVED_FIELD: &str = "Temp";
+const RG10_REMOVED_VALUE: &str = "temp-rg10-removed-field-marker@example.com";
+const RG10_GROUP_FIELD: &str = "Work";
+const RG10_GROUP_VALUE: &str = "alice-work@example.com";
+const RG10_HIDDEN_FIELD: &str = "Office";
+const RG10_HIDDEN_VALUE: &str = "office-rg10-hidden-field-marker@example.com";
+const RG10_LABEL: &str = "Work-rg10-label-marker";
+const RG10_NAME_OVERRIDE: &str = "Alice-rg10-name-override-marker";
+const RG10_BIO_OVERRIDE: &str = "rg10-bio-override-marker";
+const RG10_TAG: &str = "rg10-tag-marker";
+const RG10_DELETED_TAG: &str = "rg10-deleted-tag-marker";
+const RG10_NOTE: &str = "rg10-note-marker";
+/// Values that must never reach Bob's devices.
+const RG10_PRIVATE_MARKERS: [&str; 8] = [
+    RG10_REMOVED_VALUE,
+    RG10_HIDDEN_VALUE,
+    RG10_LABEL,
+    RG10_NAME_OVERRIDE,
+    RG10_BIO_OVERRIDE,
+    RG10_TAG,
+    RG10_DELETED_TAG,
+    RG10_NOTE,
+];
+/// Values that must never appear at either relay hop, permitted ones included.
+const RG10_ALL_MARKERS: [&str; 10] = [
+    RG10_PERMITTED_VALUE,
+    RG10_GROUP_VALUE,
+    RG10_REMOVED_VALUE,
+    RG10_HIDDEN_VALUE,
+    RG10_LABEL,
+    RG10_NAME_OVERRIDE,
+    RG10_BIO_OVERRIDE,
+    RG10_TAG,
+    RG10_DELETED_TAG,
+    RG10_NOTE,
+];
+
+/// Normalized owner-private state one owner device reports; two devices
+/// have converged when their values are equal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OwnerPrivateState {
+    /// `(type, label, value)` sorted by label.
+    card_fields: Vec<(String, String, String)>,
+    labels: Vec<LabelState>,
+    tags: Vec<TagState>,
+    contacts: Vec<String>,
+    bob_note: Option<String>,
+}
+
+/// Everything a Bob device can observe about Alice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BobView {
+    alice_name: String,
+    /// `(type, label, value)` sorted by label.
+    alice_fields: Vec<(String, String, String)>,
+    labels: Vec<String>,
+    tags: Vec<TagState>,
+    note: Option<String>,
+}
+
+fn owner_private_state_config() -> OrchestratorConfig {
+    OrchestratorConfig {
+        inject_local_ohttp_key_into_cli: false,
+        // Both hops must log at info so their output captures prove they
+        // observed the live processes before the leak assertions run.
+        relay_config: RelayConfig {
+            log_filter: Some("info".to_string()),
+            ..Default::default()
+        },
+        ohttp_relay_config: OhttpRelayConfig {
+            rate_limit_per_sec: 0,
+            log_filter: Some("info".to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+type SharedUser = std::sync::Arc<tokio::sync::RwLock<User>>;
+
+/// Three linked devices per user through split OHTTP, A1<->B1 exchanged,
+/// and the exchange synchronized to every linked device.
+async fn exchanged_six_device_pair(orch: &mut Orchestrator) -> (SharedUser, SharedUser) {
+    orch.add_user_split_ohttp("Alice", 3)
+        .expect("Failed to add Alice through split OHTTP");
+    orch.add_user_split_ohttp("Bob", 3)
+        .expect("Failed to add Bob through split OHTTP");
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create identities");
+    orch.link_all_devices()
+        .await
+        .expect("Failed to link all six devices");
+    sync_rounds(orch, 2).await;
+
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+    {
+        let alice = alice.read().await;
+        let bob = bob.read().await;
+        let alice_qr = alice
+            .generate_qr_from_device(0)
+            .await
+            .expect("A1 should start exchange");
+        let bob_qr = bob
+            .generate_qr_from_device(0)
+            .await
+            .expect("B1 should start exchange");
+        bob.complete_exchange_on_device(0, &alice_qr)
+            .await
+            .expect("B1 should complete exchange");
+        alice
+            .complete_exchange_on_device(0, &bob_qr)
+            .await
+            .expect("A1 should complete exchange");
+    }
+    sync_rounds(orch, 2).await;
+    (alice, bob)
+}
+
+async fn sync_rounds(orch: &Orchestrator, rounds: usize) {
+    for _ in 0..rounds {
+        orch.sync_all().await.expect("sync round should succeed");
+    }
+}
+
+/// Run sync rounds until `converged` reports true; false after `max_rounds`.
+async fn sync_until<F, Fut>(orch: &Orchestrator, max_rounds: usize, mut converged: F) -> bool
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 0..max_rounds {
+        orch.sync_all().await.expect("sync round should succeed");
+        if converged().await {
+            return true;
+        }
+    }
+    false
+}
+
+async fn contact_id_on_device(
+    user: &SharedUser,
+    device_index: usize,
+    contact_name: &str,
+) -> String {
+    let contacts = user
+        .read()
+        .await
+        .list_contacts_on_device(device_index)
+        .await
+        .expect("device should list contacts after exchange");
+    exchanged_contact_id(&contacts, contact_name)
+}
+
+fn sorted_fields(card: &ContactCard) -> Vec<(String, String, String)> {
+    let mut fields: Vec<_> = card
+        .fields
+        .iter()
+        .map(|field| {
+            (
+                field.field_type.clone(),
+                field.label.clone(),
+                field.value.clone(),
+            )
+        })
+        .collect();
+    fields.sort_by(|a, b| a.1.cmp(&b.1));
+    fields
+}
+
+async fn owner_private_states(alice: &SharedUser) -> Vec<OwnerPrivateState> {
+    let alice = alice.read().await;
+    let mut states = Vec::new();
+    for device_index in 0..3 {
+        let device = alice
+            .device(device_index)
+            .expect("Alice device should exist")
+            .read()
+            .await;
+        let card = device
+            .get_card()
+            .await
+            .expect("owner device should show its card");
+        let mut labels = Vec::new();
+        for name in device
+            .list_labels()
+            .await
+            .expect("owner device should list labels")
+        {
+            labels.push(
+                device
+                    .label_state(&name)
+                    .await
+                    .expect("owner device should show each label"),
+            );
+        }
+        labels.sort_by(|a, b| a.name.cmp(&b.name));
+        let mut contacts: Vec<String> = device
+            .list_contacts()
+            .await
+            .expect("owner device should list contacts")
+            .into_iter()
+            .map(|contact| contact.name)
+            .collect();
+        contacts.sort();
+        states.push(OwnerPrivateState {
+            card_fields: sorted_fields(&card),
+            labels,
+            tags: device
+                .list_tags()
+                .await
+                .expect("owner device should list tags"),
+            contacts,
+            bob_note: device
+                .read_personal_note("Bob")
+                .await
+                .expect("owner device should read Bob's note state"),
+        });
+    }
+    states
+}
+
+async fn bob_views(bob: &SharedUser) -> Vec<BobView> {
+    let bob = bob.read().await;
+    let mut views = Vec::new();
+    for device_index in 0..3 {
+        let device = bob
+            .device(device_index)
+            .expect("Bob device should exist")
+            .read()
+            .await;
+        let contacts = device
+            .list_contacts()
+            .await
+            .expect("Bob device should list contacts");
+        let alice_card = device
+            .get_contact_card(&exchanged_contact_id(&contacts, "Alice"))
+            .await
+            .expect("Bob device should show Alice's card")
+            .expect("Bob device should hold Alice's card after exchange");
+        views.push(BobView {
+            alice_name: alice_card.name.clone(),
+            alice_fields: sorted_fields(&alice_card),
+            labels: device
+                .list_labels()
+                .await
+                .expect("Bob device should list labels"),
+            tags: device
+                .list_tags()
+                .await
+                .expect("Bob device should list tags"),
+            note: device
+                .read_personal_note("Alice")
+                .await
+                .expect("Bob device should read its own note state"),
+        });
+    }
+    views
 }
