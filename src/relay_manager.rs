@@ -6,11 +6,10 @@
 //!
 //! Spawns and manages isolated relay server instances for testing.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -18,6 +17,7 @@ use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
+use crate::subprocess_log::OutputCapture;
 
 /// Reserve an available port pair (relay + metrics) by binding to port 0.
 ///
@@ -65,35 +65,6 @@ impl OhttpKeyWorkspace {
 
 /// Timeout for relay startup.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
-const MAX_CAPTURED_RELAY_OUTPUT_LINES: usize = 1_024;
-
-#[derive(Clone, Default)]
-struct RelayOutputCapture {
-    lines: Arc<Mutex<VecDeque<String>>>,
-}
-
-impl RelayOutputCapture {
-    fn record(&self, line: &str) {
-        let mut lines = self
-            .lines
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if lines.len() == MAX_CAPTURED_RELAY_OUTPUT_LINES {
-            lines.pop_front();
-        }
-        lines.push_back(line.to_string());
-    }
-
-    fn snapshot(&self) -> Vec<String> {
-        self.lines
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .iter()
-            .cloned()
-            .collect()
-    }
-}
-
 /// A running relay server instance.
 pub struct RelayInstance {
     /// The relay's WebSocket URL.
@@ -111,7 +82,7 @@ pub struct RelayInstance {
     /// The child process handle.
     process: Option<Child>,
     /// Captured stdout and stderr lines from the relay process.
-    output_capture: RelayOutputCapture,
+    output_capture: OutputCapture,
 }
 
 impl RelayInstance {
@@ -469,7 +440,7 @@ impl RelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn relay {}: {}", index, e)))?;
 
-        let output_capture = RelayOutputCapture::default();
+        let output_capture = OutputCapture::default();
         spawn_relay_drains(&mut child, index, output_capture.clone());
 
         // Verify the relay is actually listening and serving requests
@@ -813,7 +784,7 @@ impl Drop for RelayManager {
 /// `eprintln!` lines hit stderr. The orchestrator pipes both so the
 /// next time a test fails because the relay rejected a request, the
 /// relay's own log line explaining the rejection surfaces.
-fn spawn_relay_drains(child: &mut Child, index: usize, output_capture: RelayOutputCapture) {
+fn spawn_relay_drains(child: &mut Child, index: usize, output_capture: OutputCapture) {
     if let Some(stdout) = child.stdout.take() {
         let fd = stdout
             .into_owned_fd()
@@ -879,23 +850,6 @@ mod tests {
         assert_eq!(config.base_port, 0);
         assert_eq!(config.storage_backend, "memory");
         assert!(config.log_filter.is_none());
-    }
-
-    // @internal
-    #[test]
-    fn relay_output_capture_is_bounded() {
-        let capture = RelayOutputCapture::default();
-        for index in 0..=MAX_CAPTURED_RELAY_OUTPUT_LINES {
-            capture.record(&format!("line-{index}"));
-        }
-
-        let lines = capture.snapshot();
-        assert_eq!(lines.len(), MAX_CAPTURED_RELAY_OUTPUT_LINES);
-        assert_eq!(lines.first(), Some(&"line-1".to_string()));
-        assert_eq!(
-            lines.last(),
-            Some(&format!("line-{MAX_CAPTURED_RELAY_OUTPUT_LINES}"))
-        );
     }
 
     // @internal

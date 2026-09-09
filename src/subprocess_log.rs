@@ -20,7 +20,40 @@
 //! See `_private/docs/problems/2026-04-27-e2e-sync-http-400/` for the
 //! incident that prompted this.
 
+use std::collections::VecDeque;
 use std::os::fd::OwnedFd;
+use std::sync::{Arc, Mutex};
+
+const MAX_CAPTURED_OUTPUT_LINES: usize = 1_024;
+
+/// Bounded ring buffer of a subprocess's most recent stdout/stderr lines,
+/// shared between the drain threads and the test that inspects them.
+#[derive(Clone, Default)]
+pub struct OutputCapture {
+    lines: Arc<Mutex<VecDeque<String>>>,
+}
+
+impl OutputCapture {
+    pub fn record(&self, line: &str) {
+        let mut lines = self
+            .lines
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if lines.len() == MAX_CAPTURED_OUTPUT_LINES {
+            lines.pop_front();
+        }
+        lines.push_back(line.to_string());
+    }
+
+    pub fn snapshot(&self) -> Vec<String> {
+        self.lines
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .iter()
+            .cloned()
+            .collect()
+    }
+}
 
 /// Spawn an OS thread that reads `pipe` line-by-line and calls
 /// `on_line` for each line. Runs until EOF (i.e. until the subprocess
@@ -43,4 +76,27 @@ where
             }
         })
         .expect("subprocess log drain thread");
+}
+
+// INLINE_TEST_REQUIRED: the ring-buffer bound is a private constant.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @internal
+    #[test]
+    fn output_capture_is_bounded() {
+        let capture = OutputCapture::default();
+        for index in 0..=MAX_CAPTURED_OUTPUT_LINES {
+            capture.record(&format!("line-{index}"));
+        }
+
+        let lines = capture.snapshot();
+        assert_eq!(lines.len(), MAX_CAPTURED_OUTPUT_LINES);
+        assert_eq!(lines.first(), Some(&"line-1".to_string()));
+        assert_eq!(
+            lines.last(),
+            Some(&format!("line-{MAX_CAPTURED_OUTPUT_LINES}"))
+        );
+    }
 }
