@@ -23,6 +23,11 @@ name: Generate QR Code (Android)
 - tapOn: "More"
 - tapOn: "Exchange"
 - assertVisible: "Exchange Mode"
+# The picker recommends the last-used mode; once Link has been used
+# Glance sits behind "Other ways to connect" (RG-9 disclosure order).
+- tapOn:
+    text: "Other ways to connect"
+    optional: true
 - tapOn: "Glance"
 
 # Wait for the own-QR broadcast to render.

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Android Maestro Flow: Hide Contact
-# Hides a contact from the main contact list via long-press context menu.
+# Hides a contact from its detail screen (Actions → Hide contact).
 # Environment variables:
 #   CONTACT_NAME - Name of the contact to hide (required)
 
@@ -28,21 +28,22 @@ appId: app.vauchi
 - launchApp
 - waitForAnimationToEnd
 
-# Navigate to contacts.
+# Navigate to contacts. The Contacts tab lives behind More on the
+# bottom bar, so every flow opens More first.
+- tapOn: "More"
 - tapOn: "Contacts"
 - waitForAnimationToEnd
-
 # Verify contact is visible
 - assertVisible: ${CONTACT_NAME}
-
-# Long-press on the contact to show context menu
-- longPressOn: ${CONTACT_NAME}
-
-# Confirm hide in dialog
-- assertVisible: "Hide ${CONTACT_NAME}?"
-- tapOn: "Hide"
-
+# Open the contact and hide it from the detail Actions menu (the shell
+# no longer offers a long-press dialog on the list).
+- tapOn: ${CONTACT_NAME}
 - waitForAnimationToEnd
-
-# Verify contact is no longer visible in main list
+- tapOn: "Actions"
+- tapOn: "Hide contact"
+- waitForAnimationToEnd
+# Back on the list the contact must be gone.
+- pressKey: back
+- waitForAnimationToEnd
+- assertVisible: "Contacts"
 - assertNotVisible: ${CONTACT_NAME}

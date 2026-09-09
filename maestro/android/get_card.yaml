@@ -29,7 +29,8 @@ name: Get Contact Card (Android)
 # Wait for app to be ready
 - waitForAnimationToEnd
 
-# Navigate to contacts list
+# Navigate to contacts list (the tab lives behind More on the bottom bar)
+- tapOn: "More"
 - tapOn: "Contacts"
 
 # Wait for list to load

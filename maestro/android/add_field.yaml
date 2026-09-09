@@ -73,7 +73,10 @@ name: Add Card Field (Android)
     timeout: 5000
 
 # Post-state: we must be back on the card view after the save completed.
-# "Add Entry" now lives in the secondary overlay rather than on the surface,
-# so the card itself is identified by its own exchange affordance.
-- assertVisible: "Exchange Now"
+# The card lists the saved entry as "<value> (<label>)"; "Exchange Now"
+# only appears while the identity has no contacts, so it cannot identify
+# the card view once an exchange has happened. Match on the label: the
+# IME may auto-capitalise the typed value (backlog
+# 2026-09-09-android-entry-value-input-autocapitalises).
+- assertVisible: ".*\\(${FIELD_LABEL}\\)"
 - assertNotVisible: "Add ${FIELD_TYPE}"
