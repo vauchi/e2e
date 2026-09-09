@@ -102,6 +102,29 @@ pub struct CardField {
 }
 
 /// A contact card.
+/// Owner-private view of one visibility label (group) as the owner's
+/// device reports it: members and visible fields sorted, presentation
+/// overrides as set (`None` when cleared).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LabelState {
+    pub name: String,
+    /// Member contact display names.
+    pub members: Vec<String>,
+    /// Own-card field labels the label exposes.
+    pub visible_fields: Vec<String>,
+    pub name_override: Option<String>,
+    pub bio_override: Option<String>,
+    /// Size of the stored (normalized) avatar override.
+    pub avatar_override_bytes: Option<usize>,
+}
+
+/// Owner-private tag with its member contact ids, sorted.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TagState {
+    pub name: String,
+    pub members: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCard {
     /// Display name.
@@ -296,6 +319,73 @@ pub trait Device: Send + Sync {
     async fn hide_field_from_label(&self, _label: &str, _field: &str) -> E2eResult<()> {
         Err(crate::error::E2eError::DeviceNotSupported(
             "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Read a label's owner-private state (members, visible fields, overrides).
+    async fn label_state(&self, _label: &str) -> E2eResult<LabelState> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Labels not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Set (`Some`) or clear (`None`) the display name a label's contacts see.
+    async fn set_label_name_override(&self, _label: &str, _name: Option<&str>) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Label presentation overrides not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Set (`Some`) or clear (`None`) the bio a label's contacts see.
+    async fn set_label_bio_override(&self, _label: &str, _bio: Option<&str>) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Label presentation overrides not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Set (`Some(image path)`) or clear (`None`) the avatar a label's contacts see.
+    async fn set_label_avatar_override(
+        &self,
+        _label: &str,
+        _image: Option<&std::path::Path>,
+    ) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Label presentation overrides not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Create an owner-private tag.
+    async fn create_tag(&self, _name: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Tags not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Delete an owner-private tag.
+    async fn delete_tag(&self, _name: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Tags not supported on this device type".to_string(),
+        ))
+    }
+
+    /// List owner-private tags with their member contact ids.
+    async fn list_tags(&self) -> E2eResult<Vec<TagState>> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Tags not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Add a contact to a tag.
+    async fn add_contact_to_tag(&self, _tag: &str, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Tags not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Remove a contact from a tag.
+    async fn remove_contact_from_tag(&self, _tag: &str, _contact: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Tags not supported on this device type".to_string(),
         ))
     }
 

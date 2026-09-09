@@ -16,11 +16,12 @@ use tempfile::TempDir;
 use tokio::process::Command;
 use tracing::{debug, trace};
 
-use super::{CardField, Contact, ContactCard, Device, DeviceType};
+use super::{CardField, Contact, ContactCard, Device, DeviceType, LabelState, TagState};
 use crate::error::{E2eError, E2eResult};
 
 const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
 
+mod owner_state;
 mod raw;
 
 fn configure_command_environment(command: &mut Command, extra_env: &HashMap<String, String>) {
@@ -930,6 +931,66 @@ impl Device for CliDevice {
 
     async fn hide_field_from_label(&self, label: &str, field: &str) -> E2eResult<()> {
         self.run_command_success(&["labels", "hide-field", label, field])
+            .await?;
+        Ok(())
+    }
+
+    async fn label_state(&self, label: &str) -> E2eResult<LabelState> {
+        let output = self.run_command_success(&["labels", "show", label]).await?;
+        owner_state::parse_label_state(&output)
+    }
+
+    async fn set_label_name_override(&self, label: &str, name: Option<&str>) -> E2eResult<()> {
+        self.run_command_success(&["labels", "set-name", label, name.unwrap_or("--clear")])
+            .await?;
+        Ok(())
+    }
+
+    async fn set_label_bio_override(&self, label: &str, bio: Option<&str>) -> E2eResult<()> {
+        self.run_command_success(&["labels", "set-bio", label, bio.unwrap_or("--clear")])
+            .await?;
+        Ok(())
+    }
+
+    async fn set_label_avatar_override(
+        &self,
+        label: &str,
+        image: Option<&std::path::Path>,
+    ) -> E2eResult<()> {
+        let image = image.map(|path| path.to_string_lossy().into_owned());
+        self.run_command_success(&[
+            "labels",
+            "set-avatar",
+            label,
+            image.as_deref().unwrap_or("--clear"),
+        ])
+        .await?;
+        Ok(())
+    }
+
+    async fn create_tag(&self, name: &str) -> E2eResult<()> {
+        self.run_command_success(&["tags", "create", name]).await?;
+        Ok(())
+    }
+
+    async fn delete_tag(&self, name: &str) -> E2eResult<()> {
+        self.run_command_success(&["tags", "delete", name]).await?;
+        Ok(())
+    }
+
+    async fn list_tags(&self) -> E2eResult<Vec<TagState>> {
+        let output = self.run_command_success(&["tags", "list"]).await?;
+        Ok(owner_state::parse_tags(&output))
+    }
+
+    async fn add_contact_to_tag(&self, tag: &str, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["tags", "add-contact", tag, contact])
+            .await?;
+        Ok(())
+    }
+
+    async fn remove_contact_from_tag(&self, tag: &str, contact: &str) -> E2eResult<()> {
+        self.run_command_success(&["tags", "remove-contact", tag, contact])
             .await?;
         Ok(())
     }
