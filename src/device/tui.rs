@@ -169,8 +169,8 @@ exec "{}"
             .expect(regex)
             .map_err(|e| E2eError::device(format!("Pattern '{}' not found: {}", pattern, e)))?;
 
-        let matched = String::from_utf8_lossy(found.as_bytes()).to_string();
-        Ok(matched)
+        let matched = found.get(0).unwrap_or_else(|| found.as_bytes());
+        Ok(String::from_utf8_lossy(matched).to_string())
     }
 
     fn read_available(&mut self) -> E2eResult<String> {
@@ -267,9 +267,10 @@ impl TuiSession {
     }
 
     async fn send_alt(&self, c: char) -> E2eResult<()> {
-        // crossterm encodes Alt+<char> as ESC followed by the character.
-        self.send_escape().await?;
-        self.send_char(c).await
+        // crossterm decodes Alt+<char> as ESC followed by the character in
+        // the same read; a pause between them is a bare Esc and a typed
+        // letter instead.
+        self.send_text(&format!("\x1b{c}")).await
     }
 
     async fn send_text(&self, text: &str) -> E2eResult<()> {
@@ -332,26 +333,23 @@ impl TuiSession {
     /// `label` by its 1-based position.
     async fn navigate_to(&self, label: &str) -> E2eResult<()> {
         self.send_alt('m').await?;
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        let screen = self.read_screen().await?;
-        // Overlay items are rendered as "1. Label" or "1.Label" depending on
-        // the terminal width; accept both forms.
-        let mut target_index = None;
-        for line in screen.lines() {
-            let trimmed = line.trim();
-            let parts = trimmed.split_once(". ").or_else(|| trimmed.split_once('.'));
-            if let Some((num, rest)) = parts {
-                let rest = rest.trim();
-                if rest.contains(label) || rest.to_lowercase().contains(&label.to_lowercase()) {
-                    if let Ok(n) = num.parse::<usize>() {
-                        target_index = Some(n);
-                        break;
-                    }
-                }
-            }
-        }
-        let index = target_index.ok_or_else(|| {
-            E2eError::device(format!("Navigation item '{}' not found in overlay", label))
+        // The overlay draws the number and the label as separate cell runs,
+        // so a cursor-move escape (never a newline) sits between "2." and
+        // "Contacts". Expecting the pair also skips any main-screen output
+        // still buffered from before the overlay opened.
+        let pattern = format!(r"(?i)(\d+)\.(?:\x1b\[[0-9;]*[A-Za-z]|\s)*{label}");
+        let matched = self
+            .expect_timeout(&pattern, Duration::from_secs(10))
+            .await
+            .map_err(|_| {
+                E2eError::device(format!("Navigation item '{}' not found in overlay", label))
+            })?;
+        let digits: String = matched.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let index: usize = digits.parse().map_err(|_| {
+            E2eError::device(format!(
+                "Navigation index for '{}' unreadable: {}",
+                label, matched
+            ))
         })?;
         let digit = char::from_digit(index as u32, 10).ok_or_else(|| {
             E2eError::device(format!("Navigation index {} out of digit range", index))
@@ -437,11 +435,17 @@ impl Device for TuiDevice {
             .expect_timeout("What's your name?|Display name", Duration::from_secs(10))
             .await?;
         self.session.send_text(name).await?;
+        // Return inside a field reports a submission, which Core's name step
+        // ignores; Tab leaves the field so Return reaches Continue.
+        self.session.send_tab().await?;
         self.session.activate_primary().await?;
 
         // groups_setup: continue without selecting groups.
         self.session
-            .expect_timeout("Choose groups|Suggested groups", Duration::from_secs(10))
+            .expect_timeout(
+                "Choose your groups|Suggested groups",
+                Duration::from_secs(10),
+            )
             .await?;
         self.session.activate_primary().await?;
 
