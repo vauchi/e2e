@@ -7,7 +7,8 @@ use std::collections::HashMap;
 
 use tokio::process::Command;
 
-use super::{CliDevice, configure_command_environment, rate_limit_retry_after};
+use super::{CliDevice, configure_command_environment, owner_state, rate_limit_retry_after};
+use crate::device::{LabelState, TagState};
 
 // @internal
 #[test]
@@ -413,4 +414,105 @@ async fn command_timeout_fires_with_command_description() {
         message.contains("1s"),
         "timeout error must state the configured budget: {message}"
     );
+}
+
+// @internal
+#[test]
+fn label_state_parses_members_fields_and_presentation_overrides() {
+    let output = "Label: Work\n\
+        ID: 17ed905b-dcc5-451c-89f7-6b66471a5415\n\
+        Created: just now\n\
+        Modified: just now\n\
+        \n\
+        Contacts:\n  - Bob (5f3a9c1d)\n  - Carol (0a1b2c3d)\n\
+        \n\
+        Visible fields:\n  - Work\n  - Office\n\
+        \n\
+        Presentation overrides:\n  Name: Alice W\n  Bio: bio text\n  Avatar: 34 bytes\n";
+
+    let state = owner_state::parse_label_state(output).expect("label show output parses");
+
+    assert_eq!(
+        state,
+        LabelState {
+            name: "Work".to_string(),
+            members: vec!["Bob".to_string(), "Carol".to_string()],
+            visible_fields: vec!["Office".to_string(), "Work".to_string()],
+            name_override: Some("Alice W".to_string()),
+            bio_override: Some("bio text".to_string()),
+            avatar_override_bytes: Some(34),
+        }
+    );
+}
+
+// @internal
+#[test]
+fn label_state_parses_empty_sections_and_cleared_overrides() {
+    let output = "Label: Work\n\
+        ID: 17ed905b-dcc5-451c-89f7-6b66471a5415\n\
+        Created: just now\n\
+        Modified: just now\n\
+        \n\
+        Contacts: (none)\n\
+        \n\
+        Visible fields: (none)\n\
+        \n\
+        Presentation overrides:\n  Name: -\n  Bio: -\n  Avatar: -\n";
+
+    let state = owner_state::parse_label_state(output).expect("label show output parses");
+
+    assert_eq!(
+        state,
+        LabelState {
+            name: "Work".to_string(),
+            members: Vec::new(),
+            visible_fields: Vec::new(),
+            name_override: None,
+            bio_override: None,
+            avatar_override_bytes: None,
+        }
+    );
+}
+
+// @internal
+#[test]
+fn label_state_rejects_output_without_presentation_overrides() {
+    let output = "Label: Work\nID: 17ed905b\n\nContacts: (none)\n\nVisible fields: (none)\n";
+
+    let error = owner_state::parse_label_state(output).expect_err("missing overrides block");
+
+    assert!(
+        error.to_string().contains("Presentation overrides"),
+        "error must name the missing block: {error}"
+    );
+}
+
+// @internal
+#[test]
+fn tags_parse_names_and_sorted_member_ids() {
+    let output = "  Friends (4bcc0fe4)\n    Contacts: 2\n    - bbbb\n    - aaaa\n  Work (11223344)\n    Contacts: 0\n";
+
+    let tags = owner_state::parse_tags(output);
+
+    assert_eq!(
+        tags,
+        vec![
+            TagState {
+                name: "Friends".to_string(),
+                members: vec!["aaaa".to_string(), "bbbb".to_string()],
+            },
+            TagState {
+                name: "Work".to_string(),
+                members: Vec::new(),
+            },
+        ]
+    );
+}
+
+// @internal
+#[test]
+fn tags_parse_empty_listing() {
+    let output = "\u{2139} No tags defined. Create one with 'vauchi tags create <name>'\n";
+
+    assert_eq!(owner_state::parse_tags(output), Vec::<TagState>::new());
 }
