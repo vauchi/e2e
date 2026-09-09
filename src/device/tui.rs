@@ -507,12 +507,12 @@ impl Device for TuiDevice {
         // The renderer emits "[QR] <label>" followed by "  <payload>".
         let mut lines = screen.lines().peekable();
         while let Some(line) = lines.next() {
-            if line.contains("[QR]") {
-                if let Some(next_line) = lines.next() {
-                    let payload = next_line.trim().trim_start_matches("  ").to_string();
-                    if !payload.is_empty() && payload.len() >= 20 {
-                        return Ok(payload);
-                    }
+            if line.contains("[QR]")
+                && let Some(next_line) = lines.next()
+            {
+                let payload = next_line.trim().trim_start_matches("  ").to_string();
+                if !payload.is_empty() && payload.len() >= 20 {
+                    return Ok(payload);
                 }
             }
         }
