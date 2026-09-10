@@ -177,6 +177,18 @@ pub trait Device: Send + Sync {
     /// Complete an exchange using a QR code from another user.
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()>;
 
+    /// Wait for an in-flight Link-mode exchange to complete on the *initiator*
+    /// side. In Link mode the initiator shares a URL and stays on its share
+    /// screen while its live session polls the relay; a single ceremony gives
+    /// both parties the contact. The responder drives completion via
+    /// [`complete_exchange`](Self::complete_exchange); the initiator confirms
+    /// convergence here without re-navigating (which would drop its session).
+    async fn await_exchange_complete(&self) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Asymmetric Link-mode exchange is not supported on this device type".to_string(),
+        ))
+    }
+
     /// Start the device linking process (returns QR data for new device).
     async fn start_device_link(&self) -> E2eResult<String>;
 

@@ -615,10 +615,10 @@ async fn integration_cli_to_ios_exchange() {
 // @internal
 #[tokio::test]
 #[cfg(feature = "tui")]
-async fn integration_cli_to_tui_exchange() {
-    // Both sides are terminals: the CLI has no Link mode, and a
-    // camera-less TUI can only exchange over Link (share the URL, or
-    // paste the peer's). Alice shares, Bob pastes.
+async fn integration_tui_to_tui_link_exchange() {
+    // Both sides are terminals; a camera-less TUI can only exchange over
+    // Link (share the URL, or paste the peer's). Alice shares as the
+    // initiator, Bob pastes as the responder — one asymmetric ceremony.
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
@@ -631,39 +631,18 @@ async fn integration_cli_to_tui_exchange() {
         .await
         .expect("Failed to create identities");
 
-    let qr = {
-        let alice = orch.user("Alice").unwrap();
-        let alice = alice.read().await;
-        alice.generate_qr().await.expect("Alice should generate QR")
-    };
-
-    {
-        let bob = orch.user("Bob").unwrap();
-        let bob = bob.read().await;
-        bob.complete_exchange(&qr)
-            .await
-            .expect("Bob should complete exchange with Alice's QR");
-    }
-
-    for _ in 0..2 {
-        {
-            let alice = orch.user("Alice").unwrap();
-            let alice = alice.read().await;
-            alice.sync_all().await.expect("Alice sync failed");
-        }
-        {
-            let bob = orch.user("Bob").unwrap();
-            let bob = bob.read().await;
-            bob.sync_all().await.expect("Bob sync failed");
-        }
-    }
+    // Alice initiates (shares her Link URL, stays on the share screen), Bob
+    // responds (pastes it, accepts). One ceremony; both converge.
+    orch.exchange_link("Alice", "Bob")
+        .await
+        .expect("Alice (initiator) and Bob (responder) should converge over Link");
 
     let bob = orch.user("Bob").unwrap();
     let bob = bob.read().await;
     let contacts = bob.list_contacts().await.expect("Bob should list contacts");
     assert!(
         contacts.iter().any(|c| c.name == "Alice"),
-        "Bob should have Alice as a contact after CLI-to-TUI exchange"
+        "Bob should have Alice as a contact after the TUI Link exchange"
     );
 
     let alice = orch.user("Alice").unwrap();
@@ -674,7 +653,7 @@ async fn integration_cli_to_tui_exchange() {
         .expect("Alice should list contacts");
     assert!(
         contacts.iter().any(|c| c.name == "Bob"),
-        "Alice should have Bob as a contact after CLI-to-TUI exchange"
+        "Alice should have Bob as a contact after the TUI Link exchange"
     );
 
     orch.stop().await.expect("Failed to stop orchestrator");

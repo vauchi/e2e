@@ -360,6 +360,18 @@ impl User {
         device.complete_exchange(qr_data).await
     }
 
+    /// Wait for an in-flight Link-mode exchange to complete on the initiator's
+    /// primary device (which stays on its share screen while its live session
+    /// polls the relay).
+    pub async fn await_exchange_complete(&self) -> E2eResult<()> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.await_exchange_complete().await
+    }
+
     /// Complete an exchange using a specific device.
     pub async fn complete_exchange_on_device(
         &self,

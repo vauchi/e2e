@@ -573,6 +573,21 @@ impl Device for TuiDevice {
         Ok(())
     }
 
+    async fn await_exchange_complete(&self) -> E2eResult<()> {
+        // The initiator never leaves its Link share screen; its live session
+        // keeps polling the relay, so once the responder deposits its epk and
+        // card the initiator retrieves them and Core raises the completion
+        // screen. Read it here — re-navigating would tear down the very
+        // session the responder is converging with.
+        self.session
+            .expect_timeout(
+                "Contact added|Contact Added|Exchange complete|Exchange Complete",
+                Duration::from_secs(60),
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn start_device_link(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
 

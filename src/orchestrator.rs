@@ -682,6 +682,59 @@ impl Orchestrator {
         Ok(())
     }
 
+    /// Asymmetric Link-mode exchange: one initiator shares a URL and stays on
+    /// its share screen, one responder pastes it and accepts. A single Link
+    /// ceremony gives *both* parties the contact — unlike the symmetric QR
+    /// [`exchange`](Self::exchange), which runs two ceremonies and would make
+    /// each party abandon its own share session to respond. Used for the
+    /// camera-less TUI, which has no QR path.
+    pub async fn exchange_link(&self, initiator_name: &str, responder_name: &str) -> E2eResult<()> {
+        let initiator = self
+            .user(initiator_name)
+            .ok_or_else(|| E2eError::user(format!("User '{}' not found", initiator_name)))?;
+        let responder = self
+            .user(responder_name)
+            .ok_or_else(|| E2eError::user(format!("User '{}' not found", responder_name)))?;
+
+        info!("Link exchange: {} -> {}", initiator_name, responder_name);
+
+        // Initiator shares its link and stays on the share screen; its live
+        // session begins polling the relay for the responder's deposit.
+        let url = {
+            let user = initiator.read().await;
+            user.generate_qr().await?
+        };
+
+        // Responder pastes the initiator's link, accepts, and waits for its
+        // own completion. While it waits, the initiator's process converges in
+        // parallel (both are live TUIs polling the same relay).
+        {
+            let user = responder.read().await;
+            user.complete_exchange(&url).await?;
+        }
+
+        // Confirm the initiator reached completion without re-navigating it.
+        {
+            let user = initiator.read().await;
+            user.await_exchange_complete().await?;
+        }
+
+        // Establish the first ratchet direction both ways so callers can
+        // immediately publish cards or visibility changes.
+        for _ in 0..2 {
+            {
+                let user = initiator.read().await;
+                user.sync_all().await?;
+            }
+            {
+                let user = responder.read().await;
+                user.sync_all().await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Perform exchanges between all users (creates a fully connected graph).
     pub async fn exchange_all(&self) -> E2eResult<()> {
         let names: Vec<String> = self.users.keys().cloned().collect();

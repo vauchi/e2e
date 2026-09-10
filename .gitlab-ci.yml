@@ -494,10 +494,10 @@ test:release-rg10:
 # exactly what happened for weeks before tui !554 / e2e !187 repaired the
 # driver (problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload).
 # Only test_tui_create_identity is selected today. Add
-# integration_cli_to_tui_exchange to the filter once core !1580 ships
-# camera-less code entry and the CLI/TUI pins move to a release carrying it —
-# today it fails because the TUI's Contacts screen has no Add Contact /
-# QrRequestScan route for a camera-less device.
+# integration_tui_to_tui_link_exchange to the filter once the CLI/TUI pins
+# move to a release carrying the camera-less pasted-peer-link route (core
+# !1592, in 0.67.0): the harness drives it as an asymmetric Link ceremony
+# (Alice shares, Bob pastes) — see src/orchestrator.rs::exchange_link.
 test:tui-journey:
   extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
