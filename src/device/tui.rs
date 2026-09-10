@@ -887,10 +887,20 @@ fn strip_ansi(screen: &str) -> String {
         if c == '\x1b' {
             if chars.peek() == Some(&'[') {
                 chars.next();
+                let mut terminator = '\0';
                 for d in chars.by_ref() {
                     if d.is_ascii_alphabetic() {
+                        terminator = d;
                         break;
                     }
+                }
+                // Cursor-move escapes ('H'/'f' absolute, 'A'-'D' relative)
+                // separate two on-screen rows or cells. Dropping them
+                // entirely fuses adjacent text (e.g. a URL and the next
+                // label), which then reads as one word. Emit a space so
+                // word-boundary matching still works.
+                if matches!(terminator, 'H' | 'f' | 'A' | 'B' | 'C' | 'D') {
+                    out.push(' ');
                 }
             }
             continue;
