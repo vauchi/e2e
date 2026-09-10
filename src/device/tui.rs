@@ -299,6 +299,42 @@ impl TuiSession {
         pty.expect_with_timeout(pattern, timeout)
     }
 
+    /// Poll the terminal until its *rendered* text (ANSI stripped, drawn
+    /// over a rolling buffer of recent frames) contains any of the `|`-
+    /// separated needles. Robust where `expect_timeout` is not: the TUI
+    /// redraws the whole screen each frame, so cursor-position escapes
+    /// split a title across the raw stream that `expectrl` matches.
+    async fn wait_for_visible(&self, patterns: &str, timeout: Duration) -> E2eResult<String> {
+        let needles: Vec<&str> = patterns.split('|').collect();
+        let deadline = std::time::Instant::now() + timeout;
+        let mut buffer = String::new();
+        loop {
+            buffer.push_str(&self.read_screen().await?);
+            if buffer.len() > 65536 {
+                buffer = buffer.split_off(buffer.len() - 65536);
+            }
+            let visible = strip_ansi(&buffer);
+            if let Some(found) = needles.iter().find(|n| visible.contains(**n)) {
+                return Ok((*found).to_string());
+            }
+            if std::time::Instant::now() >= deadline {
+                let visible = strip_ansi(&buffer);
+                let tail: String = visible
+                    .chars()
+                    .rev()
+                    .take(600)
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect();
+                return Err(E2eError::device(format!(
+                    "none of [{patterns}] became visible within {timeout:?}; tail: {tail}"
+                )));
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    }
+
     async fn read_screen(&self) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
         let pty = pty_guard
@@ -310,39 +346,6 @@ impl TuiSession {
     /// Activate the primary contextual action (e.g. "Create new identity").
     async fn activate_primary(&self) -> E2eResult<()> {
         self.send_enter().await
-    }
-
-    /// Cycle contextual actions with Tab until the rendered command bar
-    /// contains `label`, then activate it with Enter.
-    /// Tab through the focus ring until the field carrying `label` is the
-    /// focused one, so typed text lands in it.
-    async fn focus_field(&self, label: &str) -> E2eResult<()> {
-        for _ in 0..10 {
-            let screen = strip_ansi(&self.read_screen().await?);
-            if screen.contains(&format!("> {label}")) || screen.contains(&format!("[{label}]")) {
-                return Ok(());
-            }
-            self.send_tab().await?;
-        }
-        Err(E2eError::device(format!(
-            "Field '{}' could not be focused after cycling",
-            label
-        )))
-    }
-
-    async fn activate_context_action(&self, label: &str) -> E2eResult<()> {
-        for _ in 0..10 {
-            let screen = self.read_screen().await?;
-            // The command bar is the bottom "Commands" block.
-            if screen.contains(label) {
-                return self.send_enter().await;
-            }
-            self.send_tab().await?;
-        }
-        Err(E2eError::device(format!(
-            "Context action '{}' not found after cycling",
-            label
-        )))
     }
 
     /// Open the navigation overlay and select the item whose label contains
@@ -545,20 +548,25 @@ impl Device for TuiDevice {
         self.session
             .expect_timeout("Share Link|Send this link", Duration::from_secs(10))
             .await?;
-        self.session.focus_field("Their link").await?;
+        // Typing lands in the first input (the peer-link field), and Return
+        // submits it — core routes the pasted link like an opened deep link
+        // and raises the consent screen.
         self.session.send_text(qr_data).await?;
+        // Let every pasted character be read and applied before Return:
+        // sending Return too soon makes the app process it while the input
+        // is still filling, and it activates the primary "Share" action
+        // instead of submitting the link.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        self.session.send_enter().await?;
         self.session
-            .activate_context_action("Open their link")
+            .wait_for_visible("Exchange Request|Accept Exchange", Duration::from_secs(20))
             .await?;
+        // Return with no focused input activates the context-bar primary
+        // ("Accept Exchange"), which retrieves the peer's card and completes.
+        self.session.send_enter().await?;
         self.session
-            .expect_timeout("Exchange Request|Accept Exchange", Duration::from_secs(15))
-            .await?;
-        self.session
-            .activate_context_action("Accept Exchange")
-            .await?;
-        self.session
-            .expect_timeout(
-                "Contact added|Contact Added|Exchange complete|Exchange Complete",
+            .wait_for_visible(
+                "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
                 Duration::from_secs(60),
             )
             .await?;
