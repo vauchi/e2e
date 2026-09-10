@@ -181,7 +181,11 @@ impl User {
 
     /// Add a TUI device controlled via PTY automation.
     #[cfg(feature = "tui")]
-    pub fn add_tui_device(&mut self, relay_url: &str) -> E2eResult<usize> {
+    pub fn add_tui_device(
+        &mut self,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+    ) -> E2eResult<usize> {
         let device_name = format!("device_{}", self.devices.len());
         let full_name = format!("{}_{}", self.name, device_name);
         let url = if relay_url.is_empty() {
@@ -195,7 +199,7 @@ impl User {
             device_name, self.name, url
         );
 
-        let device = TuiDevice::new(&full_name, url)?;
+        let device = TuiDevice::new(&full_name, url, extra_env.clone())?;
         let device: Box<dyn Device> = Box::new(device);
         self.devices.push(Arc::new(RwLock::new(device)));
 

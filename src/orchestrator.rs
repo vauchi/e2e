@@ -510,8 +510,23 @@ impl Orchestrator {
 
         info!("Adding TUI user '{}' (relay: {})", name, relay_url);
 
+        // Give the TUI the same OHTTP overrides the CLI devices get, so it can
+        // encap to the locally-spawned relay's ephemeral gateway key instead
+        // of the compiled-in production key (the TUI reads both env vars in
+        // `main.rs::apply_ohttp_test_overrides`). Without these the TUI never
+        // reaches the local relay — see the backlog record
+        // 2026-09-10-tui-link-initiator-does-not-complete-handshake.
+        let mut extra_env = HashMap::new();
+        extra_env.insert(
+            CLI_OHTTP_RELAY_URL_ENV.to_string(),
+            self.cli_ohttp_route_url()?,
+        );
+        if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
+            extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
+        }
+
         let mut user = User::with_relay(&name, &relay_url);
-        user.add_tui_device(&relay_url)?;
+        user.add_tui_device(&relay_url, &extra_env)?;
 
         let user = Arc::new(RwLock::new(user));
         self.users.insert(name, user.clone());

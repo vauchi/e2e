@@ -94,20 +94,29 @@ impl PtySession {
         tui_binary: &std::path::Path,
         data_dir: &std::path::Path,
         relay_url: &str,
+        extra_env: &std::collections::HashMap<String, String>,
     ) -> E2eResult<Self> {
         // Create a wrapper script to handle all the terminal setup
         // This avoids complex shell quoting issues
         let script_path = data_dir.join("run_tui.sh");
+        // Forward caller-supplied env (e.g. the e2e OHTTP key/route overrides)
+        // into the TUI process so it can reach a locally-spawned relay — the
+        // CLI gets these via its subprocess env; the TUI needs them too.
+        let extra_exports: String = extra_env
+            .iter()
+            .map(|(k, v)| format!("export {k}=\"{v}\"\n"))
+            .collect();
         let script_content = format!(
             r#"#!/bin/bash
 export TERM=xterm-256color
 export VAUCHI_DATA_DIR="{}"
 export VAUCHI_RELAY_URL="{}"
-stty rows 40 cols 160 2>/dev/null || true
+{}stty rows 40 cols 160 2>/dev/null || true
 exec "{}"
 "#,
             data_dir.display(),
             relay_url,
+            extra_exports,
             tui_binary.display()
         );
 
@@ -201,16 +210,23 @@ struct TuiSession {
     tui_path: PathBuf,
     data_dir_path: PathBuf,
     relay_url: String,
+    extra_env: std::collections::HashMap<String, String>,
 }
 
 impl TuiSession {
-    fn new(tui_path: PathBuf, data_dir_path: PathBuf, relay_url: String) -> Self {
+    fn new(
+        tui_path: PathBuf,
+        data_dir_path: PathBuf,
+        relay_url: String,
+        extra_env: std::collections::HashMap<String, String>,
+    ) -> Self {
         Self {
             pty: Mutex::new(None),
             is_running: Mutex::new(false),
             tui_path,
             data_dir_path,
             relay_url,
+            extra_env,
         }
     }
 
@@ -223,7 +239,12 @@ impl TuiSession {
         let mut pty_guard = self.pty.lock().await;
 
         // Create PTY session with wrapper script for proper terminal setup
-        let session = PtySession::new(&self.tui_path, &self.data_dir_path, &self.relay_url)?;
+        let session = PtySession::new(
+            &self.tui_path,
+            &self.data_dir_path,
+            &self.relay_url,
+            &self.extra_env,
+        )?;
         *pty_guard = Some(session);
         *is_running = true;
 
@@ -402,7 +423,11 @@ pub struct TuiDevice {
 
 impl TuiDevice {
     /// Create a new TUI device with an isolated data directory.
-    pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> E2eResult<Self> {
+    pub fn new(
+        name: impl Into<String>,
+        relay_url: impl Into<String>,
+        extra_env: std::collections::HashMap<String, String>,
+    ) -> E2eResult<Self> {
         let data_dir = TempDir::new()
             .map_err(|e| E2eError::device(format!("Failed to create temp directory: {}", e)))?;
 
@@ -410,7 +435,7 @@ impl TuiDevice {
         let relay_url = relay_url.into();
         let data_dir_path = data_dir.path().to_path_buf();
 
-        let session = TuiSession::new(tui_path, data_dir_path, relay_url.clone());
+        let session = TuiSession::new(tui_path, data_dir_path, relay_url.clone(), extra_env);
 
         Ok(Self {
             name: name.into(),
@@ -877,7 +902,11 @@ mod tests {
     #[test]
     fn test_tui_device_type() {
         // This test will fail if binary doesn't exist, which is expected
-        if let Ok(device) = TuiDevice::new("test", "ws://localhost:8080") {
+        if let Ok(device) = TuiDevice::new(
+            "test",
+            "ws://localhost:8080",
+            std::collections::HashMap::new(),
+        ) {
             assert_eq!(device.device_type(), DeviceType::Tui);
             assert_eq!(device.name(), "test");
         }

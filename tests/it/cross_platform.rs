@@ -405,8 +405,12 @@ async fn test_android_device_exchange() {
 async fn test_tui_create_identity() {
     use vauchi_e2e_tests::device::{Device, TuiDevice};
 
-    let device = TuiDevice::new("Alice_TUI", "ws://localhost:8080")
-        .expect("TUI binary not found. Run `just build tui` first.");
+    let device = TuiDevice::new(
+        "Alice_TUI",
+        "ws://localhost:8080",
+        std::collections::HashMap::new(),
+    )
+    .expect("TUI binary not found. Run `just build tui` first.");
 
     device
         .create_identity("Alice")
