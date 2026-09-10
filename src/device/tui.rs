@@ -103,7 +103,7 @@ impl PtySession {
 export TERM=xterm-256color
 export VAUCHI_DATA_DIR="{}"
 export VAUCHI_RELAY_URL="{}"
-stty rows 24 cols 80 2>/dev/null || true
+stty rows 40 cols 160 2>/dev/null || true
 exec "{}"
 "#,
             data_dir.display(),
@@ -314,6 +314,22 @@ impl TuiSession {
 
     /// Cycle contextual actions with Tab until the rendered command bar
     /// contains `label`, then activate it with Enter.
+    /// Tab through the focus ring until the field carrying `label` is the
+    /// focused one, so typed text lands in it.
+    async fn focus_field(&self, label: &str) -> E2eResult<()> {
+        for _ in 0..10 {
+            let screen = strip_ansi(&self.read_screen().await?);
+            if screen.contains(&format!("> {label}")) || screen.contains(&format!("[{label}]")) {
+                return Ok(());
+            }
+            self.send_tab().await?;
+        }
+        Err(E2eError::device(format!(
+            "Field '{}' could not be focused after cycling",
+            label
+        )))
+    }
+
     async fn activate_context_action(&self, label: &str) -> E2eResult<()> {
         for _ in 0..10 {
             let screen = self.read_screen().await?;
@@ -485,66 +501,67 @@ impl Device for TuiDevice {
         ))
     }
 
+    /// Link mode: the camera-less TUI leads its picker with Link, whose
+    /// share screen prints the `vauchi://exchange?…` URL as text. The
+    /// harness treats that URL as the "QR" payload a peer completes with.
     async fn generate_qr(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
-
-        // Navigate to the Exchange tab via the navigation overlay.
         self.session.navigate_to("Exchange").await?;
         self.session
             .expect_timeout("Exchange Mode|Pick a way", Duration::from_secs(10))
             .await?;
-
-        // Select Glance (the one-sided QR display mode). It is the hero row.
         self.session.send_char('1').await?;
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // Wait for the QR display screen. The payload is rendered below the QR.
         self.session
-            .expect_timeout("Show this to exchange|QR", Duration::from_secs(10))
+            .expect_timeout("Share Link|Send this link", Duration::from_secs(10))
             .await?;
-
+        tokio::time::sleep(Duration::from_millis(300)).await;
         let screen = self.session.read_screen().await?;
-        // The renderer emits "[QR] <label>" followed by "  <payload>".
-        let mut lines = screen.lines().peekable();
-        while let Some(line) = lines.next() {
-            if line.contains("[QR]")
-                && let Some(next_line) = lines.next()
-            {
-                let payload = next_line.trim().trim_start_matches("  ").to_string();
-                if !payload.is_empty() && payload.len() >= 20 {
-                    return Ok(payload);
+        let plain = strip_ansi(&screen);
+        for token in plain.split_whitespace() {
+            if let Some(start) = token.find("vauchi://exchange?") {
+                let link = token[start..].trim_end_matches(|c: char| {
+                    !c.is_ascii_alphanumeric() && c != '=' && c != '_' && c != '-'
+                });
+                if link.contains("pk=") {
+                    return Ok(link.to_string());
                 }
             }
         }
-
-        Err(E2eError::device("Could not extract QR payload from TUI"))
+        Err(E2eError::device(
+            "Could not extract the share link from the TUI",
+        ))
     }
 
+    /// Paste the peer's link on the Link share screen and accept the
+    /// exchange request core raises for it (camera-less route,
+    /// `problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload`).
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
         self.session.ensure_started().await?;
-
-        // Navigate to Contacts tab and use "Add Contact" to trigger QR scan.
-        self.session.navigate_to("Contacts").await?;
+        self.session.navigate_to("Exchange").await?;
         self.session
-            .expect_timeout("Contacts|Add Contact", Duration::from_secs(10))
+            .expect_timeout("Exchange Mode|Pick a way", Duration::from_secs(10))
             .await?;
-        self.session.activate_context_action("Add Contact").await?;
-
-        // Wait for the QR scan effect prompt and input the peer's data.
+        self.session.send_char('1').await?;
         self.session
-            .expect_timeout("Paste QR data|Core request", Duration::from_secs(10))
+            .expect_timeout("Share Link|Send this link", Duration::from_secs(10))
             .await?;
+        self.session.focus_field("Their link").await?;
         self.session.send_text(qr_data).await?;
-        self.session.send_enter().await?;
-
-        // Wait for the exchange to complete and return to a stable screen.
+        self.session
+            .activate_context_action("Open their link")
+            .await?;
+        self.session
+            .expect_timeout("Exchange Request|Accept Exchange", Duration::from_secs(15))
+            .await?;
+        self.session
+            .activate_context_action("Accept Exchange")
+            .await?;
         self.session
             .expect_timeout(
-                "Contact added|Exchange complete|Contacts",
-                Duration::from_secs(30),
+                "Contact added|Contact Added|Exchange complete|Exchange Complete",
+                Duration::from_secs(60),
             )
             .await?;
-
         Ok(())
     }
 
@@ -852,4 +869,25 @@ mod tests {
             assert!(path.to_str().unwrap().contains("vauchi-tui"));
         }
     }
+}
+
+/// Drop terminal escape sequences so text matching sees what the user sees.
+fn strip_ansi(screen: &str) -> String {
+    let mut out = String::with_capacity(screen.len());
+    let mut chars = screen.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for d in chars.by_ref() {
+                    if d.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    out
 }

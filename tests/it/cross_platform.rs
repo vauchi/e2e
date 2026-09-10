@@ -616,10 +616,14 @@ async fn integration_cli_to_ios_exchange() {
 #[tokio::test]
 #[cfg(feature = "tui")]
 async fn integration_cli_to_tui_exchange() {
+    // Both sides are terminals: the CLI has no Link mode, and a
+    // camera-less TUI can only exchange over Link (share the URL, or
+    // paste the peer's). Alice shares, Bob pastes.
     let mut orch = Orchestrator::new();
     orch.start().await.expect("Failed to start orchestrator");
 
-    orch.add_user("Alice", 1).expect("Failed to add Alice");
+    orch.add_user_with_tui("Alice")
+        .expect("Failed to add Alice with TUI");
     orch.add_user_with_tui("Bob")
         .expect("Failed to add Bob with TUI");
 
