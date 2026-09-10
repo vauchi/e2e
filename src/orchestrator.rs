@@ -705,19 +705,23 @@ impl Orchestrator {
             user.generate_qr().await?
         };
 
-        // Responder pastes the initiator's link, accepts, and waits for its
-        // own completion. While it waits, the initiator's process converges in
-        // parallel (both are live TUIs polling the same relay).
-        {
+        // Drive both sides concurrently: the responder pastes and accepts
+        // while the initiator waits on its share screen. Both waits drain
+        // their PTY on an async tick, so neither terminal stalls on an unread
+        // buffer — the flaw that made a sequential drive hang, since the
+        // initiator must keep polling to deposit its card for the responder.
+        let responder_complete = async {
             let user = responder.read().await;
-            user.complete_exchange(&url).await?;
-        }
-
-        // Confirm the initiator reached completion without re-navigating it.
-        {
+            user.complete_exchange(&url).await
+        };
+        let initiator_complete = async {
             let user = initiator.read().await;
-            user.await_exchange_complete().await?;
-        }
+            user.await_exchange_complete().await
+        };
+        let (responder_result, initiator_result) =
+            tokio::join!(responder_complete, initiator_complete);
+        responder_result?;
+        initiator_result?;
 
         // Establish the first ratchet direction both ways so callers can
         // immediately publish cards or visibility changes.
