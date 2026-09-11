@@ -146,14 +146,12 @@ async fn integration_offline_catchup() {
             .await
             .expect("Failed to list contacts on device 2");
 
-        // Device 2 should ideally have all 3 contacts after catchup.
-        // If this fails, device sync (#38) is not yet working.
-        if contacts_2.len() != 3 {
-            eprintln!(
-                "WARNING: Device A3 has {} contacts instead of 3 — device sync bug #38 not yet fixed",
-                contacts_2.len()
-            );
-        }
+        assert_eq!(
+            contacts_2.len(),
+            3,
+            "device A3 must have all 3 contacts after catchup, got {}",
+            contacts_2.len()
+        );
         // At minimum, primary device must still have its contacts
         let contacts_0 = alice
             .list_contacts_on_device(0)
@@ -240,9 +238,10 @@ async fn integration_card_catchup() {
             .list_contacts_on_device(1)
             .await
             .expect("Failed to list contacts on device 1");
-        if !contacts_1.iter().any(|c| c.name == "Bob") {
-            eprintln!("WARNING: Device A2 missing Bob contact — device sync bug #38");
-        }
+        assert!(
+            contacts_1.iter().any(|c| c.name == "Bob"),
+            "device A2 must have Bob after catchup"
+        );
     }
     // TODO: Once Device trait gains get_contact_card(), verify Bob's
     // email field update reached both devices.
@@ -360,12 +359,12 @@ async fn integration_extended_offline() {
             .await
             .expect("Failed to list contacts on device 1");
 
-        if contacts_1.len() != 2 {
-            eprintln!(
-                "WARNING: Device A2 has {} contacts instead of 2 — device sync bug #38",
-                contacts_1.len()
-            );
-        }
+        assert_eq!(
+            contacts_1.len(),
+            2,
+            "device A2 must have 2 contacts after catchup, got {}",
+            contacts_1.len()
+        );
 
         // Primary device must always have its contacts
         let contacts_0 = alice

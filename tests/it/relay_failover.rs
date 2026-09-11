@@ -53,13 +53,24 @@ async fn integration_relay_failover() {
         .await
         .expect("Bob should have 1 contact");
 
-    // Step 2: Stop primary relay (relay 0)
+    let alice = orch.user("Alice").expect("Alice should exist");
+    let bob = orch.user("Bob").expect("Bob should exist");
+
+    // Stop primary relay (relay 0)
     orch.stop_relay(0).await.expect("Failed to stop relay 0");
 
-    // Give time for detection
-    sleep(Duration::from_secs(1)).await;
+    // Work during the outage: Alice changes her card and attempts a sync,
+    // which must fail gracefully rather than crash.
+    {
+        let alice = alice.read().await;
+        alice
+            .add_field("email", "Email", "alice@failover.com")
+            .await
+            .expect("Failed to add field during outage");
+        let _ = alice.sync_all().await;
+    }
 
-    // Step 5: Restart primary relay
+    // Restart primary relay
     orch.restart_relay(0)
         .await
         .expect("Failed to restart relay 0");
@@ -67,10 +78,27 @@ async fn integration_relay_failover() {
     // Give time for recovery
     sleep(Duration::from_secs(2)).await;
 
-    // Step 6: Verify recovery by syncing
-    orch.sync_all().await.expect("Failed to sync all");
+    // Recovery: the queued update drains and both sides still see each other
+    {
+        let alice = alice.read().await;
+        alice
+            .sync_all()
+            .await
+            .expect("Alice sync after relay recovery");
+    }
+    {
+        let bob = bob.read().await;
+        bob.sync_all().await.expect("Bob sync after relay recovery");
+        let alice_contact = bob
+            .get_contact("Alice")
+            .await
+            .expect("Failed to get Alice on Bob");
+        assert!(
+            alice_contact.is_some(),
+            "Bob must still have Alice after relay failover"
+        );
+    }
 
-    // Verify contacts are still intact
     orch.verify_contact_count("Alice", 1)
         .await
         .expect("Alice should still have 1 contact");
