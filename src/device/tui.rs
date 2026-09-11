@@ -35,20 +35,16 @@
 //! - `?` - Help
 //! - `Esc` - Go back
 
-use std::io::{Read, Write as IoWrite};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use expectrl::{Regex, Session};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
+use super::tui_pty::{PtySession, strip_ansi};
 use super::{Contact, ContactCard, Device, DeviceType, NetworkConfig};
 use crate::error::{E2eError, E2eResult};
-
-/// Default timeout for expect operations.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Find the TUI binary in the workspace.
 fn find_tui_binary() -> E2eResult<PathBuf> {
@@ -81,126 +77,6 @@ fn find_tui_binary() -> E2eResult<PathBuf> {
     Err(E2eError::device(
         "TUI binary not found. Please run `cargo build -p vauchi-tui` first.",
     ))
-}
-
-/// Simple wrapper around expectrl Session for PTY control.
-/// This is stored separately to avoid complex generics.
-struct PtySession {
-    session: Session,
-}
-
-impl PtySession {
-    fn new(
-        tui_binary: &std::path::Path,
-        data_dir: &std::path::Path,
-        relay_url: &str,
-        extra_env: &std::collections::HashMap<String, String>,
-    ) -> E2eResult<Self> {
-        // Create a wrapper script to handle all the terminal setup
-        // This avoids complex shell quoting issues
-        let script_path = data_dir.join("run_tui.sh");
-        // Forward caller-supplied env (e.g. the e2e OHTTP key/route overrides)
-        // into the TUI process so it can reach a locally-spawned relay — the
-        // CLI gets these via its subprocess env; the TUI needs them too.
-        let extra_exports: String = extra_env
-            .iter()
-            .map(|(k, v)| format!("export {k}=\"{v}\"\n"))
-            .collect();
-        let script_content = format!(
-            r#"#!/bin/bash
-export TERM=xterm-256color
-export VAUCHI_DATA_DIR="{}"
-export VAUCHI_RELAY_URL="{}"
-{}stty rows 40 cols 160 2>/dev/null || true
-exec "{}"
-"#,
-            data_dir.display(),
-            relay_url,
-            extra_exports,
-            tui_binary.display()
-        );
-
-        std::fs::write(&script_path, &script_content)
-            .map_err(|e| E2eError::device(format!("Failed to write wrapper script: {}", e)))?;
-
-        // Make the script executable
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&script_path)
-                .map_err(|e| E2eError::device(format!("Failed to get script metadata: {}", e)))?
-                .permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&script_path, perms).map_err(|e| {
-                E2eError::device(format!("Failed to set script permissions: {}", e))
-            })?;
-        }
-
-        // Spawn the wrapper script directly inside an expectrl PTY. This is
-        // portable across Linux and macOS; the older `script -c` invocation
-        // works on Linux but is rejected by macOS `script`.
-        let script_cmd = script_path.to_string_lossy().to_string();
-        let mut session = expectrl::spawn(&script_cmd)
-            .map_err(|e| E2eError::device(format!("Failed to spawn TUI: {}", e)))?;
-
-        // Set default timeout
-        session.set_expect_timeout(Some(DEFAULT_TIMEOUT));
-
-        Ok(Self { session })
-    }
-
-    fn send_key(&mut self, key: u8) -> E2eResult<()> {
-        self.session
-            .write_all(&[key])
-            .map_err(|e| E2eError::device(format!("Failed to send key: {}", e)))?;
-        Ok(())
-    }
-
-    fn send_text(&mut self, text: &str) -> E2eResult<()> {
-        self.session
-            .write_all(text.as_bytes())
-            .map_err(|e| E2eError::device(format!("Failed to send text: {}", e)))?;
-        Ok(())
-    }
-
-    fn expect(&mut self, pattern: &str) -> E2eResult<String> {
-        self.expect_with_timeout(pattern, DEFAULT_TIMEOUT)
-    }
-
-    fn expect_with_timeout(&mut self, pattern: &str, timeout: Duration) -> E2eResult<String> {
-        self.session.set_expect_timeout(Some(timeout));
-
-        // expectrl's Regex takes the pattern directly
-        let regex = Regex(pattern);
-
-        let found = self
-            .session
-            .expect(regex)
-            .map_err(|e| E2eError::device(format!("Pattern '{}' not found: {}", pattern, e)))?;
-
-        let matched = found.get(0).unwrap_or_else(|| found.as_bytes());
-        Ok(String::from_utf8_lossy(matched).to_string())
-    }
-
-    fn read_available(&mut self) -> E2eResult<String> {
-        // Set very short timeout for non-blocking read
-        self.session
-            .set_expect_timeout(Some(Duration::from_millis(100)));
-
-        let mut buffer = vec![0u8; 4096];
-        match self.session.read(&mut buffer) {
-            Ok(n) => {
-                let content = String::from_utf8_lossy(&buffer[..n]).to_string();
-                Ok(content)
-            }
-            Err(_) => Ok(String::new()),
-        }
-    }
-
-    fn quit(&mut self) -> E2eResult<()> {
-        let _ = self.session.write_all(b"q");
-        Ok(())
-    }
 }
 
 /// Thread-safe wrapper for PTY session.
@@ -354,6 +230,15 @@ impl TuiSession {
             }
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
+    }
+
+    /// Repaint and return the whole frame — see `PtySession::redraw_screen`.
+    async fn redraw_screen(&self) -> E2eResult<String> {
+        let mut pty_guard = self.pty.lock().await;
+        let pty = pty_guard
+            .as_mut()
+            .ok_or_else(|| E2eError::device("TUI session not started"))?;
+        pty.redraw_screen()
     }
 
     async fn read_screen(&self) -> E2eResult<String> {
@@ -688,19 +573,30 @@ impl Device for TuiDevice {
     async fn sync(&self) -> E2eResult<()> {
         self.session.ensure_started().await?;
 
-        // Navigate to Sync screen (key 'n' from home)
-        self.session.send_char('n').await?;
-
-        // Press 's' to start sync
-        self.session.send_char('s').await?;
-
-        // Wait for sync to complete
+        // The sync chrome chip sits on every top-level screen; Alt+S is the
+        // terminal's key for it (other shells tap it). Core runs the relay
+        // catch-up and re-renders with the chip's outcome label.
+        self.session.navigate_to("Contacts").await?;
         self.session
-            .expect_timeout("Sync complete|Sync failed", Duration::from_secs(10))
+            .wait_for_visible("Add Contact|Contacts", Duration::from_secs(10))
             .await?;
-
-        // Go back to home
-        self.session.send_escape().await?;
+        self.session.send_alt('s').await?;
+        // Core runs the catch-up synchronously inside the key handler and
+        // re-renders the chip: "Sync" becomes "Synced", "Sync failed", or
+        // "Sync in N s" when core's own throttle declines a repeat within a
+        // minute (core !1591) — that last one is core's decision, not a
+        // harness failure. ratatui redraws only the changed cells, so what
+        // reaches the PTY is the appended "ed", " failed" or " in N s" —
+        // never the whole label.
+        let outcome = self
+            .session
+            .wait_for_visible("failed| in |ed", Duration::from_secs(10))
+            .await?;
+        if outcome == "failed" {
+            return Err(E2eError::device(
+                "TUI sync failed (sync chip reports failure)",
+            ));
+        }
 
         Ok(())
     }
@@ -708,28 +604,30 @@ impl Device for TuiDevice {
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         self.session.ensure_started().await?;
 
-        self.session.send_char('c').await?;
+        self.session.navigate_to("Contacts").await?;
+        self.session
+            .wait_for_visible("Add Contact|Contacts", Duration::from_secs(10))
+            .await?;
+        // The list is already painted by now, so a plain read sees nothing:
+        // repaint the frame and parse the list rows ("• Name" / "> Name").
+        let frame = strip_ansi(&self.session.redraw_screen().await?);
 
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        let screen = self.session.read_screen().await?;
-
-        let mut contacts = Vec::new();
-        for line in screen.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with("─") || trimmed.contains("Contacts") {
-                continue;
-            }
-            if !trimmed.is_empty() && !trimmed.starts_with('[') {
-                contacts.push(Contact {
-                    name: trimmed.to_string(),
-                    id: None,
-                    verified: false,
-                });
-            }
-        }
-
-        self.session.send_escape().await?;
+        // Cursor moves become spaces in `strip_ansi`, so rows are not lines;
+        // the box border ("│") is what bounds a cell. Two repaints may land
+        // in one read, hence the dedup.
+        let mut seen = std::collections::HashSet::new();
+        let contacts = frame
+            .split('│')
+            .map(str::trim)
+            .filter_map(|cell| cell.strip_prefix("• ").or_else(|| cell.strip_prefix("> ")))
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty() && seen.insert(name.clone()))
+            .map(|name| Contact {
+                name,
+                id: None,
+                verified: false,
+            })
+            .collect();
 
         Ok(contacts)
     }
@@ -895,6 +793,9 @@ impl Device for TuiDevice {
 }
 
 // INLINE_TEST_REQUIRED: tests access private TuiDevice terminal parsing and screen detection
+
+// INLINE_TEST_REQUIRED: constructs TuiDevice through the private binary
+// locator, which the integration tests never reach directly.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -926,35 +827,4 @@ mod tests {
             assert!(path.to_str().unwrap().contains("vauchi-tui"));
         }
     }
-}
-
-/// Drop terminal escape sequences so text matching sees what the user sees.
-fn strip_ansi(screen: &str) -> String {
-    let mut out = String::with_capacity(screen.len());
-    let mut chars = screen.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            if chars.peek() == Some(&'[') {
-                chars.next();
-                let mut terminator = '\0';
-                for d in chars.by_ref() {
-                    if d.is_ascii_alphabetic() {
-                        terminator = d;
-                        break;
-                    }
-                }
-                // Cursor-move escapes ('H'/'f' absolute, 'A'-'D' relative)
-                // separate two on-screen rows or cells. Dropping them
-                // entirely fuses adjacent text (e.g. a URL and the next
-                // label), which then reads as one word. Emit a space so
-                // word-boundary matching still works.
-                if matches!(terminator, 'H' | 'f' | 'A' | 'B' | 'C' | 'D') {
-                    out.push(' ');
-                }
-            }
-            continue;
-        }
-        out.push(c);
-    }
-    out
 }

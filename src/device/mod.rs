@@ -13,6 +13,8 @@ mod cli;
 mod maestro;
 #[cfg(feature = "tui")]
 mod tui;
+#[cfg(feature = "tui")]
+mod tui_pty;
 
 pub use cli::CliDevice;
 pub use maestro::{MaestroDevice, MaestroPlatform};

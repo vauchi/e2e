@@ -488,12 +488,11 @@ test:release-rg10:
 # (src/device/tui.rs) through `--features tui`, which no other lane compiles
 # or runs. Without this job the harness's TUI tests go dark silently: that is
 # exactly what happened for weeks before tui !554 / e2e !187 repaired the
-# driver (problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload).
-# Only test_tui_create_identity is selected today. Add
-# integration_tui_to_tui_link_exchange to the filter once the CLI/TUI pins
-# move to a release carrying the camera-less pasted-peer-link route (core
-# !1592, in 0.67.0): the harness drives it as an asymmetric Link ceremony
-# (Alice shares, Bob pastes) — see src/orchestrator.rs::exchange_link.
+# driver (problems/done/2026-09-09-tui-cannot-ingest-peer-exchange-payload).
+# Selected: test_tui_create_identity and integration_tui_to_tui_link_exchange
+# — the camera-less pasted-peer-link route (core !1592, in 0.67.0) driven as
+# an asymmetric Link ceremony (Alice shares, Bob pastes), see
+# src/orchestrator.rs::exchange_link.
 test:tui-journey:
   extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
@@ -524,7 +523,7 @@ test:tui-journey:
       test -x ../tui/target/release/vauchi-tui
 
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
-        -E 'test(/cross_platform::test_tui_create_identity/)' \
+        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::integration_tui_to_tui_link_exchange/)' \
         2>&1 | tee tui-journey-results.txt
   artifacts:
     when: always
