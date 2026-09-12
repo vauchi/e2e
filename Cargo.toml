@@ -36,7 +36,6 @@ vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.67.1", ver
 vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.67.1", version = "=0.67.1", features = ["network-native-tls"] }
 # Force vauchi-relay's transitive protocol dependency to the same Core tag
 # so the relay and CLI agree on the wire format.
-vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.67.1", version = "=0.67.1" }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "time", "sync"] }
