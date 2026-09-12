@@ -518,10 +518,15 @@ test:tui-journey:
       # 2026-09-12: tui build:release lost its rlib, this job lost an
       # object file, minutes apart). `find_tui_binary()` honours
       # VAUCHI_TUI_BIN before any sibling guess.
-      TUI_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
-      rm -rf "$TUI_DIR"
+      JOB_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
+      TUI_DIR="$JOB_DIR/tui"
+      rm -rf "$JOB_DIR"
       git clone --depth=1 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
+      # tui embeds themes/generated/tokens_ansi.json from a sibling checkout
+      # (tui/src/theme.rs), so the sibling has to exist beside the clone.
+      git clone --depth=1 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/themes.git" "$JOB_DIR/themes"
       cargo build --release --manifest-path "$TUI_DIR/Cargo.toml"
       export VAUCHI_TUI_BIN="$TUI_DIR/target/release/vauchi-tui"
       test -x "$VAUCHI_TUI_BIN"
