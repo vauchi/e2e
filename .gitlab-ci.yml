@@ -527,6 +527,11 @@ test:tui-journey:
       # (tui/src/theme.rs), so the sibling has to exist beside the clone.
       git clone --depth=1 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/themes.git" "$JOB_DIR/themes"
+      # themes/generated/ is not committed: the generator writes it beside
+      # itself (same step as the shared .clone-themes recipe), and a missing
+      # file must fail here, not as a rustc include error later.
+      python3 "$JOB_DIR/themes/scripts/generate.py"
+      test -f "$JOB_DIR/themes/generated/tokens_ansi.json"
       cargo build --release --manifest-path "$TUI_DIR/Cargo.toml"
       export VAUCHI_TUI_BIN="$TUI_DIR/target/release/vauchi-tui"
       test -x "$VAUCHI_TUI_BIN"
