@@ -48,6 +48,18 @@ use crate::error::{E2eError, E2eResult};
 
 /// Find the TUI binary in the workspace.
 fn find_tui_binary() -> E2eResult<PathBuf> {
+    // CI builds the TUI in a job-private directory and names the binary
+    // here; the sibling-checkout guesses below are the developer layout.
+    if let Ok(explicit) = std::env::var("VAUCHI_TUI_BIN") {
+        let path = PathBuf::from(&explicit);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(E2eError::device(format!(
+            "VAUCHI_TUI_BIN is set to '{explicit}' but no file exists there"
+        )));
+    }
+
     let release_path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tui/target/release/vauchi-tui");
     if release_path.exists() {
@@ -799,6 +811,36 @@ impl Device for TuiDevice {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // @scenario: tui_harness :: CI names the TUI binary explicitly
+    /// On a shared shell runner `../tui` is the tui project's own job
+    /// workspace, so the sibling-checkout guess must yield to an explicit
+    /// path (allyson, 2026-09-12: two jobs wiped each other's build tree).
+    #[test]
+    fn an_explicit_tui_binary_path_wins_over_the_sibling_guess() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join("vauchi-tui");
+        std::fs::write(&bin, b"#!/bin/sh\n").unwrap();
+        // SAFETY: test-local env, single-threaded access to this variable.
+        unsafe { std::env::set_var("VAUCHI_TUI_BIN", &bin) };
+        let found = find_tui_binary();
+        unsafe { std::env::remove_var("VAUCHI_TUI_BIN") };
+        assert_eq!(found.unwrap(), bin);
+    }
+
+    // @internal
+    #[test]
+    fn a_dangling_explicit_tui_binary_path_is_an_error_not_a_fallback() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nope");
+        unsafe { std::env::set_var("VAUCHI_TUI_BIN", &missing) };
+        let found = find_tui_binary();
+        unsafe { std::env::remove_var("VAUCHI_TUI_BIN") };
+        assert!(
+            found.is_err(),
+            "a wrong explicit path must not fall back to a sibling guess"
+        );
+    }
 
     #[test]
     fn test_tui_device_type() {

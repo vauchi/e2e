@@ -511,20 +511,28 @@ test:tui-journey:
   allow_failure: false
   script:
     - |
-      # find_tui_binary() (src/device/tui.rs) looks for the binary at
-      # ../tui/target/{release,debug}/vauchi-tui relative to this crate,
-      # so the clone must land as a sibling of the e2e checkout.
-      # Self-hosted runners keep the workspace between jobs, so a previous
-      # run's sibling clone must go before this one lands.
-      rm -rf ../tui
+      # Build the TUI in a job-private directory and hand the harness the
+      # binary path. On a shell runner the tui project's own job workspace
+      # is `../tui` of this checkout, so a sibling clone there deleted a
+      # concurrent tui job's build tree and vice versa (allyson,
+      # 2026-09-12: tui build:release lost its rlib, this job lost an
+      # object file, minutes apart). `find_tui_binary()` honours
+      # VAUCHI_TUI_BIN before any sibling guess.
+      TUI_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
+      rm -rf "$TUI_DIR"
       git clone --depth=1 --branch main \
-        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" ../tui
-      cargo build --release --manifest-path ../tui/Cargo.toml
-      test -x ../tui/target/release/vauchi-tui
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
+      cargo build --release --manifest-path "$TUI_DIR/Cargo.toml"
+      export VAUCHI_TUI_BIN="$TUI_DIR/target/release/vauchi-tui"
+      test -x "$VAUCHI_TUI_BIN"
 
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
         -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::integration_tui_to_tui_link_exchange/)' \
         2>&1 | tee tui-journey-results.txt
+  after_script:
+    # Persistent shell runners keep the workspace between jobs; the
+    # job-private clone would otherwise accumulate one tree per job id.
+    - rm -rf "${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
   artifacts:
     when: always
     reports:
