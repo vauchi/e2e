@@ -3105,7 +3105,6 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.67.1",
  "vauchi-relay",
 ]
 
