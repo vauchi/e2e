@@ -5,13 +5,13 @@
 const CI_CONFIG: &str = include_str!("../.gitlab-ci.yml");
 const RG3_TEST: &str =
     "orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay";
-const RG4_RG5_TEST_FILTER: &str = "multi_device_sync::integration_six_device_(exchange_and_update_convergence|single_exchange_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|replacement_and_revocation_preserve_active_convergence|lost_primary_continuity_certification)";
+const RG4_RG5_TEST_FILTER: &str = "multi_device_sync::integration_six_device_(exchange_and_update_convergence|single_exchange_convergence|offline_catchup_converges_exact_values|faulted_relay_delivery_converges_exact_values|duplicate_ohttp_delivery_converges_exact_values|concurrent_field_edits_converge|bounded_clock_skew_converges_to_later_update|replacement_and_revocation_preserve_active_convergence|lost_primary_continuity_certification|duress_alert_certification)";
 const OHTTP_E2E_FAULT_BUILD: &str = "cargo build --release --features e2e-faults --manifest-path \"$BUILD_TMPDIR/ohttp-relay/Cargo.toml\"";
 const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=\"e2e-faults-v1\"";
 const RG6_TEST: &str =
     "ohttp_integration::integration_ohttp_relay_observations_exclude_update_content";
 const RG8_TEST: &str = "ohttp_fail_closed_matrix";
-const RG10_TEST: &str = "multi_device_sync::integration_six_device_(personal_note_tombstone_converges_owner_only|owner_private_state_converges|visibility_override_removal_converges)";
+const RG10_TEST: &str = "multi_device_sync::integration_six_device_(personal_note_tombstone_converges_owner_only|owner_private_state_converges|visibility_override_removal_converges|contact_override_clear_converges)";
 
 fn top_level_job(name: &str) -> &str {
     let marker = format!("{name}:\n");
