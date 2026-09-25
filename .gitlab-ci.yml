@@ -474,7 +474,7 @@ test:release-rg10:
       test -x "$E2E_BIN_DIR/vauchi"
       test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
       cargo nextest run --profile ci --run-ignored default -j 1 \
-        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_(personal_note_tombstone_converges_owner_only|owner_private_state_converges|visibility_override_removal_converges)/)' \
+        -E 'binary(=it) & test(/multi_device_sync::integration_six_device_(personal_note_tombstone_converges_owner_only|owner_private_state_converges|visibility_override_removal_converges|contact_override_clear_converges)/)' \
         2>&1 | tee rg10-release-results.txt
   artifacts:
     when: always

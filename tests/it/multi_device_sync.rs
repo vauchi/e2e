@@ -2214,10 +2214,9 @@ async fn integration_six_device_owner_private_state_converges() {
 // @scenario: release_privacy_multidevice_certification.feature:Complete owner-private state converges across linked devices
 /// A per-contact visibility override set on A1, flipped on A2, and flipped
 /// back on A3 converges on every owner device and on Bob's stored card. The
-/// cli's `contacts hide|unhide` writes an explicit override each way — the
-/// override *tombstone* (`remove_contact_visibility_override`) is not
-/// reachable through the pinned cli, so this covers the override lifecycle
-/// the cli can express.
+/// cli's `contacts hide|unhide` writes an explicit override each way; the
+/// override *removal* is covered by
+/// `integration_six_device_contact_override_clear_converges`.
 // @internal
 #[tokio::test]
 async fn integration_six_device_visibility_override_removal_converges() {
@@ -2291,6 +2290,151 @@ async fn integration_six_device_visibility_override_removal_converges() {
     );
 
     orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+// @scenario: release_privacy_multidevice_certification.feature:Complete owner-private state converges across linked devices
+/// Release certification (RG-10): a new field starts hidden from Bob
+/// (ADR-054 default-closed); an override granting it on A1 reaches A2, A3
+/// and every Bob device; `contacts clear-override` on A2 syncs the removal
+/// (`VisibilityOverrideRemoved`), so every owner device drops the override
+/// and every Bob device loses the field again.
+///
+/// Owner devices are compared on the override's presence, not on the
+/// cli's computed visibility for inherited fields: `contacts visibility`
+/// reports a new field as visible while Core does not send it.
+// @internal
+#[tokio::test]
+async fn integration_six_device_contact_override_clear_converges() {
+    const FIELD: &str = "Direct";
+    const VALUE: &str = "alice-direct@example.com";
+
+    let mut orch = Orchestrator::with_config(owner_private_state_config());
+    orch.start().await.expect("Failed to start orchestrator");
+    let (alice, bob) = exchanged_six_device_pair(&mut orch).await;
+    let bob_id = contact_id_on_device(&alice, 0, "Bob").await;
+
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1 should exist").read().await;
+        a1.add_field("email", FIELD, VALUE)
+            .await
+            .expect("A1 should add the field");
+    }
+    assert!(
+        sync_until(&orch, 6, || owner_devices_have_override(
+            &alice, &bob_id, FIELD, None
+        ))
+        .await,
+        "a freshly added field must carry no override on any owner device: {:?}",
+        owner_visibilities(&alice, &bob_id, FIELD).await
+    );
+    assert!(
+        sync_until(&orch, 6, || bob_holds_field(&bob, FIELD, VALUE, false)).await,
+        "a new field must stay hidden from every Bob device until granted: {:?}",
+        bob_views(&bob).await
+    );
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(0)
+            .expect("A1 should exist")
+            .read()
+            .await
+            .unhide_field_to_contact(&bob_id, FIELD)
+            .await
+            .expect("A1 should grant the field to Bob");
+    }
+    assert!(
+        sync_until(&orch, 6, || owner_devices_have_override(
+            &alice,
+            &bob_id,
+            FIELD,
+            Some(true)
+        ))
+        .await,
+        "the override set on A1 must reach every owner device: {:?}",
+        owner_visibilities(&alice, &bob_id, FIELD).await
+    );
+    assert!(
+        sync_until(&orch, 6, || bob_holds_field(&bob, FIELD, VALUE, true)).await,
+        "every Bob device must receive the granted field: {:?}",
+        bob_views(&bob).await
+    );
+
+    {
+        let alice = alice.read().await;
+        alice
+            .device(1)
+            .expect("A2 should exist")
+            .read()
+            .await
+            .clear_contact_override(&bob_id, FIELD)
+            .await
+            .expect("A2 should clear the override");
+    }
+    assert!(
+        sync_until(&orch, 6, || owner_devices_have_override(
+            &alice, &bob_id, FIELD, None
+        ))
+        .await,
+        "clearing on A2 must remove the override from every owner device: {:?}",
+        owner_visibilities(&alice, &bob_id, FIELD).await
+    );
+    assert!(
+        sync_until(&orch, 6, || bob_holds_field(&bob, FIELD, VALUE, false)).await,
+        "once the override is cleared, every Bob device must lose the field again: {:?}",
+        bob_views(&bob).await
+    );
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}
+
+async fn owner_visibilities(
+    alice: &SharedUser,
+    contact: &str,
+    field: &str,
+) -> Vec<E2eResult<ContactFieldVisibility>> {
+    let alice = alice.read().await;
+    let mut reports = Vec::new();
+    for device_index in 0..3 {
+        let device = alice
+            .device(device_index)
+            .expect("Alice device should exist")
+            .read()
+            .await;
+        reports.push(device.contact_field_visibility(contact, field).await);
+    }
+    reports
+}
+
+/// `Some(visible)`: every owner device holds an override with that
+/// visibility. `None`: no owner device holds an override.
+async fn owner_devices_have_override(
+    alice: &SharedUser,
+    contact: &str,
+    field: &str,
+    expected: Option<bool>,
+) -> bool {
+    owner_visibilities(alice, contact, field)
+        .await
+        .iter()
+        .all(|report| match (report, expected) {
+            (Ok(state), Some(visible)) => {
+                state.source == VisibilitySource::Override && state.visible == visible
+            }
+            (Ok(state), None) => state.source == VisibilitySource::Inherited,
+            (Err(_), _) => false,
+        })
+}
+
+async fn bob_holds_field(bob: &SharedUser, label: &str, value: &str, expected: bool) -> bool {
+    bob_views(bob).await.iter().all(|view| {
+        view.alice_fields
+            .iter()
+            .any(|(_, field_label, field_value)| field_label == label && field_value == value)
+            == expected
+    })
 }
 
 // @scenario: release_privacy_multidevice_certification.feature:Revocation and replacement preserve continuity

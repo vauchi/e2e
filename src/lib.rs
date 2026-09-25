@@ -73,7 +73,8 @@ pub mod yaml;
 pub mod prelude {
     //! Re-exports commonly used types for convenience.
     pub use crate::device::{
-        CliDevice, Contact, ContactCard, Device, DeviceType, LabelState, TagState,
+        CliDevice, Contact, ContactCard, ContactFieldVisibility, Device, DeviceType, LabelState,
+        TagState, VisibilitySource,
     };
     pub use crate::error::{E2eError, E2eResult};
     pub use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
