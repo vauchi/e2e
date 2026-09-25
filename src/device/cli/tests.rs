@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tokio::process::Command;
 
 use super::{CliDevice, configure_command_environment, owner_state, rate_limit_retry_after};
-use crate::device::{LabelState, TagState};
+use crate::device::{ContactFieldVisibility, LabelState, TagState, VisibilitySource};
 
 // @internal
 #[test]
@@ -515,4 +515,68 @@ fn tags_parse_empty_listing() {
     let output = "\u{2139} No tags defined. Create one with 'vauchi tags create <name>'\n";
 
     assert_eq!(owner_state::parse_tags(output), Vec::<TagState>::new());
+}
+
+// Output shape of `vauchi contacts visibility <contact>` (cli
+// src/commands/contacts/show_cmd.rs, show_visibility).
+const CONTACT_VISIBILITY_OUTPUT: &str = "\n\
+    Visibility rules for Bob:\n\
+    \n  \u{2713} visible Direct [override]: alice-direct@example.com\n  \
+    \u{2717} hidden Home [inherited]: +41 00 000 00 00\n  \
+    \u{2713} visible (restricted) Work [inherited]: alice@work.example\n  \
+    \u{2717} hidden Private [override]: secret\n";
+
+// @internal
+#[test]
+fn contact_visibility_reports_an_explicit_override() {
+    assert_eq!(
+        owner_state::parse_contact_field_visibility(CONTACT_VISIBILITY_OUTPUT, "Direct")
+            .expect("Direct is listed"),
+        ContactFieldVisibility {
+            visible: true,
+            source: VisibilitySource::Override
+        }
+    );
+    assert_eq!(
+        owner_state::parse_contact_field_visibility(CONTACT_VISIBILITY_OUTPUT, "Private")
+            .expect("Private is listed"),
+        ContactFieldVisibility {
+            visible: false,
+            source: VisibilitySource::Override
+        }
+    );
+}
+
+// @internal
+#[test]
+fn contact_visibility_reports_inherited_rules_including_restricted() {
+    assert_eq!(
+        owner_state::parse_contact_field_visibility(CONTACT_VISIBILITY_OUTPUT, "Home")
+            .expect("Home is listed"),
+        ContactFieldVisibility {
+            visible: false,
+            source: VisibilitySource::Inherited
+        }
+    );
+    assert_eq!(
+        owner_state::parse_contact_field_visibility(CONTACT_VISIBILITY_OUTPUT, "Work")
+            .expect("Work is listed"),
+        ContactFieldVisibility {
+            visible: true,
+            source: VisibilitySource::Inherited
+        }
+    );
+}
+
+// @internal
+#[test]
+fn contact_visibility_fails_closed_on_a_missing_field_or_unknown_status() {
+    let missing = owner_state::parse_contact_field_visibility(CONTACT_VISIBILITY_OUTPUT, "Direc")
+        .expect_err("a label that is only a prefix must not match");
+    assert!(missing.to_string().contains("Direc"), "{missing}");
+
+    let unknown = "  ? unknown Direct [inherited]: x\n";
+    let error = owner_state::parse_contact_field_visibility(unknown, "Direct")
+        .expect_err("an unknown status is not a visibility");
+    assert!(error.to_string().contains("unknown"), "{error}");
 }
