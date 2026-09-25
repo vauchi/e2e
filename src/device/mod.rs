@@ -127,6 +127,23 @@ pub struct TagState {
     pub members: Vec<String>,
 }
 
+/// Where a field's visibility toward one contact comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VisibilitySource {
+    /// A per-contact override set on this contact.
+    Override,
+    /// The field's group/label rule; no override exists.
+    Inherited,
+}
+
+/// One own-card field's visibility toward one contact, as the owner's
+/// device reports it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContactFieldVisibility {
+    pub visible: bool,
+    pub source: VisibilitySource,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCard {
     /// Display name.
@@ -412,6 +429,26 @@ pub trait Device: Send + Sync {
 
     /// Show a field to a specific contact.
     async fn unhide_field_to_contact(&self, _contact: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact visibility not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Remove a per-contact visibility override, so the field falls back to
+    /// its group/label rule.
+    async fn clear_contact_override(&self, _contact: &str, _field: &str) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact visibility not supported on this device type".to_string(),
+        ))
+    }
+
+    /// One own-card field's visibility toward a contact, and whether it
+    /// comes from an override or the inherited rule.
+    async fn contact_field_visibility(
+        &self,
+        _contact: &str,
+        _field: &str,
+    ) -> E2eResult<ContactFieldVisibility> {
         Err(crate::error::E2eError::DeviceNotSupported(
             "Contact visibility not supported on this device type".to_string(),
         ))

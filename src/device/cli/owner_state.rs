@@ -6,7 +6,7 @@
 //! `tags list`). Members and fields come back sorted so two devices'
 //! readouts compare byte-for-byte.
 
-use crate::device::{LabelState, TagState};
+use crate::device::{ContactFieldVisibility, LabelState, TagState, VisibilitySource};
 use crate::error::{E2eError, E2eResult};
 
 const OVERRIDES_HEADER: &str = "Presentation overrides:";
@@ -113,4 +113,43 @@ fn parse_byte_count(value: &str) -> E2eResult<usize> {
         .ok_or_else(|| {
             E2eError::parse_output(format!("unexpected avatar override size: {value:?}"))
         })
+}
+
+/// Parse one field's row from `vauchi contacts visibility <contact>`:
+/// `<status> <label> [override|inherited]: <value>`, where the status is
+/// `✓ visible`, `✗ hidden`, or either with ` (restricted)`.
+pub(super) fn parse_contact_field_visibility(
+    output: &str,
+    field: &str,
+) -> E2eResult<ContactFieldVisibility> {
+    for line in output.lines() {
+        for (marker, source) in [
+            (" [override]:", VisibilitySource::Override),
+            (" [inherited]:", VisibilitySource::Inherited),
+        ] {
+            let Some(end) = line.find(marker) else {
+                continue;
+            };
+            let Some(status) = line[..end].strip_suffix(field) else {
+                continue;
+            };
+            let Some(status) = status.strip_suffix(' ') else {
+                continue;
+            };
+            let status = status.trim();
+            let visible = if status.starts_with('\u{2713}') {
+                true
+            } else if status.starts_with('\u{2717}') {
+                false
+            } else {
+                return Err(E2eError::parse_output(format!(
+                    "field {field:?} has visibility status {status:?}, not visible or hidden"
+                )));
+            };
+            return Ok(ContactFieldVisibility { visible, source });
+        }
+    }
+    Err(E2eError::parse_output(format!(
+        "no visibility row for field {field:?} in: {output:?}"
+    )))
 }

@@ -16,7 +16,10 @@ use tempfile::TempDir;
 use tokio::process::Command;
 use tracing::{debug, trace};
 
-use super::{CardField, Contact, ContactCard, Device, DeviceType, LabelState, TagState};
+use super::{
+    CardField, Contact, ContactCard, ContactFieldVisibility, Device, DeviceType, LabelState,
+    TagState,
+};
 use crate::error::{E2eError, E2eResult};
 
 const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
@@ -1005,6 +1008,23 @@ impl Device for CliDevice {
         self.run_command_success(&["contacts", "unhide", contact, field])
             .await?;
         Ok(())
+    }
+
+    async fn clear_contact_override(&self, contact: &str, field: &str) -> E2eResult<()> {
+        self.run_command_success(&["contacts", "clear-override", contact, field])
+            .await?;
+        Ok(())
+    }
+
+    async fn contact_field_visibility(
+        &self,
+        contact: &str,
+        field: &str,
+    ) -> E2eResult<ContactFieldVisibility> {
+        let output = self
+            .run_command_success(&["contacts", "visibility", contact])
+            .await?;
+        owner_state::parse_contact_field_visibility(&output, field)
     }
 
     async fn verify_contact(&self, contact: &str) -> E2eResult<()> {
