@@ -56,7 +56,7 @@ fn main() {
         .add_own_field(ContactField::new(
             FieldType::Email,
             "Email",
-            "test@vauchi.app",
+            "me@example.com",
             0,
         ))
         .expect("Failed to add own field");
@@ -64,7 +64,7 @@ fn main() {
         .add_own_field(ContactField::new(
             FieldType::Phone,
             "Mobile",
-            "+1-555-0000",
+            "+1-202-555-0100",
             0,
         ))
         .expect("Failed to add own field");
@@ -135,10 +135,10 @@ fn main() {
         };
         // Generate a phone number in valid format (digits, dashes, plus only)
         let area: u16 = (200 + (i * 3) % 800) as u16;
-        let num1: u16 = (100 + (i * 7) % 900) as u16;
-        let num2: u16 = (1000 + (i * 13) % 9000) as u16;
-        let phone = format!("+1-{}-{}-{}", area, num1, num2);
-        let email: String = FreeEmail().fake_with_rng(&mut rng);
+        // 555-0100..0199 is the range reserved for fiction, so no real
+        // subscriber appears in demos or store screenshots.
+        let phone = format!("+1-{}-555-01{:02}", area, i % 100);
+        let email: String = SafeEmail().fake_with_rng(&mut rng);
 
         let mut card = ContactCard::new(&name);
         card.add_field(ContactField::new(FieldType::Phone, "Mobile", &phone, 0))
@@ -161,14 +161,12 @@ fn main() {
 
         // Website for ~20%
         if i % 5 == 0 {
-            let domain: String = DomainSuffix().fake_with_rng(&mut rng);
             card.add_field(ContactField::new(
                 FieldType::Website,
                 "Website",
                 &format!(
-                    "https://{}.{}",
-                    name.to_lowercase().replace(' ', ""),
-                    domain
+                    "https://{}.example.com",
+                    name.to_lowercase().replace(' ', "")
                 ),
                 0,
             ))
