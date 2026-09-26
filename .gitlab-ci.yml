@@ -684,7 +684,7 @@ check:test-lane-coverage:
     - sh scripts/check-test-timeouts.sh
     # The release-lane guard reads this file, so an MR that edits a lane
     # filter must meet it here; test:integration only runs it after merge
-    # (backlog/2026-09-25-release-lane-guard-drifts-from-ci-filters).
+    # (problems/done/2026-09-25-release-lane-guard-drifts-from-ci-filters).
     - cargo nextest run --profile ci -E 'binary(release_lanes)'
 
 # GitLab security templates configuration
