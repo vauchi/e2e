@@ -169,3 +169,66 @@ fn native_binary_producer_and_consumers_share_linux_runner() {
         );
     }
 }
+
+const FIXTURE_SOURCE: &str =
+    "async fn integration_six_device_alpha() {}\nasync fn integration_six_device_beta() {}\n";
+
+fn fixture_lane(alternatives: &str) -> String {
+    format!(
+        "  script:\n    - cargo nextest run -E 'binary(=it) & test(/multi_device_sync::integration_six_device_({alternatives})/)'\n"
+    )
+}
+
+// @internal
+#[test]
+fn lane_gaps_accept_a_lane_that_selects_every_required_test() {
+    let job = fixture_lane("alpha|beta");
+    assert_eq!(
+        six_device_lane_gaps(&job, &["alpha", "beta"], FIXTURE_SOURCE),
+        Vec::<String>::new()
+    );
+}
+
+// @internal
+#[test]
+fn lane_gaps_allow_a_lane_to_add_tests() {
+    let job = fixture_lane("alpha|beta|gamma");
+    assert_eq!(
+        six_device_lane_gaps(&job, &["alpha", "beta"], FIXTURE_SOURCE),
+        Vec::<String>::new()
+    );
+}
+
+// @internal
+#[test]
+fn lane_gaps_report_a_required_test_the_lane_dropped() {
+    let job = fixture_lane("alpha");
+    assert_eq!(
+        six_device_lane_gaps(&job, &["alpha", "beta"], FIXTURE_SOURCE),
+        vec!["beta: not selected by the lane's filter".to_string()]
+    );
+}
+
+// @internal
+#[test]
+fn lane_gaps_report_a_required_test_that_no_longer_exists() {
+    let job = fixture_lane("alpha|beta");
+    let renamed = "async fn integration_six_device_alpha() {}\nasync fn integration_six_device_beta_v2() {}\n";
+    assert_eq!(
+        six_device_lane_gaps(&job, &["alpha", "beta"], renamed),
+        vec![
+            "beta: no `fn integration_six_device_beta()` in tests/it/multi_device_sync.rs"
+                .to_string()
+        ]
+    );
+}
+
+// @internal
+#[test]
+fn lane_gaps_report_a_lane_without_a_six_device_filter() {
+    let job = "  script:\n    - cargo nextest run -E 'binary(=it)'\n";
+    assert_eq!(
+        six_device_lane_gaps(job, &["alpha"], FIXTURE_SOURCE),
+        vec!["no `multi_device_sync::integration_six_device_(...)` filter in the lane".to_string()]
+    );
+}
