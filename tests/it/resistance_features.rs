@@ -497,11 +497,15 @@ fn test_duress_full_workflow() {
         assert_ne!(contact.id(), &charlie_id);
     }
 
-    // Verify: hidden contacts not in list
+    // Verify: the real hidden contacts are not revealed through the hidden
+    // list either — decoy mode has no hidden contacts (ADR-032; #386 closed
+    // this read, which previously returned Bob and Charlie under duress).
     let hidden = alice.list_hidden_contacts().unwrap();
-    let hidden_ids: Vec<&str> = hidden.iter().map(|c| c.id()).collect();
-    assert!(hidden_ids.contains(&bob_id.as_str()));
-    assert!(hidden_ids.contains(&charlie_id.as_str()));
+    assert!(
+        hidden.is_empty(),
+        "duress must not reveal real hidden contacts, got {:?}",
+        hidden.iter().map(|c| c.id()).collect::<Vec<_>>()
+    );
 
     // ADR-032 + ADR-068: a trusted contact WITHOUT an established ratchet
     // still receives the covert alert — the send path seals a genesis
