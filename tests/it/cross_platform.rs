@@ -234,27 +234,9 @@ async fn integration_device_link_then_exchange_and_sync() {
 async fn test_ios_simulator_exchange() {
     use vauchi_e2e_tests::device::MaestroDevice;
 
-    // Auto-detect a booted iOS simulator UDID. Maestro's `--device` flag
-    // accepts either a device name or a UDID; the UDID is stable when
-    // multiple simulators share the same name.
-    let udid = std::process::Command::new("xcrun")
-        .args(["simctl", "list", "devices", "booted"])
-        .stdout(std::process::Stdio::piped())
-        .output()
-        .ok()
-        .and_then(|o| {
-            let out = String::from_utf8_lossy(&o.stdout);
-            out.lines().find_map(|line| {
-                // Lines look like: "    iPhone 17 Pro (79993A0D-...) (Booted)"
-                line.split('(')
-                    .nth(1)
-                    .and_then(|s| s.split(')').next())
-                    .filter(|s| s.contains('-'))
-                    .map(|s| s.to_string())
-            })
-        });
-
-    let udid = match udid {
+    // Maestro's `--device` flag accepts a name or a UDID; the UDID is
+    // stable when several simulators share a name.
+    let udid = match detect_booted_ios_simulator() {
         Some(u) => u,
         None => return,
     };
@@ -270,8 +252,12 @@ async fn test_ios_simulator_exchange() {
         .expect("iOS simulator create_identity flow should succeed");
 }
 
-/// Detect a booted iOS simulator UDID, if any.
+/// Detect a booted iOS simulator UDID, if any. None under
+/// VAUCHI_E2E_NO_DEVICES, before `xcrun` runs (#396).
 fn detect_booted_ios_simulator() -> Option<String> {
+    if !vauchi_e2e_tests::device::devices_allowed() {
+        return None;
+    }
     std::process::Command::new("xcrun")
         .args(["simctl", "list", "devices", "booted"])
         .stdout(std::process::Stdio::piped())
@@ -280,6 +266,7 @@ fn detect_booted_ios_simulator() -> Option<String> {
         .and_then(|o| {
             let out = String::from_utf8_lossy(&o.stdout);
             out.lines().find_map(|line| {
+                // Lines look like: "    iPhone 17 Pro (79993A0D-...) (Booted)"
                 line.split('(')
                     .nth(1)
                     .and_then(|s| s.split(')').next())
@@ -298,6 +285,10 @@ fn detect_android_device_with_filter<F>(filter: F) -> Option<String>
 where
     F: Fn(&str) -> bool,
 {
+    // Before `adb` runs: under VAUCHI_E2E_NO_DEVICES no phone is touched (#396).
+    if !vauchi_e2e_tests::device::devices_allowed() {
+        return None;
+    }
     let adb_output = std::process::Command::new("adb")
         .args(["devices", "-l"])
         .stdout(std::process::Stdio::piped())

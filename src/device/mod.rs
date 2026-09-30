@@ -26,6 +26,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::E2eResult;
 
+/// Environment variable that keeps the suite off attached phones and
+/// booted simulators. Device tests clear app state, so a push from one
+/// session must not drive a device another session is testing on (#396).
+pub const NO_DEVICES_ENV: &str = "VAUCHI_E2E_NO_DEVICES";
+
+/// Whether device and simulator tests may run, given the value of
+/// [`NO_DEVICES_ENV`]: unset, empty or `0` allows them; anything else
+/// keeps devices untouched.
+pub fn devices_allowed_from(value: Option<&str>) -> bool {
+    matches!(value, None | Some("") | Some("0"))
+}
+
+/// [`devices_allowed_from`] for the current environment. Every device and
+/// simulator detector checks this before calling `adb` or `xcrun`.
+pub fn devices_allowed() -> bool {
+    devices_allowed_from(std::env::var(NO_DEVICES_ENV).ok().as_deref())
+}
+
 /// Network simulation configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NetworkConfig {
