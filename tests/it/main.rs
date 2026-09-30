@@ -31,6 +31,7 @@ mod action_family_oracles;
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;
+mod device_opt_out;
 mod exchange_error_paths;
 mod five_user_exchange;
 mod multi_device_sync;
