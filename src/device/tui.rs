@@ -48,9 +48,15 @@ use crate::error::{E2eError, E2eResult};
 
 /// Find the TUI binary in the workspace.
 fn find_tui_binary() -> E2eResult<PathBuf> {
+    find_tui_binary_given(std::env::var("VAUCHI_TUI_BIN").ok())
+}
+
+/// [`find_tui_binary`] with the value of `VAUCHI_TUI_BIN` passed in, so
+/// tests need not mutate the process environment.
+fn find_tui_binary_given(explicit: Option<String>) -> E2eResult<PathBuf> {
     // CI builds the TUI in a job-private directory and names the binary
     // here; the sibling-checkout guesses below are the developer layout.
-    if let Ok(explicit) = std::env::var("VAUCHI_TUI_BIN") {
+    if let Some(explicit) = explicit {
         let path = PathBuf::from(&explicit);
         if path.is_file() {
             return Ok(path);
@@ -821,10 +827,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("vauchi-tui");
         std::fs::write(&bin, b"#!/bin/sh\n").unwrap();
-        // SAFETY: test-local env, single-threaded access to this variable.
-        unsafe { std::env::set_var("VAUCHI_TUI_BIN", &bin) };
-        let found = find_tui_binary();
-        unsafe { std::env::remove_var("VAUCHI_TUI_BIN") };
+
+        let found = find_tui_binary_given(Some(bin.to_string_lossy().into_owned()));
+
         assert_eq!(found.unwrap(), bin);
     }
 
@@ -833,9 +838,9 @@ mod tests {
     fn a_dangling_explicit_tui_binary_path_is_an_error_not_a_fallback() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("nope");
-        unsafe { std::env::set_var("VAUCHI_TUI_BIN", &missing) };
-        let found = find_tui_binary();
-        unsafe { std::env::remove_var("VAUCHI_TUI_BIN") };
+
+        let found = find_tui_binary_given(Some(missing.to_string_lossy().into_owned()));
+
         assert!(
             found.is_err(),
             "a wrong explicit path must not fall back to a sibling guess"
