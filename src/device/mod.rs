@@ -162,6 +162,25 @@ pub struct ContactFieldVisibility {
     pub source: VisibilitySource,
 }
 
+/// An owner-level relationship decision about one contact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ContactLifecycleAction {
+    Archive,
+    Unarchive,
+    Ignore,
+    Unignore,
+    Block,
+    Unblock,
+}
+
+/// The relationship flags a device holds for one contact.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContactLifecycle {
+    pub archived: bool,
+    pub ignored: bool,
+    pub blocked: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCard {
     /// Display name.
@@ -457,6 +476,24 @@ pub trait Device: Send + Sync {
     async fn clear_contact_override(&self, _contact: &str, _field: &str) -> E2eResult<()> {
         Err(crate::error::E2eError::DeviceNotSupported(
             "Contact visibility not supported on this device type".to_string(),
+        ))
+    }
+
+    /// Archive, ignore or block a contact, or undo one of those.
+    async fn apply_contact_lifecycle(
+        &self,
+        _contact: &str,
+        _action: ContactLifecycleAction,
+    ) -> E2eResult<()> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact lifecycle not supported on this device type".to_string(),
+        ))
+    }
+
+    /// The archived, ignored and blocked flags this device holds for a contact.
+    async fn contact_lifecycle(&self, _contact: &str) -> E2eResult<ContactLifecycle> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "Contact lifecycle not supported on this device type".to_string(),
         ))
     }
 

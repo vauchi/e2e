@@ -17,8 +17,8 @@ use tokio::process::Command;
 use tracing::{debug, trace};
 
 use super::{
-    CardField, Contact, ContactCard, ContactFieldVisibility, Device, DeviceType, LabelState,
-    TagState,
+    CardField, Contact, ContactCard, ContactFieldVisibility, ContactLifecycle,
+    ContactLifecycleAction, Device, DeviceType, LabelState, TagState,
 };
 use crate::error::{E2eError, E2eResult};
 
@@ -1014,6 +1014,35 @@ impl Device for CliDevice {
         self.run_command_success(&["contacts", "clear-override", contact, field])
             .await?;
         Ok(())
+    }
+
+    async fn apply_contact_lifecycle(
+        &self,
+        contact: &str,
+        action: ContactLifecycleAction,
+    ) -> E2eResult<()> {
+        let verb = match action {
+            ContactLifecycleAction::Archive => "archive",
+            ContactLifecycleAction::Unarchive => "unarchive",
+            ContactLifecycleAction::Ignore => "ignore",
+            ContactLifecycleAction::Unignore => "unignore",
+            ContactLifecycleAction::Block => "block",
+            ContactLifecycleAction::Unblock => "unblock",
+        };
+        self.run_command_success(&["contacts", verb, contact])
+            .await?;
+        Ok(())
+    }
+
+    async fn contact_lifecycle(&self, contact: &str) -> E2eResult<ContactLifecycle> {
+        let output = self
+            .run_command_success(&["--raw", "contacts", "show", contact])
+            .await?;
+        serde_json::from_str(&output).map_err(|e| {
+            E2eError::parse_output(format!(
+                "raw contact lacks lifecycle flags: {e}; got: {output}"
+            ))
+        })
     }
 
     async fn contact_field_visibility(

@@ -34,6 +34,7 @@ mod delivery_pipeline;
 mod device_opt_out;
 mod exchange_error_paths;
 mod five_user_exchange;
+mod longitudinal_continuity;
 mod multi_device_sync;
 mod offline_catchup;
 mod ohttp_advanced;
