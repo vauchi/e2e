@@ -46,6 +46,7 @@ mod recovery_flow;
 mod relay_failover;
 mod resistance_features;
 mod seeded_contacts;
+mod six_device;
 mod version_enforcement_tests;
 mod visibility_labels;
 mod yaml_scenarios;
