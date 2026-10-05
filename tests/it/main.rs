@@ -41,6 +41,7 @@ mod ohttp_advanced;
 mod ohttp_fail_closed_matrix;
 mod ohttp_helpers;
 mod ohttp_integration;
+mod ohttp_source_address;
 mod onboarding_flow;
 mod orchestrator_default_ohttp;
 mod recovery_flow;
