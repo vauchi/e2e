@@ -39,6 +39,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
+use vauchi_e2e_tests::prelude::CliDevice;
+
 pub(crate) const DISTINCT_ORIGIN_ERROR: &str = "distinct valid origin";
 // Runner contention slows CLI invocations 2-6x (argon2 init worst);
 // 180s matches the VAUCHI_E2E_CLI_TIMEOUT_SECS default budget while
@@ -52,27 +54,9 @@ pub(crate) type OriginCase = (
     Vec<(&'static str, &'static str)>,
 );
 
-/// CLI paths to try, most-trusted first.
-///
-/// `target/e2e-bin` outranks `cli/target/debug` because only
-/// `just e2e-build` passes `--features e2e-test-clock`. A CLI built
-/// without it ignores `VAUCHI_TEST_CLOCK_EPOCH`, so grace-period tests
-/// fail several assertions deep ("Grace period has not elapsed") instead
-/// of here, where the cause is obvious.
-fn cli_binary_candidates(env_bin_dir: Option<&str>) -> Vec<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let mut candidates = Vec::new();
-    if let Some(dir) = env_bin_dir {
-        candidates.push(PathBuf::from(dir).join("vauchi"));
-    }
-    candidates.push(manifest_dir.join("../target/e2e-bin/vauchi"));
-    candidates.push(manifest_dir.join("../cli/target/debug/vauchi"));
-    candidates
-}
-
 pub(crate) fn cli_binary() -> PathBuf {
     let env_bin_dir = std::env::var("E2E_BIN_DIR").ok();
-    cli_binary_candidates(env_bin_dir.as_deref())
+    CliDevice::cli_binary_candidates(env_bin_dir.as_deref())
         .into_iter()
         .find(|path| path.exists())
         .unwrap_or_else(|| {
@@ -242,51 +226,6 @@ impl Drop for HostileServer {
             let _ = handle.join();
         }
     }
-}
-
-/// A CLI without `e2e-test-clock` silently ignores the test clock, so
-/// preferring it over the recipe-built binary turns a setup mistake into
-/// a misleading grace-period assertion failure.
-// @internal
-#[test]
-fn recipe_built_cli_outranks_a_plain_debug_build() {
-    let candidates = cli_binary_candidates(None);
-
-    let recipe_built = candidates
-        .iter()
-        .position(|path| path.ends_with("target/e2e-bin/vauchi"));
-    let plain_debug = candidates
-        .iter()
-        .position(|path| path.ends_with("cli/target/debug/vauchi"));
-
-    assert_eq!(
-        recipe_built,
-        Some(0),
-        "`just e2e-build` output must be tried first, got {candidates:?}"
-    );
-    assert_eq!(
-        plain_debug,
-        Some(1),
-        "a hand-built debug CLI is the last resort, got {candidates:?}"
-    );
-}
-
-/// `E2E_BIN_DIR` is how CI hands over its SHA-cached binaries; it must
-/// win over anything found in the working tree.
-// @internal
-#[test]
-fn env_bin_dir_outranks_every_working_tree_path() {
-    let candidates = cli_binary_candidates(Some("/opt/prebuilt"));
-
-    assert_eq!(
-        candidates.first(),
-        Some(&PathBuf::from("/opt/prebuilt/vauchi"))
-    );
-    assert_eq!(
-        candidates.len(),
-        3,
-        "env override adds to, never replaces, the working-tree fallbacks: {candidates:?}"
-    );
 }
 
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users

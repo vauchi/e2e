@@ -140,51 +140,44 @@ impl CliDevice {
         self
     }
 
+    /// CLI paths to try, most-trusted first.
+    ///
+    /// `E2E_BIN_DIR` is how CI hands over its binaries. `target/e2e-bin`
+    /// outranks every plain build because only `just e2e-build` passes
+    /// `--features e2e-test-clock`; a CLI without it ignores
+    /// `VAUCHI_TEST_CLOCK_EPOCH`, which silently turns clock-driven tests into
+    /// same-second tie-breaks (#395). The cli/ crate is its own Cargo
+    /// workspace, so its debug build lands in `cli/target/debug`; the
+    /// workspace-root paths are historical fallbacks.
+    pub fn cli_binary_candidates(env_bin_dir: Option<&str>) -> Vec<PathBuf> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut candidates = Vec::new();
+        if let Some(dir) = env_bin_dir {
+            candidates.push(PathBuf::from(dir).join("vauchi"));
+        }
+        candidates.extend([
+            workspace.join("target/e2e-bin/vauchi"),
+            workspace.join("cli/target/debug/vauchi"),
+            workspace.join("target/debug/vauchi"),
+            workspace.join("target/release/vauchi"),
+        ]);
+        candidates
+    }
+
     /// Find the CLI binary in the workspace.
     fn find_cli_binary() -> E2eResult<PathBuf> {
-        // Try E2E_BIN_DIR first (SHA-cached binaries from build-binaries.sh).
-        // CI bakes a release-or-debug binary at this path per repo policy.
-        if let Ok(dir) = std::env::var("E2E_BIN_DIR") {
-            let path = PathBuf::from(&dir).join("vauchi");
-            if path.exists() {
-                return Ok(path);
-            }
-        }
-
-        // Prefer the debug binary for local development runs. Production-like
-        // coverage uses the SHA-cached `E2E_BIN_DIR` path above. Both builds
-        // receive the local ephemeral OHTTP key through the explicit bundled
-        // key override, so neither requires a direct transport mode.
-        //
-        // The cli/ crate is its own Cargo workspace, so a bare `cargo
-        // build` in cli/ lands at `cli/target/debug/vauchi`. The
-        // workspace-root `target/debug/vauchi` is a historical-residue
-        // location with no current producer — check it after the
-        // cli-local path so a stale artifact there can't shadow a fresh
-        // cli build.
-        let cli_local_debug =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../cli/target/debug/vauchi");
-        if cli_local_debug.exists() {
-            return Ok(cli_local_debug);
-        }
-
-        let debug_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug/vauchi");
-        if debug_path.exists() {
-            return Ok(debug_path);
-        }
-
-        // Release fallback retained for tests that inject the ephemeral local
-        // OHTTP key through `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
-        let release_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/release/vauchi");
-        if release_path.exists() {
-            return Ok(release_path);
-        }
-
-        Err(E2eError::cli_execution(
-            "CLI binary not found. Run `just build cli` (debug) first — \
-             the orchestrator supplies the local OHTTP key to either build.",
-        ))
+        let env_bin_dir = std::env::var("E2E_BIN_DIR").ok();
+        Self::cli_binary_candidates(env_bin_dir.as_deref())
+            .into_iter()
+            .find(|path| path.exists())
+            .ok_or_else(|| {
+                E2eError::cli_execution(
+                    "CLI binary not found. Run `just e2e-build` — it builds the CLI \
+                     with --features e2e-test-clock, which the clock-driven tests \
+                     require and a plain `just build cli` omits. To use binaries \
+                     from elsewhere, set E2E_BIN_DIR.",
+                )
+            })
     }
 
     /// Run a CLI command and return the output.
