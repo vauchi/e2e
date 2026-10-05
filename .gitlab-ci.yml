@@ -415,6 +415,35 @@ test:release-rg6-observability:
       - rg6-observability-release-results.txt
     expire_in: 1 week
 
+# RG-7 release certification — the application relay observes the OHTTP
+# relay's address, never the end user's (ADR-037). The client connects from
+# 127.0.0.2, so the test needs a Linux runner (all of 127/8 is loopback).
+test:release-rg7:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(/ohttp_source_address::application_relay_observes_the_ohttp_relay_never_the_end_user/)' \
+        2>&1 | tee rg7-release-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - rg7-release-results.txt
+    expire_in: 1 week
+
 # RG-8 release certification — OHTTP fail-closed adversarial matrix plus
 # action-family fan-out: origin boundary probes and hostile bootstrap poisoning
 # must fail closed; device-link, panic-shred, and hard-shred fan-out must use
