@@ -9,6 +9,8 @@ const OHTTP_E2E_FAULT_BUILD: &str = "cargo build --release --features e2e-faults
 const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=\"e2e-faults-v1\"";
 const RG6_TEST: &str =
     "ohttp_integration::integration_ohttp_relay_observations_exclude_update_content";
+const RG7_TEST: &str =
+    "ohttp_source_address::application_relay_observes_the_ohttp_relay_never_the_end_user";
 const RG8_TEST: &str = "ohttp_fail_closed_matrix";
 
 const MULTI_DEVICE_SYNC_SOURCE: &str = include_str!("it/multi_device_sync.rs");
@@ -174,6 +176,19 @@ fn rg6_release_lane_is_blocking_and_runs_the_relay_observer() {
 
 // @internal
 #[test]
+fn rg7_release_lane_is_blocking_and_runs_the_source_address_observer() {
+    let job = top_level_job("test:release-rg7");
+
+    assert!(job.contains("allow_failure: false"));
+    assert!(job.contains("job: test:smoke"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"merge_request_event\""));
+    assert!(job.contains("$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+    assert!(job.contains(RG7_TEST));
+}
+
+// @internal
+#[test]
 fn rg8_release_lane_is_blocking_and_runs_the_fail_closed_matrix() {
     let job = top_level_job("test:release-rg8");
 
@@ -232,6 +247,7 @@ fn native_binary_producer_and_consumers_share_linux_runner() {
         "test:release-rg3",
         "test:release-rg4-rg5",
         "test:release-rg6-observability",
+        "test:release-rg7",
         "test:release-rg8",
         "test:release-rg10",
         "test:release-rg15",
