@@ -199,6 +199,31 @@ fn rg10_release_lane_is_blocking_and_runs_the_owner_private_state_journey() {
     assert!(gaps.is_empty(), "RG-10 lane gaps: {gaps:?}");
 }
 
+/// RG-15 continuity: the longitudinal journey (ignore, archive, offline
+/// catch-up, block) plus the two device-lifecycle continuity journeys.
+const RG15_REQUIRED: &[&str] = &[
+    "longitudinal_continuity::integration_six_device_longitudinal_contact_continuity_certification",
+    "integration_six_device_replacement_and_revocation_preserve_active_convergence",
+    "integration_six_device_lost_primary_continuity_certification",
+];
+
+// @internal
+#[test]
+fn rg15_release_lane_is_blocking_and_runs_the_continuity_journeys() {
+    let job = top_level_job("test:release-rg15");
+
+    assert!(job.contains("allow_failure: false"));
+    assert!(job.contains("job: test:smoke"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"merge_request_event\""));
+    assert!(job.contains("$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+    let missing: Vec<_> = RG15_REQUIRED
+        .iter()
+        .filter(|name| !job.contains(*name))
+        .collect();
+    assert!(missing.is_empty(), "RG-15 lane does not select {missing:?}");
+}
+
 // @internal
 #[test]
 fn native_binary_producer_and_consumers_share_linux_runner() {
@@ -209,6 +234,7 @@ fn native_binary_producer_and_consumers_share_linux_runner() {
         "test:release-rg6-observability",
         "test:release-rg8",
         "test:release-rg10",
+        "test:release-rg15",
         "test:integration",
     ] {
         let job = top_level_job(job_name);
