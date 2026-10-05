@@ -23,6 +23,22 @@ use super::{
 use crate::error::{E2eError, E2eResult};
 
 const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
+const TEST_CLOCK_ENV: &str = "VAUCHI_TEST_CLOCK_EPOCH";
+
+/// One probe per binary per test process: each costs two CLI launches.
+fn honors_test_clock_cached(cli: &std::path::Path) -> bool {
+    static PROBED: std::sync::OnceLock<Mutex<HashMap<PathBuf, bool>>> = std::sync::OnceLock::new();
+    let probed = PROBED.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(&known) = probed.lock().expect("probe cache").get(cli) {
+        return known;
+    }
+    let honors = CliDevice::cli_honors_test_clock(cli);
+    probed
+        .lock()
+        .expect("probe cache")
+        .insert(cli.to_path_buf(), honors);
+    honors
+}
 
 mod owner_state;
 mod raw;
@@ -162,6 +178,35 @@ impl CliDevice {
             workspace.join("target/release/vauchi"),
         ]);
         candidates
+    }
+
+    /// Whether `cli` is an `e2e-test-clock` build. Such a build panics on a
+    /// malformed `VAUCHI_TEST_CLOCK_EPOCH` the moment a command stamps time;
+    /// any other build accepts it and keeps the real clock.
+    pub fn cli_honors_test_clock(cli: &std::path::Path) -> bool {
+        let Ok(scratch) = TempDir::new() else {
+            return false;
+        };
+        let data_dir = scratch.path().to_string_lossy().to_string();
+        let run = |args: &[&str], epoch: Option<&str>| {
+            let mut command = std::process::Command::new(cli);
+            command.args(["--data-dir", &data_dir]).args(args);
+            command.env_remove(TEST_CLOCK_ENV);
+            if let Some(epoch) = epoch {
+                command.env(TEST_CLOCK_ENV, epoch);
+            }
+            command.output()
+        };
+        let initialised = run(&["init", "clock-probe"], None).is_ok_and(|out| out.status.success());
+        initialised
+            && run(
+                &["card", "add", "phone", "probe", "+12025550000"],
+                Some("not-a-number"),
+            )
+            .is_ok_and(|out| {
+                !out.status.success()
+                    && String::from_utf8_lossy(&out.stderr).contains(TEST_CLOCK_ENV)
+            })
     }
 
     /// Find the CLI binary in the workspace.
@@ -422,6 +467,14 @@ impl Device for CliDevice {
     }
 
     fn set_command_env(&mut self, key: &str, value: &str) -> E2eResult<()> {
+        if key == TEST_CLOCK_ENV && !honors_test_clock_cached(&self.cli_path) {
+            return Err(E2eError::device(format!(
+                "{} ignores {TEST_CLOCK_ENV}: it was built without --features \
+                 e2e-test-clock, so a clock-driven test would silently use the real \
+                 clock (#395). Run `just e2e-build`, or set E2E_BIN_DIR to its output.",
+                self.cli_path.display()
+            )));
+        }
         self.extra_env.insert(key.to_string(), value.to_string());
         Ok(())
     }
