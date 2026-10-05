@@ -16,6 +16,8 @@ use super::six_device::{
 };
 
 const CONVERGENCE_ROUNDS: usize = 6;
+const DAY: u64 = 86_400;
+const TEST_CLOCK: &str = "VAUCHI_TEST_CLOCK_EPOCH";
 
 /// Bob's and Alice's ids for each other, per device index.
 struct Peers {
@@ -42,8 +44,17 @@ async fn integration_six_device_longitudinal_contact_continuity_certification() 
     publish(&bob, 1, "LongBobPhone", "+12025550701", Some("Alice")).await;
     assert_both_directions(&orch, &alice, &bob, &peers, "+12025550601", "+12025550701").await;
 
+    // Each phase runs days later, so every device crosses daily mailbox-token
+    // rotations (ADR-029) between phases; continuity must survive them.
+    let exchanged_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_secs();
+    set_clock(&alice, &bob, exchanged_at + DAY).await;
     ignore_keeps_continuity(&orch, &alice, &bob, &peers).await;
+    set_clock(&alice, &bob, exchanged_at + 8 * DAY).await;
     archive_and_offline_catch_up_keep_continuity(&orch, &alice, &bob, &peers).await;
+    set_clock(&alice, &bob, exchanged_at + 40 * DAY).await;
     block_ends_continuity(&orch, &alice, &bob, &peers).await;
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -182,6 +193,22 @@ async fn block_ends_continuity(
         vec![false; 3],
         "no Alice device may accept Bob's update after A1 blocked him"
     );
+}
+
+/// Moves every one of the six devices' clocks to `epoch` (the CLI's
+/// `e2e-test-clock` build reads it on each command).
+async fn set_clock(alice: &SharedUser, bob: &SharedUser, epoch: u64) {
+    for user in [alice, bob] {
+        let user = user.read().await;
+        for index in 0..3 {
+            user.device(index)
+                .expect("device should exist")
+                .write()
+                .await
+                .set_command_env(TEST_CLOCK, &epoch.to_string())
+                .expect("CLI devices accept a test clock");
+        }
+    }
 }
 
 async fn peer_ids(user: &SharedUser, peer_name: &str) -> Vec<String> {
