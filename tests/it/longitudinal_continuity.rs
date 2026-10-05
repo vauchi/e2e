@@ -17,6 +17,10 @@ use super::six_device::{
 
 const CONVERGENCE_ROUNDS: usize = 6;
 const DAY: u64 = 86_400;
+/// An undo is stamped a minute after the action it undoes. Same-second
+/// stamps would hand the outcome to ADR-020's device-id tie-break, which
+/// differs every run.
+const UNDO_LATER: u64 = 60;
 const TEST_CLOCK: &str = "VAUCHI_TEST_CLOCK_EPOCH";
 
 /// Bob's and Alice's ids for each other, per device index.
@@ -50,10 +54,15 @@ async fn integration_six_device_longitudinal_contact_continuity_certification() 
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock after epoch")
         .as_secs();
-    set_clock(&alice, &bob, exchanged_at + DAY).await;
-    ignore_keeps_continuity(&orch, &alice, &bob, &peers).await;
-    set_clock(&alice, &bob, exchanged_at + 8 * DAY).await;
-    archive_and_offline_catch_up_keep_continuity(&orch, &alice, &bob, &peers).await;
+    ignore_keeps_continuity(&orch, &alice, &bob, &peers, exchanged_at + DAY).await;
+    archive_and_offline_catch_up_keep_continuity(
+        &orch,
+        &alice,
+        &bob,
+        &peers,
+        exchanged_at + 8 * DAY,
+    )
+    .await;
     set_clock(&alice, &bob, exchanged_at + 40 * DAY).await;
     block_ends_continuity(&orch, &alice, &bob, &peers).await;
 
@@ -65,7 +74,9 @@ async fn ignore_keeps_continuity(
     alice: &SharedUser,
     bob: &SharedUser,
     peers: &Peers,
+    day: u64,
 ) {
+    set_clock(alice, bob, day).await;
     act(
         alice,
         2,
@@ -93,6 +104,7 @@ async fn ignore_keeps_continuity(
         "Bob is never told he is ignored"
     );
 
+    set_clock(alice, bob, day + UNDO_LATER).await;
     act(
         alice,
         0,
@@ -108,7 +120,9 @@ async fn archive_and_offline_catch_up_keep_continuity(
     alice: &SharedUser,
     bob: &SharedUser,
     peers: &Peers,
+    day: u64,
 ) {
+    set_clock(alice, bob, day).await;
     act(
         alice,
         1,
@@ -129,6 +143,7 @@ async fn archive_and_offline_catch_up_keep_continuity(
 
     // A3 stays offline while Bob changes his details and Alice unarchives.
     publish(bob, 0, "LongBobPhone", "+12025550703", None).await;
+    set_clock(alice, bob, day + UNDO_LATER).await;
     act(
         alice,
         0,
