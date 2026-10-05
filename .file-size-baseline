@@ -10,5 +10,5 @@ src/yaml/executor.rs 1353
 # Device trait impl (one impl block); crossed 1000 adding the duress
 # certification operations 2026-07-24 — split candidate: extract the
 # output-parsing helpers.
-src/device/cli.rs 1008
+src/device/cli.rs 926
 tests/it/multi_device_sync.rs exempt
