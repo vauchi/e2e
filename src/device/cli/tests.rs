@@ -4,6 +4,7 @@
 
 // INLINE_TEST_REQUIRED: tests depend on private CLI command helpers
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use tokio::process::Command;
 
@@ -579,4 +580,38 @@ fn contact_visibility_fails_closed_on_a_missing_field_or_unknown_status() {
     let error = owner_state::parse_contact_field_visibility(unknown, "Direct")
         .expect_err("an unknown status is not a visibility");
     assert!(error.to_string().contains("unknown"), "{error}");
+}
+
+/// Only `just e2e-build` builds the CLI with `--features e2e-test-clock`; a
+/// plain debug CLI ignores `VAUCHI_TEST_CLOCK_EPOCH`, which turned the
+/// bounded-skew certification into a same-second device-id tie-break (#395).
+// @internal
+#[test]
+fn recipe_built_cli_is_tried_before_a_plain_debug_build() {
+    let candidates = CliDevice::cli_binary_candidates(None);
+
+    let recipe_built = candidates
+        .iter()
+        .position(|path| path.ends_with("target/e2e-bin/vauchi"));
+    let plain_debug = candidates
+        .iter()
+        .position(|path| path.ends_with("cli/target/debug/vauchi"));
+
+    assert_eq!(recipe_built, Some(0), "got {candidates:?}");
+    assert_eq!(plain_debug, Some(1), "got {candidates:?}");
+}
+
+/// `E2E_BIN_DIR` is how CI hands over its binaries; it wins over the
+/// working tree and adds to, never replaces, the fallbacks.
+// @internal
+#[test]
+fn env_bin_dir_is_tried_first() {
+    let with_env = CliDevice::cli_binary_candidates(Some("/opt/prebuilt"));
+    let without = CliDevice::cli_binary_candidates(None);
+
+    assert_eq!(
+        with_env.first(),
+        Some(&PathBuf::from("/opt/prebuilt/vauchi"))
+    );
+    assert_eq!(&with_env[1..], &without[..]);
 }
