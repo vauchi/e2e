@@ -484,6 +484,40 @@ test:release-rg10:
       - rg10-release-results.txt
     expire_in: 1 week
 
+# RG-15 release certification — long-lived contact continuity. The
+# longitudinal journey keeps one exchange useful through ignore, archive and an
+# offline sibling and ends it only by block (ADR-072, ADR-056); the two
+# device-lifecycle journeys keep it through a lost primary and a replaced,
+# revoked device. Like RG-10, new cli grammar (contacts ignore) reaches this
+# lane only after the cli MR that adds it has merged.
+test:release-rg15:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-relay"
+      test -x "$E2E_BIN_DIR/vauchi"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(/longitudinal_continuity::integration_six_device_longitudinal_contact_continuity_certification|multi_device_sync::integration_six_device_replacement_and_revocation_preserve_active_convergence|multi_device_sync::integration_six_device_lost_primary_continuity_certification/)' \
+        2>&1 | tee rg15-release-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - rg15-release-results.txt
+    expire_in: 1 week
+
 # RG-1 TUI onboarding journey — drives the real vauchi-tui binary over a PTY
 # (src/device/tui.rs) through `--features tui`, which no other lane compiles
 # or runs. Without this job the harness's TUI tests go dark silently: that is
