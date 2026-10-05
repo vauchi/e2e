@@ -615,3 +615,37 @@ fn env_bin_dir_is_tried_first() {
     );
     assert_eq!(&with_env[1..], &without[..]);
 }
+
+/// A stand-in CLI: with `honors_clock` it rejects a malformed test-clock
+/// epoch on a timestamping command, as the `e2e-test-clock` build does.
+fn stand_in_cli(dir: &tempfile::TempDir, honors_clock: bool) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let path = dir.path().join("vauchi");
+    let reject = if honors_clock {
+        r#"case "$*" in *card*) if [ "$VAUCHI_TEST_CLOCK_EPOCH" = "not-a-number" ]; then echo "VAUCHI_TEST_CLOCK_EPOCH is set but malformed" >&2; exit 101; fi;; esac"#
+    } else {
+        ""
+    };
+    std::fs::write(&path, format!("#!/bin/sh\n{reject}\nexit 0\n")).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+// @internal
+#[test]
+fn a_cli_built_with_the_test_clock_is_recognised() {
+    let dir = tempfile::TempDir::new().unwrap();
+
+    assert!(CliDevice::cli_honors_test_clock(&stand_in_cli(&dir, true)));
+}
+
+/// #395: a plain build accepts any epoch and silently uses the real clock.
+// @internal
+#[test]
+fn a_cli_that_ignores_the_test_clock_is_recognised() {
+    let dir = tempfile::TempDir::new().unwrap();
+
+    assert!(!CliDevice::cli_honors_test_clock(&stand_in_cli(
+        &dir, false
+    )));
+}
