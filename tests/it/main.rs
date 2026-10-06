@@ -28,6 +28,7 @@ fn install_rustls_provider() {
 }
 
 mod action_family_oracles;
+mod cli_signed_ohttp_key;
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;
