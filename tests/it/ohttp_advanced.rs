@@ -14,86 +14,54 @@ use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use vauchi_e2e_tests::relay_manager::{RelayConfig, RelayManager};
 
-use ohttp_helpers::{
-    ROTATION_WAIT_SECS, create_ohttp_transport, spawn_ohttp_stack,
-    spawn_ohttp_stack_cached_rotation, spawn_ohttp_stack_fast_rotation,
-};
+use ohttp_helpers::{create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_with_cache};
 
 // @scenario: sync:OHTTP cached key remains valid for requests
 #[tokio::test]
 async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
-    let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
-        spawn_ohttp_stack_cached_rotation().await;
-
+    // The outer relay caches the key for an hour: past a window boundary it
+    // still hands out yesterday's key, which the gateway must keep accepting.
+    let (mut relay_mgr, mut ohttp_mgr, relay_url, ohttp_url) =
+        spawn_ohttp_stack_with_cache(3_600).await;
     let client = reqwest::Client::new();
+    let fetch = |url: String| {
+        let client = client.clone();
+        async move {
+            client
+                .get(url)
+                .send()
+                .await
+                .expect("fetch key")
+                .bytes()
+                .await
+                .expect("read key")
+        }
+    };
+    let key = fetch(format!("{ohttp_url}/v2/ohttp-key")).await;
 
-    // 1. Fetch key (may be cached by the ohttp-relay proxy)
-    let key = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
+    relay_mgr
+        .relay(0)
+        .expect("relay")
+        .advance_ohttp_windows(1)
         .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+        .expect("advance one window");
 
-    // 2. Rapid re-fetch — should return the same bytes (key hasn't
-    //    rotated yet; the proxy may also be serving a cache hit)
-    let key_again = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key again")
-        .bytes()
-        .await
-        .expect("read key again");
-    assert_eq!(
-        key.as_ref(),
-        key_again.as_ref(),
-        "rapid re-fetch must return the same key"
-    );
+    let cached = fetch(format!("{ohttp_url}/v2/ohttp-key")).await;
+    let current = fetch(format!("{relay_url}/v2/ohttp-key")).await;
+    assert_eq!(cached, key, "the outer relay still serves its cached key");
+    assert_ne!(current, key, "the gateway has moved to the next window");
 
-    // 3. Send with cached key — must succeed
-    let transport = create_ohttp_transport(&ohttp_url, &key);
-    let blob_id = transport
-        .send_update(&"a".repeat(64), "dGVzdA==", None)
-        .expect("send with cached key must succeed");
-    assert!(!blob_id.is_empty(), "blob_id must be non-empty");
-
-    // 4. Wait for both cache TTL (2s) and rotation (2s) to expire.
-    //    3s guarantees exactly one rotation; the S10 grace period
-    //    retains the previous key so step 5 succeeds.
-    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
-
-    // 5. Verify the proxy cache has expired by checking that the
-    //    served key has changed (rotation happened + cache refreshed)
-    let key_after_expiry = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key after expiry")
-        .bytes()
-        .await
-        .expect("read key after expiry");
-    assert_ne!(
-        key.as_ref(),
-        key_after_expiry.as_ref(),
-        "key must differ after cache TTL + rotation (proves cache expired)"
-    );
-
-    // 6. Send with the old (now stale) key — must still succeed
-    //    via the gateway's S10 grace period (previous key fallback)
-    let transport_stale = create_ohttp_transport(&ohttp_url, &key);
-    let grace_blob_id = transport_stale
+    let stale_blob_id = create_ohttp_transport(&ohttp_url, &cached)
         .send_update(&"b".repeat(64), "Z3JhY2U=", None)
-        .expect("send with stale key must succeed via S10 grace");
-    assert!(!grace_blob_id.is_empty(), "grace blob_id must be non-empty");
+        .expect("yesterday's cached key must still be accepted");
+    assert!(
+        !stale_blob_id.is_empty(),
+        "stale-key blob_id must be non-empty"
+    );
 
-    // 7. Send with fresh key — must succeed
-    let transport_fresh = create_ohttp_transport(&ohttp_url, &key_after_expiry);
-    let fresh_blob_id = transport_fresh
+    let fresh_blob_id = create_ohttp_transport(&ohttp_url, &current)
         .send_update(&"c".repeat(64), "ZnJlc2g=", None)
-        .expect("send with fresh key must succeed");
+        .expect("send with the current key must succeed");
     assert!(!fresh_blob_id.is_empty(), "fresh blob_id must be non-empty");
 
     ohttp_mgr.stop().await;
@@ -467,10 +435,9 @@ async fn integration_ohttp_response_sizes_are_padded() {
 #[tokio::test]
 async fn integration_ohttp_requests_during_rotation_succeed() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
-        spawn_ohttp_stack_fast_rotation().await;
+        spawn_ohttp_stack_with_cache(0).await;
 
-    let client = reqwest::Client::new();
-    let key_bytes = client
+    let key_bytes = reqwest::Client::new()
         .get(format!("{ohttp_url}/v2/ohttp-key"))
         .send()
         .await
@@ -479,29 +446,29 @@ async fn integration_ohttp_requests_during_rotation_succeed() {
         .await
         .expect("read key");
 
-    // Send a burst of requests spanning a rotation interval (2s).
-    // At least some requests will hit during or after rotation.
-    // All should succeed — either with the current key or via grace period fallback.
-    let mut success_count = 0;
-    let mut error_count = 0;
-
+    // Ten requests with one key; the gateway crosses a window boundary
+    // after the fifth. Every one must succeed: the key it was fetched with
+    // stays held for the next window.
+    let mut failures = Vec::new();
     for i in 0..10 {
-        let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
-        let recipient = format!("{:0>64}", i);
-        match transport.send_update(&recipient, "dGVzdA==", None) {
-            Ok(_) => success_count += 1,
-            Err(_) => error_count += 1,
+        if i == 5 {
+            relay_mgr
+                .relay(0)
+                .expect("relay")
+                .advance_ohttp_windows(1)
+                .await
+                .expect("advance one window");
         }
-        // Space requests across the rotation window
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
+        if let Err(e) = transport.send_update(&format!("{i:0>64}"), "dGVzdA==", None) {
+            failures.push((i, e.to_string()));
+        }
     }
 
-    // With 2s rotation interval and 3s of requests, at most 1 rotation happens.
-    // All requests should succeed via current key or grace period.
-    assert!(
-        success_count >= 9,
-        "at least 9/10 requests must succeed during rotation, \
-         got {success_count} successes, {error_count} errors"
+    assert_eq!(
+        failures,
+        Vec::<(usize, String)>::new(),
+        "every request across the boundary"
     );
 
     ohttp_mgr.stop().await;

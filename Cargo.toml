@@ -92,6 +92,10 @@ toml = "0.9"
 # Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
 vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 
+# Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
+# pinned to the Core tag above like vauchi-core.
+vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.73.0", version = "=0.73.0" }
+
 # OHTTP key generation for stale-key error tests
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"] }
 

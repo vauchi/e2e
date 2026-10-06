@@ -19,9 +19,7 @@ use crate::ohttp_helpers;
 use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 
-use ohttp_helpers::{
-    ROTATION_WAIT_SECS, create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_fast_rotation,
-};
+use ohttp_helpers::{create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_with_cache};
 
 // ── P1: Key Bootstrap ──────────────────────────────────────────────
 
@@ -531,7 +529,7 @@ async fn integration_ohttp_relay_strips_client_identity() {
 #[tokio::test]
 async fn integration_ohttp_key_rotation_grace_period() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
-        spawn_ohttp_stack_fast_rotation().await;
+        spawn_ohttp_stack_with_cache(0).await;
 
     let client = reqwest::Client::new();
 
@@ -555,8 +553,13 @@ async fn integration_ohttp_key_rotation_grace_period() {
         result.err()
     );
 
-    // 3. Wait for key rotation (2s interval + margin)
-    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
+    // 3. Cross into the next window: K2 becomes current, K1 stays held.
+    relay_mgr
+        .relay(0)
+        .expect("relay")
+        .advance_ohttp_windows(1)
+        .await
+        .expect("advance to K2's window");
 
     // 4. Verify key has actually rotated (new key != K1)
     let key_k2 = client
@@ -582,8 +585,13 @@ async fn integration_ohttp_key_rotation_grace_period() {
         grace_result.err()
     );
 
-    // 6. Wait for second rotation (K1 gets evicted, K2 becomes previous)
-    tokio::time::sleep(std::time::Duration::from_secs(ROTATION_WAIT_SECS)).await;
+    // 6. Cross one more window: K1's window is no longer held.
+    relay_mgr
+        .relay(0)
+        .expect("relay")
+        .advance_ohttp_windows(1)
+        .await
+        .expect("advance to K3's window");
 
     // 7. Verify another rotation happened
     let key_k3 = client
