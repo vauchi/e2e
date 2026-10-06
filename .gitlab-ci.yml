@@ -604,6 +604,17 @@ test:tui-journey:
       export VAUCHI_TUI_BIN="$TUI_DIR/target/release/vauchi-tui"
       test -x "$VAUCHI_TUI_BIN"
 
+      # The relay too, job-private for the same reason, with its test clock
+      # and the anchor ceremony CLI e2e provisions each relay's test anchor
+      # with (#288). Without this the harness fell back to the sibling
+      # ../relay workspace, another job's tree, which lacked the CLI.
+      git clone --depth=1 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$JOB_DIR/relay"
+      cargo build --release --features e2e-test-clock --manifest-path "$JOB_DIR/relay/Cargo.toml"
+      mkdir -p "$JOB_DIR/bin"
+      cp "$JOB_DIR/relay/target/release/vauchi-relay" "$JOB_DIR/relay/target/release/vauchi-ohttp-anchor" "$JOB_DIR/bin/"
+      export E2E_BIN_DIR="$JOB_DIR/bin"
+
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
         -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::integration_tui_to_tui_link_exchange/)' \
         2>&1 | tee tui-journey-results.txt
