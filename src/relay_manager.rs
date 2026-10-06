@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -17,6 +18,7 @@ use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 use crate::error::{E2eError, E2eResult};
+use crate::ohttp_anchor::{TestAnchor, unix_now};
 use crate::subprocess_log::OutputCapture;
 
 /// Reserve an available port pair (relay + metrics) by binding to port 0.
@@ -61,6 +63,10 @@ impl OhttpKeyWorkspace {
     fn key_path(&self, port: u16) -> PathBuf {
         self.directory.path().join(format!("{port}-ohttp.key"))
     }
+
+    fn anchor_dir(&self, port: u16) -> PathBuf {
+        self.directory.path().join(format!("{port}-anchor"))
+    }
 }
 
 /// Timeout for relay startup.
@@ -79,6 +85,10 @@ pub struct RelayInstance {
     /// Keeping the same file across restarts lets the CLI's injected
     /// bundled key remain valid after `restart_relay`.
     ohttp_key_file_path: Option<PathBuf>,
+    /// The windowed gateway's test anchor (#288); `None` in interval mode.
+    pub(crate) ohttp_anchor: Option<TestAnchor>,
+    /// Where e2e has set the relay's OHTTP test clock, in Unix seconds.
+    pub(crate) ohttp_clock: AtomicU64,
     /// The child process handle.
     process: Option<Child>,
     /// Captured stdout and stderr lines from the relay process.
@@ -342,6 +352,7 @@ impl RelayManager {
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
         let mut ohttp_key_file_path: Option<PathBuf> = None;
+        let mut ohttp_anchor: Option<TestAnchor> = None;
         env_vars.insert(
             "RELAY_LISTEN_ADDR".to_string(),
             format!("127.0.0.1:{}", port),
@@ -407,6 +418,15 @@ impl RelayManager {
                 key_file.to_string_lossy().to_string(),
             );
             ohttp_key_file_path = Some(key_file);
+            if self.config.ohttp_key_rotation_secs.is_none() {
+                let anchor = TestAnchor::provision(
+                    &self.binary_path,
+                    &self.ohttp_key_workspace.anchor_dir(port),
+                )
+                .await?;
+                anchor.insert_env(&mut env_vars);
+                ohttp_anchor = Some(anchor);
+            }
         }
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
@@ -455,6 +475,8 @@ impl RelayManager {
             port,
             metrics_port,
             ohttp_key_file_path,
+            ohttp_anchor,
+            ohttp_clock: AtomicU64::new(unix_now()),
             process: Some(child),
             output_capture,
         };
@@ -601,12 +623,13 @@ impl RelayManager {
         // Get the port and existing OHTTP key file from the current relay
         // instance. Reusing the same key file keeps the CLI's injected
         // bundled key valid after the restart.
-        let (port, metrics_port, existing_key_file, output_capture) =
+        let (port, metrics_port, existing_key_file, existing_anchor, output_capture) =
             if let Some(relay) = self.relays.get(index) {
                 (
                     relay.port,
                     relay.metrics_port,
                     relay.ohttp_key_file_path.clone(),
+                    relay.ohttp_anchor.clone(),
                     relay.output_capture.clone(),
                 )
             } else {
@@ -625,6 +648,7 @@ impl RelayManager {
 
         let mut env_vars: HashMap<String, String> = HashMap::new();
         let mut ohttp_key_file_path: Option<PathBuf> = None;
+        let mut ohttp_anchor: Option<TestAnchor> = None;
         env_vars.insert(
             "RELAY_LISTEN_ADDR".to_string(),
             format!("127.0.0.1:{}", port),
@@ -685,6 +709,12 @@ impl RelayManager {
                 key_file.to_string_lossy().to_string(),
             );
             ohttp_key_file_path = Some(key_file);
+            // The same anchor and intermediate: a restart must not change
+            // the key clients already trust.
+            if let Some(anchor) = existing_anchor {
+                anchor.insert_env(&mut env_vars);
+                ohttp_anchor = Some(anchor);
+            }
         }
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging (e.g. `RUST_LOG=info` to see why
@@ -723,6 +753,9 @@ impl RelayManager {
         if let Some(relay) = self.relays.get_mut(index) {
             relay.process = Some(child);
             relay.ohttp_key_file_path = ohttp_key_file_path;
+            relay.ohttp_anchor = ohttp_anchor;
+            // A restarted relay's test clock starts again from the system clock.
+            relay.ohttp_clock.store(unix_now(), Ordering::SeqCst);
             info!("Relay {} restarted successfully", index);
         }
 

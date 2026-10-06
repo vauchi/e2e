@@ -60,6 +60,7 @@
 
 pub mod device;
 pub mod error;
+pub mod ohttp_anchor;
 pub mod ohttp_relay_manager;
 pub mod orchestrator;
 pub mod relay_manager;
