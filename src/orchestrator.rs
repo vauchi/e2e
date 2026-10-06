@@ -20,13 +20,11 @@ use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use crate::relay_manager::{RelayConfig, RelayManager};
 use crate::user::{User, UserBuilder};
 
-/// Env var read by the cli (`cli/src/commands/common.rs`) to override
-/// `OhttpConfig::bundled_gateway_key`. The orchestrator fetches the
-/// freshly-spawned local relay's `/v2/ohttp-key` and sets this env on
-/// every spawned `vauchi` subprocess so the release cli can encap to a
-/// key the local relay can decrypt. See problem record
-/// `_private/docs/problems/2026-05-04-f13-cli-bundled-key-injection-for-e2e/`.
-const CLI_BUNDLED_OHTTP_KEY_HEX_ENV: &str = "VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX";
+/// Env var the cli and tui read as their relay's OHTTP trust anchor
+/// (#288). The orchestrator sets it on every spawned subprocess to the
+/// local relay's test anchor, so they take gateway keys only from that
+/// relay's signed chain. No key is compiled in any more.
+const CLI_RELAY_ANCHOR_ENV: &str = "VAUCHI_RELAY_ANCHOR";
 const CLI_OHTTP_RELAY_URL_ENV: &str = "VAUCHI_OHTTP_RELAY_URL";
 
 /// Configuration for the orchestrator.
@@ -56,19 +54,6 @@ pub struct OrchestratorConfig {
     /// Configuration for the spawned ohttp-relay (only used when
     /// `with_ohttp_relay` is `true`).
     pub ohttp_relay_config: OhttpRelayConfig,
-    /// Inject the spawned local relay's OHTTP gateway key into every
-    /// cli subprocess via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
-    /// Required for release cli tests — the release binary compiles out
-    /// the `VAUCHI_ALLOW_DIRECT` escape hatch and would otherwise fall
-    /// back to the compiled-in production bundled key, whose pubkey the
-    /// ephemeral local relay cannot decrypt.
-    ///
-    /// On by default so ordinary CLI-driven scenarios exercise the real
-    /// OHTTP path against the local relay. Explicitly set to `false` to
-    /// test key bootstrap (the client must fetch the live gateway key
-    /// through the ohttp-relay). See problem record
-    /// `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
-    pub inject_local_ohttp_key_into_cli: bool,
 }
 
 impl Default for OrchestratorConfig {
@@ -80,9 +65,12 @@ impl Default for OrchestratorConfig {
             with_ohttp_relay: true,
             ohttp_relay_config: OhttpRelayConfig {
                 rate_limit_per_sec: 0,
+                // Tests move the relay across days with its test clock; the
+                // outer relay bounds its key cache by the real clock, so a
+                // cache would keep serving a day the relay has left (#288).
+                key_cache_ttl_secs: 0,
                 ..Default::default()
             },
-            inject_local_ohttp_key_into_cli: true,
         }
     }
 }
@@ -112,10 +100,9 @@ pub struct Orchestrator {
     ohttp_relay_manager: Option<OhttpRelayManager>,
     users: HashMap<String, Arc<RwLock<User>>>,
     started: bool,
-    /// Hex-encoded local relay gateway key, populated on `start()` when
-    /// `inject_local_ohttp_key_into_cli` is `true`. Forwarded to every
-    /// spawned cli subprocess via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
-    cli_bundled_ohttp_key_hex: Option<String>,
+    /// The local relay's test anchor as hex, set on `start()` and forwarded
+    /// to every spawned cli/tui subprocess via `VAUCHI_RELAY_ANCHOR`.
+    relay_anchor_hex: Option<String>,
 }
 
 impl Orchestrator {
@@ -132,7 +119,7 @@ impl Orchestrator {
             ohttp_relay_manager: None,
             users: HashMap::new(),
             started: false,
-            cli_bundled_ohttp_key_hex: None,
+            relay_anchor_hex: None,
         }
     }
 
@@ -180,58 +167,14 @@ impl Orchestrator {
 
         self.relay_manager = Some(relay_manager);
 
-        // Fetch the freshly-spawned local relay's OHTTP gateway key
-        // and stash it as the bundled-key override for every cli we
-        // launch. Without this, the release cli (`E2E_BIN_DIR/vauchi`,
-        // which compiles out the `VAUCHI_ALLOW_DIRECT` hatch) would
-        // fall back to the production bundled key whose pubkey the
-        // local relay's ephemeral private key cannot decrypt — see
-        // F13 step 5 caveat in
-        // `2026-05-04-ohttp-gateway-decap-unsupported-via-outer-hop`.
-        if self.config.inject_local_ohttp_key_into_cli {
-            let relay_http_url = self.primary_relay_http_url()?;
-            let key_url = format!("{}/v2/ohttp-key", relay_http_url.trim_end_matches('/'));
-            debug!("Fetching local relay OHTTP gateway key from {key_url}");
-            // Bounded fetch: a relay that accepts TCP but stalls would
-            // otherwise hang Orchestrator::start() (and the whole test)
-            // forever — the bare `reqwest::get` had no timeout
-            // (problems/2026-07-19-e2e-multi-device-serialization-hang).
-            // Guarded by scripts/check-test-timeouts.sh — do not revert
-            // to the unbounded call.
-            let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(10))
-                .build()
-                .map_err(|e| E2eError::scenario(format!("HTTP client build failed: {e}")))?;
-            let mut last_err = String::new();
-            let mut fetched = None;
-            for attempt in 1..=3u32 {
-                match client.get(&key_url).send().await {
-                    Ok(resp) => match resp.error_for_status() {
-                        Ok(ok) => match ok.bytes().await {
-                            Ok(b) => {
-                                fetched = Some(b);
-                                break;
-                            }
-                            Err(e) => last_err = format!("read body: {e}"),
-                        },
-                        Err(e) => last_err = format!("non-2xx: {e}"),
-                    },
-                    Err(e) => last_err = format!("request: {e}"),
-                }
-                debug!("OHTTP key fetch attempt {attempt} failed: {last_err}");
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            }
-            let bytes = fetched.ok_or_else(|| {
-                E2eError::scenario(format!(
-                    "Failed to fetch {key_url} after 3 attempts: {last_err}"
-                ))
-            })?;
-            self.cli_bundled_ohttp_key_hex = Some(hex::encode(&bytes));
-            info!(
-                "Injecting local relay OHTTP gateway key into cli subprocesses ({} bytes)",
-                bytes.len()
-            );
-        }
+        // Hand every cli the relay's test anchor, so it takes gateway keys
+        // only from the relay's signed chain, as a production client will.
+        self.relay_anchor_hex = self
+            .relay_manager
+            .as_ref()
+            .and_then(|manager| manager.relay(0))
+            .and_then(|relay| relay.ohttp_anchor())
+            .map(hex::encode);
 
         self.started = true;
 
@@ -395,8 +338,8 @@ impl Orchestrator {
             CLI_OHTTP_RELAY_URL_ENV.to_string(),
             self.cli_ohttp_route_url()?,
         );
-        if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
-            extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
+        if let Some(hex) = self.relay_anchor_hex.as_ref() {
+            extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
         }
 
         let user = UserBuilder::new(&name, relay_url)
@@ -438,6 +381,9 @@ impl Orchestrator {
 
         let mut extra_env = HashMap::new();
         extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
+        if let Some(hex) = self.relay_anchor_hex.as_ref() {
+            extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
+        }
 
         let user = UserBuilder::new(&name, relay_url)
             .with_devices(device_count)
@@ -521,8 +467,8 @@ impl Orchestrator {
             CLI_OHTTP_RELAY_URL_ENV.to_string(),
             self.cli_ohttp_route_url()?,
         );
-        if let Some(hex) = self.cli_bundled_ohttp_key_hex.as_ref() {
-            extra_env.insert(CLI_BUNDLED_OHTTP_KEY_HEX_ENV.to_string(), hex.clone());
+        if let Some(hex) = self.relay_anchor_hex.as_ref() {
+            extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
         }
 
         let mut user = User::with_relay(&name, &relay_url);
@@ -557,6 +503,9 @@ impl Orchestrator {
         let mut user = User::with_relay(&name, &relay_url);
         for mut extra_env in device_extra_envs {
             extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url.clone());
+            if let Some(hex) = self.relay_anchor_hex.as_ref() {
+                extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
+            }
             user.add_cli_device_with_env(&relay_url, &extra_env)?;
         }
 
@@ -634,6 +583,24 @@ impl Orchestrator {
             rm.stop_relay(index).await?;
         }
         Ok(())
+    }
+
+    /// Move the primary relay's OHTTP gateway `windows` days on (#288).
+    pub async fn advance_relay_ohttp_windows(&self, windows: u64) -> E2eResult<u64> {
+        self.primary_relay()?.advance_ohttp_windows(windows).await
+    }
+
+    /// Set the primary relay's OHTTP clock to `epoch`, keeping it on the day
+    /// a test has moved its clients' clocks to.
+    pub async fn set_relay_ohttp_clock(&self, epoch: u64) -> E2eResult<()> {
+        self.primary_relay()?.set_ohttp_clock(epoch).await
+    }
+
+    fn primary_relay(&self) -> E2eResult<&crate::relay_manager::RelayInstance> {
+        self.relay_manager
+            .as_ref()
+            .and_then(|manager| manager.relay(0))
+            .ok_or_else(|| E2eError::scenario("No relay available"))
     }
 
     /// Restart a specific relay (for failover testing).

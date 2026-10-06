@@ -24,7 +24,6 @@ use super::six_device::{
 
 fn six_device_certification_config() -> OrchestratorConfig {
     OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         // These scenarios certify convergence under explicit delivery faults.
         // Rate limiting has its own OHTTP integration test and can otherwise
         // delay one causal round beyond this suite's bounded convergence loop.
@@ -342,7 +341,6 @@ async fn integration_cross_device_card_convergence() {
 #[tokio::test]
 async fn integration_six_device_exchange_and_update_convergence() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -1103,7 +1101,6 @@ async fn integration_six_device_duress_alert_certification() {
 #[tokio::test]
 async fn integration_six_device_offline_catchup_converges_exact_values() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -1222,7 +1219,6 @@ async fn integration_six_device_offline_catchup_converges_exact_values() {
 #[tokio::test]
 async fn integration_six_device_faulted_relay_delivery_converges_exact_values() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -1756,7 +1752,6 @@ async fn integration_six_device_bounded_clock_skew_converges_to_later_update() {
 #[tokio::test]
 async fn integration_six_device_personal_note_tombstone_converges_owner_only() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -2449,7 +2444,6 @@ async fn bob_holds_field(bob: &SharedUser, label: &str, value: &str, expected: b
 #[tokio::test]
 async fn integration_six_device_replacement_and_revocation_preserve_active_convergence() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -2949,7 +2943,6 @@ struct BobView {
 
 fn owner_private_state_config() -> OrchestratorConfig {
     OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         // Both hops must log at info so their output captures prove they
         // observed the live processes before the leak assertions run.
         relay_config: RelayConfig {

@@ -45,11 +45,10 @@ use vauchi_e2e_tests::{
 ///    keypair — decap still fails. The release E2E_BIN_DIR cli
 ///    compiles out the `VAUCHI_ALLOW_DIRECT` escape hatch, so the
 ///    fallback to the bundled production key is unconditional.
-///    Fixed by orchestrator-injected key:
-///    `OrchestratorConfig::inject_local_ohttp_key_into_cli` fetches
-///    the local relay's `/v2/ohttp-key` once at start() and forwards
-///    it to every spawned cli via `VAUCHI_OVERRIDE_BUNDLED_OHTTP_KEY_HEX`.
-///    Problem record `2026-05-04-f13-cli-bundled-key-injection-for-e2e`.
+///    Fixed by orchestrator-injected key (problem record
+///    `2026-05-04-f13-cli-bundled-key-injection-for-e2e`); since #288 no
+///    key is compiled in and the orchestrator hands every cli the relay's
+///    test anchor via `VAUCHI_RELAY_ANCHOR` instead.
 /// 4. **Residual `HTTP 404` on `vauchi sync`** in CI (transient).
 ///    Step 5's first un-ignore attempt deterministically failed in
 ///    CI with `HTTP 404` while passing locally. Suspect 1 — stale CI
@@ -76,7 +75,6 @@ async fn smoke_orchestrator_with_ohttp_relay_routes_through_outer_hop() {
             ..Default::default()
         },
         with_ohttp_relay: true,
-        inject_local_ohttp_key_into_cli: true,
         ..Default::default()
     };
     let mut orch = Orchestrator::with_config(config);
@@ -191,9 +189,6 @@ async fn integration_ohttp_split_relay_config_routes_via_ohttp_relay() {
             ..Default::default()
         },
         with_ohttp_relay: true,
-        // Explicitly disable bundled-key injection so the client must fetch
-        // the live gateway key through the ohttp-relay (the Option B path).
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     };
     let mut orch = Orchestrator::with_config(config);

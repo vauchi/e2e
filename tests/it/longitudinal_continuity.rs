@@ -35,7 +35,6 @@ struct Peers {
 #[tokio::test]
 async fn integration_six_device_longitudinal_contact_continuity_certification() {
     let mut orch = Orchestrator::with_config(OrchestratorConfig {
-        inject_local_ohttp_key_into_cli: false,
         ..Default::default()
     });
     orch.start().await.expect("Failed to start orchestrator");
@@ -63,7 +62,7 @@ async fn integration_six_device_longitudinal_contact_continuity_certification() 
         exchanged_at + 8 * DAY,
     )
     .await;
-    set_clock(&alice, &bob, exchanged_at + 40 * DAY).await;
+    set_clock(&orch, &alice, &bob, exchanged_at + 40 * DAY).await;
     block_ends_continuity(&orch, &alice, &bob, &peers).await;
 
     orch.stop().await.expect("Failed to stop orchestrator");
@@ -76,7 +75,7 @@ async fn ignore_keeps_continuity(
     peers: &Peers,
     day: u64,
 ) {
-    set_clock(alice, bob, day).await;
+    set_clock(orch, alice, bob, day).await;
     act(
         alice,
         2,
@@ -104,7 +103,7 @@ async fn ignore_keeps_continuity(
         "Bob is never told he is ignored"
     );
 
-    set_clock(alice, bob, day + UNDO_LATER).await;
+    set_clock(orch, alice, bob, day + UNDO_LATER).await;
     act(
         alice,
         0,
@@ -122,7 +121,7 @@ async fn archive_and_offline_catch_up_keep_continuity(
     peers: &Peers,
     day: u64,
 ) {
-    set_clock(alice, bob, day).await;
+    set_clock(orch, alice, bob, day).await;
     act(
         alice,
         1,
@@ -143,7 +142,7 @@ async fn archive_and_offline_catch_up_keep_continuity(
 
     // A3 stays offline while Bob changes his details and Alice unarchives.
     publish(bob, 0, "LongBobPhone", "+12025550703", None).await;
-    set_clock(alice, bob, day + UNDO_LATER).await;
+    set_clock(orch, alice, bob, day + UNDO_LATER).await;
     act(
         alice,
         0,
@@ -212,7 +211,13 @@ async fn block_ends_continuity(
 
 /// Moves every one of the six devices' clocks to `epoch` (the CLI's
 /// `e2e-test-clock` build reads it on each command).
-async fn set_clock(alice: &SharedUser, bob: &SharedUser, epoch: u64) {
+/// Moves every device's clock to `epoch`, and the relay's OHTTP clock with
+/// it: an anchored CLI accepts a gateway key only for the day it is in
+/// (#288), so the relay must sign keys for that day too.
+async fn set_clock(orch: &Orchestrator, alice: &SharedUser, bob: &SharedUser, epoch: u64) {
+    orch.set_relay_ohttp_clock(epoch)
+        .await
+        .expect("the relay's OHTTP clock follows the devices'");
     for user in [alice, bob] {
         let user = user.read().await;
         for index in 0..3 {

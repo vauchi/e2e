@@ -145,6 +145,14 @@ impl RelayInstance {
     pub async fn advance_ohttp_windows(&self, windows: u64) -> E2eResult<u64> {
         let target =
             (self.ohttp_clock() / OHTTP_WINDOW_SECONDS + windows) * OHTTP_WINDOW_SECONDS + 60;
+        self.set_ohttp_clock(target).await?;
+        Ok(target)
+    }
+
+    /// Set the relay's OHTTP clock to `epoch` (Unix seconds), so it signs
+    /// keys for the day a test has moved its clients to. Only forward.
+    pub async fn set_ohttp_clock(&self, epoch: u64) -> E2eResult<()> {
+        let target = epoch;
         let response = reqwest::Client::new()
             .post(format!("{}/__e2e/clock", self.http_url()))
             .body(target.to_string())
@@ -154,7 +162,7 @@ impl RelayInstance {
         match response.status() {
             reqwest::StatusCode::OK => {
                 self.ohttp_clock.store(target, Ordering::SeqCst);
-                Ok(target)
+                Ok(())
             }
             reqwest::StatusCode::NOT_FOUND => Err(E2eError::relay(
                 "the relay has no /__e2e/clock: build it with --features e2e-test-clock",
