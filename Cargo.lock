@@ -3015,8 +3015,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.75.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.0#5ad0868260881390ccb40c6384669be107c06f5f"
+version = "0.75.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.1#861f8fcbf5a8de632dbee28b62af3895eb80b05f"
 dependencies = [
  "base64",
  "hex",
@@ -3034,8 +3034,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.75.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.0#5ad0868260881390ccb40c6384669be107c06f5f"
+version = "0.75.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.1#861f8fcbf5a8de632dbee28b62af3895eb80b05f"
 dependencies = [
  "argon2",
  "base64",
@@ -3112,8 +3112,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.75.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.0#5ad0868260881390ccb40c6384669be107c06f5f"
+version = "0.75.1"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.1#861f8fcbf5a8de632dbee28b62af3895eb80b05f"
 dependencies = [
  "serde",
  "serde_json",
@@ -3123,7 +3123,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
-source = "git+https://gitlab.com/vauchi/relay.git?branch=main#85959c148d9a794aec7d45b96746c2d3cc24c652"
+source = "git+https://gitlab.com/vauchi/relay.git?branch=main#3b475a7cb3b8390f35267893a2429020289ceed4"
 dependencies = [
  "aws-lc-rs",
  "axum",

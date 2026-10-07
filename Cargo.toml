@@ -32,8 +32,8 @@ seed-contacts = ["dep:fake", "dep:rand"]
 # Tracks the tag `cli` ships (cli/Cargo.toml), because CI builds the E2E
 # CLI binary from cli main — a pin behind it certifies a core the CLI
 # under test is not running.
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.0", version = "=0.75.0" }
-vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.0", version = "=0.75.0", features = ["network-native-tls"] }
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.1", version = "=0.75.1" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.1", version = "=0.75.1", features = ["network-native-tls"] }
 # Force vauchi-relay's transitive protocol dependency to the same Core tag
 # so the relay and CLI agree on the wire format.
 
@@ -94,7 +94,7 @@ vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
 
 # Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
 # pinned to the Core tag above like vauchi-core.
-vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.0", version = "=0.75.0" }
+vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.75.1", version = "=0.75.1" }
 
 # OHTTP key generation for stale-key error tests
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"] }
