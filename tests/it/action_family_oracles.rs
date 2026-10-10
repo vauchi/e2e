@@ -305,13 +305,39 @@ fn panic_shred_completes_local_erasure_without_network() {
 
 use crate::ohttp_helpers::spawn_ohttp_stack;
 
+/// The endpoint flags of a CLI that reaches `relay` only through the
+/// outer hop `ohttp`, anchored to the real relay behind it: an anchored
+/// client reads only signed gateway keys (#288; the unsigned
+/// `/v2/ohttp-key` is retired).
+fn hop_args<'a>(relay: &'a str, anchor: &'a str, ohttp: &'a str) -> [&'a str; 6] {
+    [
+        "--relay",
+        relay,
+        "--relay-anchor",
+        anchor,
+        "--ohttp-relay",
+        ohttp,
+    ]
+}
+
+/// The test anchor of the stack's relay, as the CLI takes it.
+fn relay_anchor_hex(relay_mgr: &vauchi_e2e_tests::relay_manager::RelayManager) -> String {
+    hex::encode(
+        relay_mgr
+            .relay(0)
+            .expect("relay")
+            .ohttp_anchor()
+            .expect("the harness gave the relay a test anchor"),
+    )
+}
+
+fn with_hop<'a>(command: &[&'a str], hop: &[&'a str]) -> Vec<&'a str> {
+    command.iter().chain(hop).copied().collect()
+}
+
 /// Initialize a named identity against explicit endpoints.
-fn init_named_identity(data_dir: &Path, name: &str, relay: &str, ohttp: &str) {
-    let outcome = run_cli(
-        &["init", name, "--relay", relay, "--ohttp-relay", ohttp],
-        &[],
-        data_dir,
-    );
+fn init_named_identity(data_dir: &Path, name: &str, hop: &[&str]) {
+    let outcome = run_cli(&with_hop(&["init", name], hop), &[], data_dir);
     assert!(
         outcome.success,
         "init {name} should succeed: {}",
@@ -335,19 +361,8 @@ fn qr_token(output: &str) -> String {
     panic!("no QR token in output: {output}");
 }
 
-fn exchange_start(data_dir: &Path, relay: &str, ohttp: &str) -> String {
-    let outcome = run_cli(
-        &[
-            "exchange",
-            "start",
-            "--relay",
-            relay,
-            "--ohttp-relay",
-            ohttp,
-        ],
-        &[],
-        data_dir,
-    );
+fn exchange_start(data_dir: &Path, hop: &[&str]) -> String {
+    let outcome = run_cli(&with_hop(&["exchange", "start"], hop), &[], data_dir);
     assert!(
         outcome.success,
         "exchange start should succeed: {}",
@@ -356,20 +371,8 @@ fn exchange_start(data_dir: &Path, relay: &str, ohttp: &str) -> String {
     qr_token(&outcome.stdout)
 }
 
-fn exchange_complete(data_dir: &Path, qr: &str, relay: &str, ohttp: &str) {
-    let outcome = run_cli(
-        &[
-            "exchange",
-            "complete",
-            qr,
-            "--relay",
-            relay,
-            "--ohttp-relay",
-            ohttp,
-        ],
-        &[],
-        data_dir,
-    );
+fn exchange_complete(data_dir: &Path, qr: &str, hop: &[&str]) {
+    let outcome = run_cli(&with_hop(&["exchange", "complete", qr], hop), &[], data_dir);
     assert!(
         outcome.success,
         "exchange complete should succeed: {}",
@@ -377,22 +380,14 @@ fn exchange_complete(data_dir: &Path, qr: &str, relay: &str, ohttp: &str) {
     );
 }
 
-fn sync_cli(data_dir: &Path, relay: &str, ohttp: &str) -> CliOutcome {
-    let outcome = run_cli(
-        &["sync", "--relay", relay, "--ohttp-relay", ohttp],
-        &[],
-        data_dir,
-    );
+fn sync_cli(data_dir: &Path, hop: &[&str]) -> CliOutcome {
+    let outcome = run_cli(&with_hop(&["sync"], hop), &[], data_dir);
     assert!(outcome.success, "sync should succeed: {}", outcome.stderr);
     outcome
 }
 
-fn contacts_list(data_dir: &Path, relay: &str, ohttp: &str) -> String {
-    let outcome = run_cli(
-        &["contacts", "list", "--relay", relay, "--ohttp-relay", ohttp],
-        &[],
-        data_dir,
-    );
+fn contacts_list(data_dir: &Path, hop: &[&str]) -> String {
+    let outcome = run_cli(&with_hop(&["contacts", "list"], hop), &[], data_dir);
     assert!(
         outcome.success,
         "contacts list should succeed: {}",
@@ -414,22 +409,25 @@ fn contacts_list(data_dir: &Path, relay: &str, ohttp: &str) -> String {
 async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
     let app = HostileServer::start(KeyMode::Garbage);
+    let app_url = app.url();
+    let anchor = relay_anchor_hex(&relay_mgr);
+    let hop = hop_args(&app_url, &anchor, &ohttp_url);
 
     let alice = tempfile::tempdir().expect("alice data dir");
     let bob = tempfile::tempdir().expect("bob data dir");
-    init_named_identity(alice.path(), "Alice", &app.url(), &ohttp_url);
-    init_named_identity(bob.path(), "Bob", &app.url(), &ohttp_url);
+    init_named_identity(alice.path(), "Alice", &hop);
+    init_named_identity(bob.path(), "Bob", &hop);
 
     // Stage the contact through the OHTTP path: both sides start, both
     // complete, both sync — exactly the harness's mutual-exchange flow.
-    let alice_qr = exchange_start(alice.path(), &app.url(), &ohttp_url);
-    let bob_qr = exchange_start(bob.path(), &app.url(), &ohttp_url);
-    exchange_complete(bob.path(), &alice_qr, &app.url(), &ohttp_url);
-    exchange_complete(alice.path(), &bob_qr, &app.url(), &ohttp_url);
-    sync_cli(alice.path(), &app.url(), &ohttp_url);
-    sync_cli(bob.path(), &app.url(), &ohttp_url);
+    let alice_qr = exchange_start(alice.path(), &hop);
+    let bob_qr = exchange_start(bob.path(), &hop);
+    exchange_complete(bob.path(), &alice_qr, &hop);
+    exchange_complete(alice.path(), &bob_qr, &hop);
+    sync_cli(alice.path(), &hop);
+    sync_cli(bob.path(), &hop);
     assert!(
-        contacts_list(alice.path(), &app.url(), &ohttp_url).contains("Bob"),
+        contacts_list(alice.path(), &hop).contains("Bob"),
         "Alice should have Bob staged as a contact"
     );
 
@@ -437,14 +435,7 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
     // delivery) must go through the outer hop; the report must show
     // both legs delivered.
     let outcome = run_cli_pty(
-        &[
-            "gdpr",
-            "panic-shred",
-            "--relay",
-            &app.url(),
-            "--ohttp-relay",
-            &ohttp_url,
-        ],
+        &with_hop(&["gdpr", "panic-shred"], &hop),
         "PANIC\n",
         alice.path(),
     );
@@ -471,8 +462,8 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
 
     // Bob syncs: the delivered revocation crypto-shreds Alice's CEK and
     // removes her contact row.
-    sync_cli(bob.path(), &app.url(), &ohttp_url);
-    let bob_contacts = contacts_list(bob.path(), &app.url(), &ohttp_url);
+    sync_cli(bob.path(), &hop);
+    let bob_contacts = contacts_list(bob.path(), &hop);
     assert!(
         !bob_contacts.contains("Alice"),
         "Bob must observe Alice's revocation (contact removed), got: {bob_contacts}"
@@ -505,22 +496,25 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
 async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
     let app = HostileServer::start(KeyMode::Garbage);
+    let app_url = app.url();
+    let anchor = relay_anchor_hex(&relay_mgr);
+    let hop = hop_args(&app_url, &anchor, &ohttp_url);
 
     let alice = tempfile::tempdir().expect("alice data dir");
     let bob = tempfile::tempdir().expect("bob data dir");
-    init_named_identity(alice.path(), "Alice", &app.url(), &ohttp_url);
-    init_named_identity(bob.path(), "Bob", &app.url(), &ohttp_url);
+    init_named_identity(alice.path(), "Alice", &hop);
+    init_named_identity(bob.path(), "Bob", &hop);
 
     // Stage the contact through the OHTTP path — same mutual-exchange
     // flow as the panic-shred oracle.
-    let alice_qr = exchange_start(alice.path(), &app.url(), &ohttp_url);
-    let bob_qr = exchange_start(bob.path(), &app.url(), &ohttp_url);
-    exchange_complete(bob.path(), &alice_qr, &app.url(), &ohttp_url);
-    exchange_complete(alice.path(), &bob_qr, &app.url(), &ohttp_url);
-    sync_cli(alice.path(), &app.url(), &ohttp_url);
-    sync_cli(bob.path(), &app.url(), &ohttp_url);
+    let alice_qr = exchange_start(alice.path(), &hop);
+    let bob_qr = exchange_start(bob.path(), &hop);
+    exchange_complete(bob.path(), &alice_qr, &hop);
+    exchange_complete(alice.path(), &bob_qr, &hop);
+    sync_cli(alice.path(), &hop);
+    sync_cli(bob.path(), &hop);
     assert!(
-        contacts_list(alice.path(), &app.url(), &ohttp_url).contains("Bob"),
+        contacts_list(alice.path(), &hop).contains("Bob"),
         "Alice should have Bob staged as a contact"
     );
 
@@ -534,14 +528,7 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
     let scheduled_at = now.saturating_sub(8 * 24 * 60 * 60).to_string();
 
     let outcome = run_cli_pty_env(
-        &[
-            "gdpr",
-            "schedule-deletion",
-            "--relay",
-            &app.url(),
-            "--ohttp-relay",
-            &ohttp_url,
-        ],
+        &with_hop(&["gdpr", "schedule-deletion"], &hop),
         "delete\n",
         alice.path(),
         &[("VAUCHI_TEST_CLOCK_EPOCH", &scheduled_at)],
@@ -556,14 +543,7 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
     // purge + Bob's revocation delivery) must go through the outer hop;
     // the report must show both legs.
     let outcome = run_cli_pty(
-        &[
-            "gdpr",
-            "execute-deletion",
-            "--relay",
-            &app.url(),
-            "--ohttp-relay",
-            &ohttp_url,
-        ],
+        &with_hop(&["gdpr", "execute-deletion"], &hop),
         "EXECUTE\n",
         alice.path(),
     );
@@ -590,13 +570,9 @@ async fn hard_shred_after_grace_fanout_over_outer_hop_only() {
 
     // Bob's normal-clock sync crypto-shreds Alice's CEK and removes her
     // contact row after receiving the delivered revocation.
-    let sync = run_cli(
-        &["sync", "--relay", &app.url(), "--ohttp-relay", &ohttp_url],
-        &[],
-        bob.path(),
-    );
+    let sync = run_cli(&with_hop(&["sync"], &hop), &[], bob.path());
     assert!(sync.success, "pinned sync should succeed: {}", sync.stderr);
-    let bob_contacts = contacts_list(bob.path(), &app.url(), &ohttp_url);
+    let bob_contacts = contacts_list(bob.path(), &hop);
     assert!(
         !bob_contacts.contains("Alice"),
         "Bob must observe Alice's revocation (contact removed), got: {bob_contacts}"
