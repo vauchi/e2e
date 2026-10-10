@@ -17,12 +17,12 @@ async fn fetch(url: &str) -> (reqwest::StatusCode, Vec<u8>) {
     (status, response.bytes().await.expect("read body").to_vec())
 }
 
-async fn signed_record(ohttp_url: &str) -> SignedKeyConfig {
-    let (status, body) = fetch(&format!("{ohttp_url}/v2/ohttp-key-signed")).await;
+async fn signed_record(base_url: &str) -> SignedKeyConfig {
+    let (status, body) = fetch(&format!("{base_url}/v2/ohttp-key-signed")).await;
     assert_eq!(
         status,
         reqwest::StatusCode::OK,
-        "signed record via the outer relay"
+        "signed record from {base_url}"
     );
     SignedKeyConfig::decode(&body).expect("a well-formed signed record")
 }
@@ -30,7 +30,7 @@ async fn signed_record(ohttp_url: &str) -> SignedKeyConfig {
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
 #[tokio::test]
 async fn the_record_through_the_outer_relay_is_accepted_and_its_key_works() {
-    let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
+    let (mut relay_mgr, mut ohttp_mgr, relay_url, ohttp_url) =
         spawn_ohttp_stack_with_cache(0).await;
     let relay = relay_mgr.relay(0).expect("relay");
     let anchor = relay
@@ -42,10 +42,10 @@ async fn the_record_through_the_outer_relay_is_accepted_and_its_key_works() {
     let held = accept_signed_key(&record, &anchor, relay.ohttp_clock(), None)
         .expect("core accepts the relay's record under its anchor");
     assert_eq!(held.window, window_of(relay.ohttp_clock()));
-    let (_, served) = fetch(&format!("{ohttp_url}/v2/ohttp-key")).await;
+    let direct = signed_record(&relay_url).await;
     assert_eq!(
-        held.key_config, served,
-        "the signed key is the key the gateway serves"
+        held.key_config, direct.key_config,
+        "the outer relay passes the gateway's record through unchanged"
     );
     let blob_id = create_ohttp_transport(&ohttp_url, &held.key_config)
         .send_update(&"a".repeat(64), "c2lnbmVk", None)

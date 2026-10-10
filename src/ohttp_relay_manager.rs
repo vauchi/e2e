@@ -38,7 +38,7 @@ pub struct OhttpRelayConfig {
     pub rate_limit_per_sec: u32,
     /// Request timeout in seconds.
     pub request_timeout_secs: u64,
-    /// TTL for caching upstream `/v2/ohttp-key` responses (seconds).
+    /// TTL for caching upstream `/v2/ohttp-key-signed` records (seconds).
     /// Set to 0 to disable caching. Default: 300.
     pub key_cache_ttl_secs: u64,
     /// `RUST_LOG` for the spawned process; `None` inherits the parent's
