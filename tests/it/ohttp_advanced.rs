@@ -14,41 +14,47 @@ use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use vauchi_e2e_tests::relay_manager::{RelayConfig, RelayManager};
 
-use ohttp_helpers::{create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_with_cache};
+use ohttp_helpers::{
+    create_ohttp_transport, signed_key_config, signed_ohttp_key, spawn_ohttp_stack,
+    spawn_ohttp_stack_with_cache,
+};
+use vauchi_protocol::ohttp_key::{SignedKeyConfig, window_of};
 
 // @scenario: sync:OHTTP cached key remains valid for requests
 #[tokio::test]
 async fn integration_ohttp_cached_key_remains_valid_during_rotation() {
-    // The outer relay caches the key for an hour: past a window boundary it
-    // still hands out yesterday's key, which the gateway must keep accepting.
+    // The outer relay caches the signed record for an hour: past a window
+    // boundary it still hands out yesterday's record, whose key the gateway
+    // must keep accepting.
     let (mut relay_mgr, mut ohttp_mgr, relay_url, ohttp_url) =
         spawn_ohttp_stack_with_cache(3_600).await;
-    let client = reqwest::Client::new();
-    let fetch = |url: String| {
-        let client = client.clone();
-        async move {
-            client
-                .get(url)
-                .send()
-                .await
-                .expect("fetch key")
-                .bytes()
-                .await
-                .expect("read key")
-        }
+    let relay = relay_mgr.relay(0).expect("relay");
+    let key = signed_key_config(&ohttp_url, relay).await;
+    let record_key = |url: String| async move {
+        let body = reqwest::Client::new()
+            .get(url)
+            .send()
+            .await
+            .expect("fetch the signed record")
+            .bytes()
+            .await
+            .expect("read the signed record");
+        SignedKeyConfig::decode(&body)
+            .expect("a well-formed signed record")
+            .key_config
     };
-    let key = fetch(format!("{ohttp_url}/v2/ohttp-key")).await;
 
-    relay_mgr
-        .relay(0)
-        .expect("relay")
+    relay
         .advance_ohttp_windows(1)
         .await
         .expect("advance one window");
 
-    let cached = fetch(format!("{ohttp_url}/v2/ohttp-key")).await;
-    let current = fetch(format!("{relay_url}/v2/ohttp-key")).await;
-    assert_eq!(cached, key, "the outer relay still serves its cached key");
+    let cached = record_key(format!("{ohttp_url}/v2/ohttp-key-signed")).await;
+    let current = record_key(format!("{relay_url}/v2/ohttp-key-signed")).await;
+    assert_eq!(
+        cached, key,
+        "the outer relay still serves its cached record"
+    );
     assert_ne!(current, key, "the gateway has moved to the next window");
 
     let stale_blob_id = create_ohttp_transport(&ohttp_url, &cached)
@@ -219,7 +225,7 @@ async fn integration_ohttp_relay_rate_limit_returns_429() {
     );
 
     let key_resp = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .get(format!("{ohttp_url}/v2/ohttp-key-signed"))
         .send()
         .await
         .expect("key fetch");
@@ -240,17 +246,8 @@ async fn integration_ohttp_relay_rate_limit_returns_429() {
 async fn integration_ohttp_and_direct_http_coexist() {
     let (mut relay_mgr, mut ohttp_mgr, relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
-    let client = reqwest::Client::new();
-
     // Fetch OHTTP key
-    let key_bytes = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     // 1. Send via OHTTP (through ohttp-relay)
     let ohttp_transport = create_ohttp_transport(&ohttp_url, &key_bytes);
@@ -305,76 +302,47 @@ async fn integration_ohttp_and_direct_http_coexist() {
     relay_mgr.stop_all().await;
 }
 
-// ── P3: Key fingerprint header ────────────────────────────────────
+// ── P3: Signed key record ─────────────────────────────────────────
+//
+// The unsigned key's Key-Fingerprint header (S13) left with the unsigned
+// route (#288 plan 7.5): the anchor's signature chain is what a client
+// checks now, and a record is stable for its whole window.
 
-// @scenario: sync:OHTTP key fingerprint
+// @scenario: sync:OHTTP signed key record
 #[tokio::test]
-async fn integration_ohttp_key_fingerprint_present_and_stable() {
+async fn integration_ohttp_signed_record_stable_within_window() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
+    let relay = relay_mgr.relay(0).expect("relay");
 
     let client = reqwest::Client::new();
-
-    // Fetch key with headers
-    let resp = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key");
-
-    assert!(resp.status().is_success());
-
-    // Key-Fingerprint header must be present (S13)
-    let fingerprint = resp
-        .headers()
-        .get("key-fingerprint")
-        .expect("Key-Fingerprint header must be present (S13)")
-        .to_str()
-        .expect("fingerprint must be valid UTF-8")
-        .to_owned();
-
-    // Must be a hex-encoded SHA-256 (64 hex chars)
+    let mut bodies = Vec::new();
+    for _ in 0..2 {
+        let resp = client
+            .get(format!("{ohttp_url}/v2/ohttp-key-signed"))
+            .send()
+            .await
+            .expect("fetch the signed record");
+        assert!(resp.status().is_success());
+        assert_eq!(
+            resp.headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok()),
+            Some("application/vnd.vauchi.ohttp-key-signed")
+        );
+        bodies.push(resp.bytes().await.expect("read the signed record"));
+    }
     assert_eq!(
-        fingerprint.len(),
-        64,
-        "Key-Fingerprint must be 64 hex chars (SHA-256), got {} chars: '{}'",
-        fingerprint.len(),
-        fingerprint
-    );
-    assert!(
-        fingerprint.chars().all(|c| c.is_ascii_hexdigit()),
-        "Key-Fingerprint must be hex-only, got: '{}'",
-        fingerprint
+        bodies[0], bodies[1],
+        "the record must be stable within its window"
     );
 
-    // Verify stability: fetching again returns the same fingerprint
-    let key_bytes = resp.bytes().await.expect("read key");
-    let resp2 = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("second key fetch");
-    let fingerprint2 = resp2
-        .headers()
-        .get("key-fingerprint")
-        .expect("fingerprint on second fetch")
-        .to_str()
-        .unwrap()
-        .to_owned();
-    let key_bytes2 = resp2.bytes().await.expect("read key 2");
-
-    assert_eq!(key_bytes, key_bytes2, "key must be stable between fetches");
+    let held = signed_ohttp_key(&ohttp_url, relay).await;
+    let record = SignedKeyConfig::decode(&bodies[0]).expect("a well-formed record");
     assert_eq!(
-        fingerprint, fingerprint2,
-        "fingerprint must be stable between fetches"
+        held.key_config, record.key_config,
+        "the accepted key is the key the record carries"
     );
-
-    // Verify fingerprint matches SHA-256 of key bytes
-    use sha2::{Digest, Sha256};
-    let computed = hex::encode(Sha256::digest(&key_bytes));
-    assert_eq!(
-        fingerprint, computed,
-        "Key-Fingerprint must equal SHA-256 of key config bytes"
-    );
+    assert_eq!(held.window, window_of(relay.ohttp_clock()));
 
     ohttp_mgr.stop().await;
     relay_mgr.stop_all().await;
@@ -387,15 +355,7 @@ async fn integration_ohttp_key_fingerprint_present_and_stable() {
 async fn integration_ohttp_response_sizes_are_padded() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
-    let client = reqwest::Client::new();
-    let key_bytes = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     // Send two payloads of very different sizes — the OHTTP responses should
     // be similar sizes due to padding (both small payloads land in the same
@@ -437,14 +397,7 @@ async fn integration_ohttp_requests_during_rotation_succeed() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
         spawn_ohttp_stack_with_cache(0).await;
 
-    let key_bytes = reqwest::Client::new()
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     // Ten requests with one key; the gateway crosses a window boundary
     // after the fifth. Every one must succeed: the key it was fetched with

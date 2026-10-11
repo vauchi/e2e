@@ -14,14 +14,15 @@
 //!    before any network I/O with the distinct-origin error — the
 //!    retired `VAUCHI_ALLOW_DIRECT` hatch is gone from the binary
 //!    (core!1393/1396), so injecting it changes nothing.
-//! 2. Hostile bootstrap: an outer relay answering `/v2/ohttp-key` with
-//!    garbage, an oversized body, a wrong content type, or an empty
-//!    body must not poison the client — sync fails bounded, and the
+//! 2. Hostile bootstrap: an outer relay answering `/v2/ohttp-key-signed`
+//!    with garbage, an oversized body, a wrong content type, an empty
+//!    body, or a well-formed record that does not chain to the client's
+//!    anchor must not poison the client — sync fails bounded, and the
 //!    application relay sees ZERO direct requests (every application
-//!    contact must traverse the outer hop, ADR-037). After rejecting a
-//!    poisoned key the client falls back to its compiled-in bundled
-//!    gateway key, so the outer may record one encapsulated POST it
-//!    cannot decrypt; we pin that it sees OHTTP endpoints only.
+//!    contact must traverse the outer hop, ADR-037). The client is
+//!    anchored and has no compiled-in key (#288), so it never asks for
+//!    the retired unsigned `/v2/ohttp-key` and never encapsulates to a
+//!    key it did not accept.
 //!
 //! Claim boundary: these tests pin the `vauchi sync` production path
 //! against the release CLI binary. The device-link initiator/responder,
@@ -129,10 +130,50 @@ pub(crate) enum KeyMode {
     Oversized,
     WrongType,
     Empty,
+    Forged,
+}
+
+/// The anchor the probe CLI trusts. Nothing hostile here signs under it.
+const PROBE_ANCHOR_HEX: &str = "4242424242424242424242424242424242424242424242424242424242424242";
+
+const SIGNED_KEY_TYPE: &str = "application/vnd.vauchi.ohttp-key-signed";
+
+/// A well-formed signed record for today whose signatures chain to no
+/// anchor: what an outer relay forging a gateway key could serve.
+fn forged_record() -> Vec<u8> {
+    use ohttp::{KeyConfig, SymmetricSuite, hpke};
+    use vauchi_protocol::ohttp_key::{IntermediateCert, SignedKeyConfig, window_of};
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock after 1970")
+        .as_secs();
+    let key_config = KeyConfig::new(
+        0,
+        hpke::Kem::X25519Sha256,
+        vec![SymmetricSuite::new(
+            hpke::Kdf::HkdfSha256,
+            hpke::Aead::ChaCha20Poly1305,
+        )],
+    )
+    .and_then(|config| config.encode())
+    .expect("a KeyConfig");
+    SignedKeyConfig {
+        window: window_of(now),
+        key_config,
+        signature: [0x11; 64],
+        intermediate: IntermediateCert {
+            public_key: [0x22; 32],
+            not_before: 0,
+            not_after: u64::MAX,
+            anchor_signature: [0x33; 64],
+        },
+    }
+    .encode()
 }
 
 /// In-process hostile HTTP endpoint: records every request line and
-/// serves a poisoned `/v2/ohttp-key` response (500 elsewhere).
+/// serves a poisoned `/v2/ohttp-key-signed` response (500 elsewhere).
 pub(crate) struct HostileServer {
     port: u16,
     requests: Arc<Mutex<Vec<String>>>,
@@ -187,13 +228,14 @@ impl HostileServer {
             .expect("request log")
             .push(request_line.clone());
 
-        let is_key_fetch = request_line.starts_with("GET /v2/ohttp-key");
+        let is_key_fetch = request_line.starts_with("GET /v2/ohttp-key-signed");
         let (status, content_type, body): (&str, &str, Vec<u8>) = if is_key_fetch {
             match mode {
-                KeyMode::Garbage => ("200 OK", "application/ohttp-keys", vec![0xFF; 256]),
-                KeyMode::Oversized => ("200 OK", "application/ohttp-keys", vec![0u8; 128 * 1024]),
+                KeyMode::Garbage => ("200 OK", SIGNED_KEY_TYPE, vec![0xFF; 256]),
+                KeyMode::Oversized => ("200 OK", SIGNED_KEY_TYPE, vec![0u8; 128 * 1024]),
                 KeyMode::WrongType => ("200 OK", "application/json", b"{}".to_vec()),
-                KeyMode::Empty => ("200 OK", "application/ohttp-keys", Vec::new()),
+                KeyMode::Empty => ("200 OK", SIGNED_KEY_TYPE, Vec::new()),
+                KeyMode::Forged => ("200 OK", SIGNED_KEY_TYPE, forged_record()),
             }
         } else {
             (
@@ -289,7 +331,7 @@ fn origin_boundary_probes_fail_closed() {
 }
 
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
-/// Hostile bootstrap: poisoned `/v2/ohttp-key` responses must not
+/// Hostile bootstrap: poisoned `/v2/ohttp-key-signed` responses must not
 /// poison the client, and the application relay must see zero direct
 /// requests throughout.
 // @internal
@@ -300,6 +342,7 @@ fn hostile_bootstrap_responses_fail_closed() {
         ("oversized key response", KeyMode::Oversized),
         ("wrong content type", KeyMode::WrongType),
         ("empty key response", KeyMode::Empty),
+        ("record under another anchor", KeyMode::Forged),
     ];
 
     let data_dir = tempfile::tempdir().expect("probe data dir");
@@ -309,7 +352,15 @@ fn hostile_bootstrap_responses_fail_closed() {
         let outer = HostileServer::start(mode);
         let app = HostileServer::start(KeyMode::Garbage);
         let outcome = run_cli(
-            &["sync", "--relay", &app.url(), "--ohttp-relay", &outer.url()],
+            &[
+                "sync",
+                "--relay",
+                &app.url(),
+                "--relay-anchor",
+                PROBE_ANCHOR_HEX,
+                "--ohttp-relay",
+                &outer.url(),
+            ],
             &[],
             data_dir.path(),
         );
@@ -328,20 +379,20 @@ fn hostile_bootstrap_responses_fail_closed() {
         assert!(
             outer_log
                 .iter()
-                .any(|line| line.starts_with("GET /v2/ohttp-key")),
-            "{label}: the client should attempt the public key bootstrap \
+                .any(|line| line.starts_with("GET /v2/ohttp-key-signed ")),
+            "{label}: the client should fetch the signed key record \
              from the outer relay, got: {outer_log:?}"
         );
-        // After the poisoned key is rejected, the client falls back to
-        // its compiled-in bundled gateway key (sync_http.rs
-        // `resolve_ohttp_key` step 3) and may attempt one encapsulated
-        // POST the hostile outer cannot decrypt. Pin that the outer
-        // only ever sees the OHTTP endpoints — never an application
-        // API path in cleartext.
+        // Anchored, the client asks only for signed records (and, once
+        // its anchor stops verifying, the rollover chain). It holds no
+        // accepted key, so it encapsulates nothing, and it never falls
+        // back to the retired unsigned key or an application path.
         for line in &outer_log {
             assert!(
-                line.starts_with("GET /v2/ohttp-key") || line.starts_with("POST /v2/ohttp "),
-                "{label}: the outer hop must only see OHTTP endpoints, got: {outer_log:?}"
+                line.starts_with("GET /v2/ohttp-key-signed ")
+                    || line.starts_with("GET /v2/ohttp-anchor-rollover "),
+                "{label}: the outer hop must only see signed-key bootstrap \
+                 requests, got: {outer_log:?}"
             );
         }
         assert!(

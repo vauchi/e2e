@@ -16,10 +16,14 @@
 #[allow(dead_code)]
 use crate::ohttp_helpers;
 
+use vauchi_core::network::ohttp_key_trust::HeldOhttpKey;
 use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient, ProxyConfig};
 use vauchi_e2e_tests::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 
-use ohttp_helpers::{create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack_with_cache};
+use ohttp_helpers::{
+    create_ohttp_transport, relay_ohttp_clock, signed_key_config, signed_ohttp_key,
+    spawn_ohttp_stack, spawn_ohttp_stack_with_cache,
+};
 
 // ── P1: Key Bootstrap ──────────────────────────────────────────────
 
@@ -28,21 +32,9 @@ use ohttp_helpers::{create_ohttp_transport, spawn_ohttp_stack, spawn_ohttp_stack
 async fn integration_ohttp_key_bootstrap_via_relay() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
-    // Fetch OHTTP key config via ohttp-relay → vauchi-relay
-    let client = reqwest::Client::new();
-    let resp = client
-        .get(format!("{}/v2/ohttp-key", ohttp_url))
-        .send()
-        .await
-        .expect("fetch ohttp key");
-
-    assert!(
-        resp.status().is_success(),
-        "OHTTP key fetch failed: {}",
-        resp.status()
-    );
-
-    let key_bytes = resp.bytes().await.expect("read key bytes");
+    // Fetch the signed key record via ohttp-relay → vauchi-relay; accepting
+    // it under the relay's anchor is what a client does before using it.
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
     assert!(!key_bytes.is_empty(), "OHTTP key config must not be empty");
 
     // Verify the key is usable: create an OhttpClient from it
@@ -65,15 +57,7 @@ async fn integration_ohttp_send_and_fetch() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // 1. Fetch OHTTP key
-    let client = reqwest::Client::new();
-    let key_bytes = client
-        .get(format!("{}/v2/ohttp-key", ohttp_url))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     // 2. Create transport with OHTTP
     let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
@@ -169,14 +153,7 @@ async fn integration_ohttp_relay_observations_exclude_update_content() {
     let ohttp_url = ohttp_mgr.url().expect("ohttp relay url");
 
     let client = reqwest::Client::new();
-    let key_bytes = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
     let transport = create_ohttp_transport(&ohttp_url, &key_bytes);
     let recipient_id = "a".repeat(64);
     transport
@@ -224,15 +201,7 @@ async fn integration_ohttp_exchange_offer_claim_complete() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // Fetch OHTTP key
-    let client = reqwest::Client::new();
-    let key_bytes = client
-        .get(format!("{}/v2/ohttp-key", ohttp_url))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     // Initiator: post offer
     let t_offer = create_ohttp_transport(&ohttp_url, &key_bytes);
@@ -377,13 +346,13 @@ async fn integration_ohttp_relay_strips_client_identity() {
                         remote_addr: addr,
                         headers,
                         method: "GET".to_string(),
-                        uri: "/v2/ohttp-key".to_string(),
+                        uri: "/v2/ohttp-key-signed".to_string(),
                     });
 
-                    // Return a dummy key (enough to record the request metadata).
+                    // Return a dummy record (enough to record the request metadata).
                     (
                         StatusCode::OK,
-                        [("content-type", "application/ohttp-keys")],
+                        [("content-type", "application/vnd.vauchi.ohttp-key-signed")],
                         Bytes::from_static(&[0xAA, 0xBB]),
                     )
                 }
@@ -391,7 +360,7 @@ async fn integration_ohttp_relay_strips_client_identity() {
 
         Router::new()
             .route("/v2/ohttp", post(ohttp_handler))
-            .route("/v2/ohttp-key", get(key_handler))
+            .route("/v2/ohttp-key-signed", get(key_handler))
             .route("/health", get(|| async { StatusCode::OK }))
     };
 
@@ -424,7 +393,7 @@ async fn integration_ohttp_relay_strips_client_identity() {
 
     // 3a. Key fetch with identifying headers
     let _key_resp = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
+        .get(format!("{ohttp_url}/v2/ohttp-key-signed"))
         .header("X-Forwarded-For", "192.168.1.42")
         .header("X-Real-Ip", "10.0.0.99")
         .header("Forwarded", "for=203.0.113.50")
@@ -531,17 +500,9 @@ async fn integration_ohttp_key_rotation_grace_period() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) =
         spawn_ohttp_stack_with_cache(0).await;
 
-    let client = reqwest::Client::new();
-
     // 1. Fetch initial key K1
-    let key_k1 = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch K1")
-        .bytes()
-        .await
-        .expect("read K1");
+    let held_k1 = signed_ohttp_key(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
+    let key_k1 = held_k1.key_config.clone();
     assert!(!key_k1.is_empty(), "K1 must not be empty");
 
     // 2. Send with K1 — should succeed (K1 is current)
@@ -562,19 +523,8 @@ async fn integration_ohttp_key_rotation_grace_period() {
         .expect("advance to K2's window");
 
     // 4. Verify key has actually rotated (new key != K1)
-    let key_k2 = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch K2")
-        .bytes()
-        .await
-        .expect("read K2");
-    assert_ne!(
-        key_k1.as_ref(),
-        key_k2.as_ref(),
-        "key must have rotated after waiting"
-    );
+    let key_k2 = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
+    assert_ne!(key_k1, key_k2, "key must have rotated after waiting");
 
     // 5. Send with stale K1 — should STILL succeed (S10 grace period)
     let transport_stale = create_ohttp_transport(&ohttp_url, &key_k1);
@@ -594,25 +544,23 @@ async fn integration_ohttp_key_rotation_grace_period() {
         .expect("advance to K3's window");
 
     // 7. Verify another rotation happened
-    let key_k3 = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("fetch K3")
-        .bytes()
-        .await
-        .expect("read K3");
-    assert_ne!(
-        key_k2.as_ref(),
-        key_k3.as_ref(),
-        "key must have rotated a second time"
-    );
+    let key_k3 = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
+    assert_ne!(key_k2, key_k3, "key must have rotated a second time");
 
     // 8. Send with K1 — evicted after the 2nd rotation, so the relay refuses
     //    it. Since core 831893df the client recovers on that refusal instead
     //    of surfacing it: evict, refetch, retry once. This asserted
-    //    `is_err()` up to core v0.61.0, the pre-recovery contract.
-    let transport_evicted = create_ohttp_transport(&ohttp_url, &key_k1);
+    //    `is_err()` up to core v0.61.0, the pre-recovery contract. Anchored,
+    //    the refetch is a signed record (#288); `/v2/ohttp-key` is retired.
+    let relay = relay_mgr.relay(0).expect("relay");
+    let mut transport_evicted = create_ohttp_transport(&ohttp_url, &key_k1);
+    transport_evicted
+        .set_signed_ohttp(
+            relay.ohttp_anchor().expect("test anchor"),
+            held_k1,
+            relay_ohttp_clock(relay),
+        )
+        .expect("install K1 as the held key");
     let evicted_result = transport_evicted.send_update(&"c".repeat(64), "ZXZpY3RlZA==", None);
     let evicted_message_id =
         evicted_result.expect("doubly-stale K1 must recover via refetch-and-retry");
@@ -627,14 +575,7 @@ async fn integration_ohttp_key_rotation_grace_period() {
     );
 
     // 9. Refetch key and send — should succeed (client recovery)
-    let key_fresh = client
-        .get(format!("{ohttp_url}/v2/ohttp-key"))
-        .send()
-        .await
-        .expect("refetch key")
-        .bytes()
-        .await
-        .expect("read fresh key");
+    let key_fresh = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
     let transport_fresh = create_ohttp_transport(&ohttp_url, &key_fresh);
     let fresh_result = transport_fresh.send_update(&"d".repeat(64), "ZnJlc2g=", None);
     assert!(
@@ -669,17 +610,37 @@ async fn integration_ohttp_with_garbage_key_recovers_via_refetch() {
         config.encode().unwrap()
     };
 
-    let transport = create_ohttp_transport(&ohttp_url, &wrong_key);
+    // The client holds the wrong key as yesterday's signed key, as after a
+    // gateway restart lost it. Anchored, a transport refetches only signed
+    // records (#288); the unsigned `/v2/ohttp-key` is retired.
+    let relay = relay_mgr.relay(0).expect("relay");
+    let current = signed_ohttp_key(&ohttp_url, relay).await;
+    let mut transport = create_ohttp_transport(&ohttp_url, &wrong_key);
+    transport
+        .set_signed_ohttp(
+            relay.ohttp_anchor().expect("test anchor"),
+            HeldOhttpKey {
+                window: current.window - 1,
+                key_config: wrong_key,
+            },
+            relay_ohttp_clock(relay),
+        )
+        .expect("install the held key");
     let result = transport.send_update(&"a".repeat(64), "dGVzdA==", None);
 
     // The relay cannot decapsulate a blob sealed with the wrong key, so it
     // answers 400. Since core 831893df that is read as a rotated key —
-    // evict, refetch `/v2/ohttp-key`, retry once — so the send succeeds.
+    // evict, refetch the signed record, retry once — so the send succeeds.
     // This asserted `is_err()` up to core v0.61.0, the pre-recovery contract.
     let message_id = result.expect("wrong OHTTP key must recover via refetch-and-retry");
     assert!(
         !message_id.is_empty(),
         "recovered send must return a message id"
+    );
+    assert_eq!(
+        transport.held_ohttp_key(),
+        Some(current),
+        "recovery installs today's signed key"
     );
 
     // Recovery must stay inside OHTTP. `allow_direct` is false on this
@@ -705,15 +666,7 @@ async fn smoke_ohttp_key_bootstrap_and_send() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
 
     // 1. Fetch OHTTP key
-    let client = reqwest::Client::new();
-    let key_bytes = client
-        .get(format!("{}/v2/ohttp-key", ohttp_url))
-        .send()
-        .await
-        .expect("fetch key")
-        .bytes()
-        .await
-        .expect("read key");
+    let key_bytes = signed_key_config(&ohttp_url, relay_mgr.relay(0).expect("relay")).await;
 
     assert!(!key_bytes.is_empty(), "OHTTP key must not be empty");
 

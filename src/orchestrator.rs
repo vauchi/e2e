@@ -528,6 +528,9 @@ impl Orchestrator {
             .ok_or_else(|| E2eError::user(format!("User '{user_name}' not found")))?;
         let mut extra_env = HashMap::new();
         extra_env.insert(CLI_OHTTP_RELAY_URL_ENV.to_string(), ohttp_url);
+        if let Some(hex) = self.relay_anchor_hex.as_ref() {
+            extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
+        }
         user.write()
             .await
             .add_cli_device_with_env(&relay_url, &extra_env)
