@@ -227,6 +227,16 @@ impl CliDevice {
 
     /// Run a CLI command and return the output.
     async fn run_command(&self, args: &[&str]) -> E2eResult<Output> {
+        self.run_command_with_env(args, &[]).await
+    }
+
+    /// Run a CLI command with extra environment variables. The CLI takes
+    /// secrets only from its environment, never argv (private#285).
+    async fn run_command_with_env(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &str)],
+    ) -> E2eResult<Output> {
         let mut cmd = Command::new(&self.cli_path);
         cmd.arg("--data-dir")
             .arg(self.data_dir.path())
@@ -242,6 +252,7 @@ impl CliDevice {
             .kill_on_drop(true);
 
         configure_command_environment(&mut cmd, &self.extra_env);
+        cmd.envs(envs.iter().copied());
 
         debug!(
             "Running CLI command: {} --data-dir {} --relay {} {}",
@@ -271,7 +282,16 @@ impl CliDevice {
 
     /// Run a CLI command and expect success.
     async fn run_command_success(&self, args: &[&str]) -> E2eResult<String> {
-        let output = self.run_command(args).await?;
+        self.run_command_success_with_env(args, &[]).await
+    }
+
+    /// Run a CLI command with extra environment variables and expect success.
+    async fn run_command_success_with_env(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &str)],
+    ) -> E2eResult<String> {
+        let output = self.run_command_with_env(args, envs).await?;
 
         if !output.status.success() {
             return Err(E2eError::CliCommand {
@@ -952,14 +972,20 @@ impl Device for CliDevice {
     async fn export_backup(&self, password: &str) -> E2eResult<String> {
         let backup_path = self.data_dir.path().join("backup.vauchi");
         let path_str = backup_path.to_string_lossy().to_string();
-        self.run_command_success(&["export", &path_str, "--password", password])
-            .await?;
+        self.run_command_success_with_env(
+            &["export", &path_str],
+            &[("VAUCHI_BACKUP_PASSWORD", password)],
+        )
+        .await?;
         Ok(path_str)
     }
 
     async fn import_backup(&self, path: &str, password: &str) -> E2eResult<()> {
-        self.run_command_success(&["import", path, "--password", password])
-            .await?;
+        self.run_command_success_with_env(
+            &["import", path],
+            &[("VAUCHI_BACKUP_PASSWORD", password)],
+        )
+        .await?;
         Ok(())
     }
 }
