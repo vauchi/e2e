@@ -39,6 +39,7 @@ mod longitudinal_continuity;
 mod multi_device_sync;
 mod offline_catchup;
 mod ohttp_advanced;
+mod ohttp_delayed;
 mod ohttp_fail_closed_matrix;
 mod ohttp_helpers;
 mod ohttp_integration;
