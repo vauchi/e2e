@@ -9,7 +9,7 @@
 //!
 //! Feature: resistance_features.feature @duress @emergency @hidden @panic
 
-use vauchi_core::{AuthMode, Contact, ContactCard, DuressSettings, SymmetricKey, Vauchi};
+use vauchi_core::{AuthMode, Contact, ContactCard, SymmetricKey, Vauchi};
 
 // Helper to create a test contact with a unique PK
 fn make_contact(pk_byte: u8, name: &str) -> Contact {
@@ -91,63 +91,22 @@ fn test_authenticate_with_invalid_password_fails() {
     assert!(result.is_err(), "Invalid password must fail authentication");
 }
 
-// Duress Alerts: Queue and Configuration
-// Feature: resistance_features.feature @duress
+// Feature: duress_mode.feature @duress
 
-/// @scenario: Duress alert is queued when duress PIN is entered
+/// @scenario: duress_mode.feature:A duress unlock sends nothing
 #[test]
-fn test_duress_alert_queued_on_duress_auth() {
+fn test_duress_unlock_queues_nothing() {
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
     alice.setup_app_password("1234").unwrap();
     alice.setup_duress_password("678901").unwrap();
 
-    // Configure duress alert settings (no recipients yet)
-    let settings = DuressSettings {
-        alert_contact_ids: vec![],
-        alert_message: "Emergency".to_string(),
-        include_location: false,
-    };
-    alice.save_duress_settings(&settings).unwrap();
-
-    // Authenticate with duress PIN
     let mode = alice.authenticate("678901").unwrap();
+
     assert_eq!(mode, AuthMode::Duress);
-
-    // ADR-032: duress alerts are covert card-update sends to configured
-    // trusted contacts — there is no detectable local "duress event". With
-    // no recipients configured, there is nothing to disguise-send, so no
-    // covert traffic is queued. (The positive path — an alert queued to a
-    // ratcheted trusted contact — is owned by core's safety-alert and
-    // duress-unlock wiring tests.)
-    assert_eq!(
-        alice.pending_update_count().unwrap(),
-        0,
-        "no recipients configured -> no covert duress traffic queued"
-    );
-}
-
-/// @scenario: Duress settings can be configured and retrieved
-#[test]
-fn test_duress_settings_save_and_load() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-
-    let settings = DuressSettings {
-        alert_contact_ids: vec!["contact1".to_string(), "contact2".to_string()],
-        alert_message: "Emergency situation".to_string(),
-        include_location: true,
-    };
-
-    vauchi.save_duress_settings(&settings).unwrap();
-
-    let loaded = vauchi.load_duress_settings().unwrap();
-    assert!(loaded.is_some(), "Settings must be retrievable after save");
-
-    let loaded_settings = loaded.unwrap();
-    assert_eq!(loaded_settings.alert_contact_ids.len(), 2);
-    assert_eq!(loaded_settings.alert_message, "Emergency situation");
-    assert!(loaded_settings.include_location);
+    // ADR-032 amendment 2026-10-11 (#636): any alert from a duress unlock
+    // is a signal that could reveal duress mode.
+    assert_eq!(alice.pending_update_count().unwrap(), 0);
 }
 
 /// @scenario: Duress mode can be disabled
@@ -446,7 +405,7 @@ fn test_emergency_broadcast_honors_blocked_status() {
 // Comprehensive: Duress with Hidden and Decoy Contacts
 // Feature: resistance_features.feature @duress @hidden @comprehensive
 
-/// @scenario: Full duress flow: real contacts hidden, decoys shown, alert queued
+/// @scenario: Full duress flow: real contacts hidden, decoys shown, nothing sent
 #[test]
 fn test_duress_full_workflow() {
     let mut alice = Vauchi::in_memory().unwrap();
@@ -474,14 +433,6 @@ fn test_duress_full_workflow() {
         .add_decoy_contact("decoy2", "Decoy Work Contact", &decoy_card)
         .unwrap();
 
-    // Configure duress with alert to real hidden contacts
-    let settings = DuressSettings {
-        alert_contact_ids: vec![bob_id.clone(), charlie_id.clone()],
-        alert_message: "Duress alarm".to_string(),
-        include_location: true,
-    };
-    alice.save_duress_settings(&settings).unwrap();
-
     // Setup passwords
     alice.setup_app_password("1234").unwrap();
     alice.setup_duress_password("678901").unwrap();
@@ -507,14 +458,6 @@ fn test_duress_full_workflow() {
         hidden.iter().map(|c| c.id()).collect::<Vec<_>>()
     );
 
-    // ADR-032 + ADR-068: a trusted contact WITHOUT an established ratchet
-    // still receives the covert alert — the send path seals a genesis
-    // envelope rooted in the exchanged shared_key (pre-genesis this was
-    // silently skipped, the life-safety gap closed by core!1432). Both
-    // configured contacts must have a queued, wire-ordinary blob.
-    assert_eq!(
-        alice.pending_update_count().unwrap(),
-        2,
-        "a duress alert must queue a genesis-sealed blob per session-less trusted contact"
-    );
+    // A duress unlock sends nothing (ADR-032 amendment 2026-10-11, #636).
+    assert_eq!(alice.pending_update_count().unwrap(), 0);
 }

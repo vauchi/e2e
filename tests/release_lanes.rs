@@ -30,7 +30,7 @@ const RG4_RG5_REQUIRED: &[&str] = &[
     "bounded_clock_skew_converges_to_later_update",
     "replacement_and_revocation_preserve_active_convergence",
     "lost_primary_continuity_certification",
-    "duress_alert_certification",
+    "emergency_alert_certification",
 ];
 const RG10_REQUIRED: &[&str] = &[
     "personal_note_tombstone_converges_owner_only",

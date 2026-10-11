@@ -904,10 +904,10 @@ async fn poll_bob_devices_for_alert(
     None
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
-/// Release certification: the ADR-032 alert path over the production-shaped
-/// six-device split-OHTTP topology — the socket-backed layer the core
-/// in-process guard tests cannot reach
+// @scenario: emergency_broadcast :: Receive emergency alert notification
+/// Release certification: the emergency alert path (ADR-036) over the
+/// production-shaped six-device split-OHTTP topology — the socket-backed
+/// layer the core in-process guard tests cannot reach
 /// (record: 2026-07-24-duress-alert-e2e-coverage-gap).
 ///
 /// 1. A secondary device (A2, never exchanged, no session) raises an
@@ -930,7 +930,7 @@ async fn poll_bob_devices_for_alert(
 /// relay output meanwhile.
 // @internal
 #[tokio::test]
-async fn integration_six_device_duress_alert_certification() {
+async fn integration_six_device_emergency_alert_certification() {
     let mut orch = Orchestrator::with_config(six_device_certification_config());
     orch.start().await.expect("Failed to start orchestrator");
     orch.add_user_split_ohttp("Alice", 3)
