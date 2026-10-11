@@ -41,6 +41,12 @@ pub struct OhttpRelayConfig {
     /// TTL for caching upstream `/v2/ohttp-key-signed` records (seconds).
     /// Set to 0 to disable caching. Default: 300.
     pub key_cache_ttl_secs: u64,
+    /// Longest random delay before a ticketed request is forwarded
+    /// (`/v2/ohttp-async`, private#628). Default 0: forwarded at once and
+    /// collected on the client's next sync, so tests never wait on it. The
+    /// relay's own default (900 s) would hold every delayed fetch for up
+    /// to a quarter of an hour.
+    pub forward_delay_max_secs: u64,
     /// `RUST_LOG` for the spawned process; `None` inherits the parent's
     /// `RUST_LOG` and otherwise defaults to `warn`.
     pub log_filter: Option<String>,
@@ -53,6 +59,7 @@ impl Default for OhttpRelayConfig {
             rate_limit_per_sec: 100,
             request_timeout_secs: 30,
             key_cache_ttl_secs: 300,
+            forward_delay_max_secs: 0,
             log_filter: None,
         }
     }
@@ -180,7 +187,35 @@ impl OhttpRelayManager {
     /// Spawn the OHTTP relay, forwarding to the given gateway URL.
     pub async fn spawn(&mut self, gateway_url: &str) -> E2eResult<()> {
         let port = find_available_port()?;
+        self.spawn_on(port, gateway_url, OutputCapture::default())
+            .await
+    }
 
+    /// Restarts the relay on the same port. Everything it held in memory,
+    /// such as answers to ticketed requests, is gone, as after a real
+    /// restart. Captured output carries over.
+    pub async fn restart(&mut self) -> E2eResult<()> {
+        let (port, gateway_url, capture) = {
+            let instance = self
+                .instance
+                .as_ref()
+                .ok_or_else(|| E2eError::relay("no vauchi-ohttp-relay to restart"))?;
+            (
+                instance.port,
+                instance.gateway_url.clone(),
+                instance.output_capture.clone(),
+            )
+        };
+        self.stop().await;
+        self.spawn_on(port, &gateway_url, capture).await
+    }
+
+    async fn spawn_on(
+        &mut self,
+        port: u16,
+        gateway_url: &str,
+        output_capture: OutputCapture,
+    ) -> E2eResult<()> {
         info!(
             "Spawning vauchi-ohttp-relay on port {} → {}",
             port, gateway_url
@@ -207,6 +242,10 @@ impl OhttpRelayManager {
             "OHTTP_RELAY_KEY_CACHE_TTL_SECS".to_string(),
             self.config.key_cache_ttl_secs.to_string(),
         );
+        env_vars.insert(
+            "OHTTP_RELAY_FORWARD_DELAY_MAX_SECS".to_string(),
+            self.config.forward_delay_max_secs.to_string(),
+        );
         // Forward the parent's RUST_LOG so test runs can opt into more
         // verbose subprocess logging. Default to `warn` for quiet
         // happy-path runs.
@@ -232,7 +271,6 @@ impl OhttpRelayManager {
             .spawn()
             .map_err(|e| E2eError::relay(format!("Failed to spawn vauchi-ohttp-relay: {}", e)))?;
 
-        let output_capture = OutputCapture::default();
         if let Some(stdout) = child.stdout.take() {
             let fd = stdout
                 .into_owned_fd()
@@ -394,6 +432,31 @@ impl OhttpRelayManager {
             )));
         }
         Ok(())
+    }
+
+    /// Waits until the relay has written `count` output lines containing
+    /// `needle`, for at most five seconds. The relay works on its own
+    /// clock (a delayed forward runs on a spawned task), so its output is
+    /// the event to wait for.
+    pub async fn wait_for_output(&self, needle: &str, count: usize) -> E2eResult<()> {
+        let instance = self
+            .instance
+            .as_ref()
+            .ok_or_else(|| E2eError::relay("OHTTP relay is not running"))?;
+        for _ in 0..250 {
+            let seen = instance
+                .captured_output()
+                .iter()
+                .filter(|line| line.contains(needle))
+                .count();
+            if seen >= count {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        Err(E2eError::relay(format!(
+            "OHTTP relay never logged {count} line(s) containing {needle:?}"
+        )))
     }
 
     /// Stop the OHTTP relay.

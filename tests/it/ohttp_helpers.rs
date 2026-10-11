@@ -20,6 +20,13 @@ use vauchi_protocol::ohttp_key::SignedKeyConfig;
 /// Spawn vauchi-relay with OHTTP enabled + ohttp-relay forwarding proxy.
 /// Returns (relay_manager, ohttp_relay_manager, relay_http_url, ohttp_relay_url).
 pub async fn spawn_ohttp_stack() -> (RelayManager, OhttpRelayManager, String, String) {
+    spawn_ohttp_stack_with(OhttpRelayConfig::default()).await
+}
+
+/// [`spawn_ohttp_stack`] with an outer relay configured by `ohttp_config`.
+pub async fn spawn_ohttp_stack_with(
+    ohttp_config: OhttpRelayConfig,
+) -> (RelayManager, OhttpRelayManager, String, String) {
     let relay_config = RelayConfig {
         http_api_enabled: true,
         ohttp_enabled: true,
@@ -34,8 +41,7 @@ pub async fn spawn_ohttp_stack() -> (RelayManager, OhttpRelayManager, String, St
 
     let relay_http_url = relay_mgr.relay(0).expect("relay instance").http_url();
 
-    let mut ohttp_mgr =
-        OhttpRelayManager::new(OhttpRelayConfig::default()).expect("ohttp relay manager");
+    let mut ohttp_mgr = OhttpRelayManager::new(ohttp_config).expect("ohttp relay manager");
     ohttp_mgr
         .spawn(&relay_http_url)
         .await
