@@ -847,6 +847,38 @@ mod tests {
         );
     }
 
+    // @internal
+    /// Core 0.81.0 shares `https://vauchi.app/x#pk=…&n=…&nm=…`
+    /// (vauchi/private#277); the harness must read that off the share
+    /// screen as it read the old `vauchi://exchange?…` form.
+    #[test]
+    fn the_share_screen_link_is_read_in_its_https_form() {
+        let screen = "Send this link:\n  https://vauchi.app/x#pk=AAAA_-&n=BBBB&nm=QWxpY2U.  \n";
+
+        assert_eq!(
+            share_link_in(screen).as_deref(),
+            Some("https://vauchi.app/x#pk=AAAA_-&n=BBBB&nm=QWxpY2U")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn the_share_screen_link_is_still_read_in_its_legacy_form() {
+        let screen = "Send this link: vauchi://exchange?pk=AAAA&n=BBBB)";
+
+        assert_eq!(
+            share_link_in(screen).as_deref(),
+            Some("vauchi://exchange?pk=AAAA&n=BBBB")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_screen_without_an_exchange_link_yields_none() {
+        assert_eq!(share_link_in("Visit https://vauchi.app/x for help"), None);
+        assert_eq!(share_link_in("Exchange Mode — Pick a way"), None);
+    }
+
     #[test]
     fn test_tui_device_type() {
         // This test will fail if binary doesn't exist, which is expected
