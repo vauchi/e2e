@@ -433,7 +433,7 @@ impl Device for TuiDevice {
     }
 
     /// Link mode: the camera-less TUI leads its picker with Link, whose
-    /// share screen prints the `vauchi://exchange?…` URL as text. The
+    /// share screen prints the exchange URL as text. The
     /// harness treats that URL as the "QR" payload a peer completes with.
     async fn generate_qr(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
@@ -447,20 +447,8 @@ impl Device for TuiDevice {
             .await?;
         tokio::time::sleep(Duration::from_millis(300)).await;
         let screen = self.session.read_screen().await?;
-        let plain = strip_ansi(&screen);
-        for token in plain.split_whitespace() {
-            if let Some(start) = token.find("vauchi://exchange?") {
-                let link = token[start..].trim_end_matches(|c: char| {
-                    !c.is_ascii_alphanumeric() && c != '=' && c != '_' && c != '-'
-                });
-                if link.contains("pk=") {
-                    return Ok(link.to_string());
-                }
-            }
-        }
-        Err(E2eError::device(
-            "Could not extract the share link from the TUI",
-        ))
+        share_link_in(&strip_ansi(&screen))
+            .ok_or_else(|| E2eError::device("Could not extract the share link from the TUI"))
     }
 
     /// Paste the peer's link on the Link share screen and accept the
@@ -814,6 +802,24 @@ impl Device for TuiDevice {
 
 // INLINE_TEST_REQUIRED: constructs TuiDevice through the private binary
 // locator, which the integration tests never reach directly.
+/// The exchange link on a Link share screen: Core's
+/// `https://vauchi.app/x#…` form since 0.81.0 (vauchi/private#277), or the
+/// `vauchi://exchange?…` form older builds print.
+fn share_link_in(screen: &str) -> Option<String> {
+    const LINK_PREFIXES: [&str; 2] = ["https://vauchi.app/x#", "vauchi://exchange?"];
+    screen.split_whitespace().find_map(|token| {
+        LINK_PREFIXES.iter().find_map(|prefix| {
+            let start = token.find(prefix)?;
+            let link = token[start..].trim_end_matches(|c: char| {
+                !c.is_ascii_alphanumeric() && c != '=' && c != '_' && c != '-'
+            });
+            link.contains("pk=").then(|| link.to_string())
+        })
+    })
+}
+
+// INLINE_TEST_REQUIRED: private helpers of the feature-gated tui module
+// (find_tui_binary_given, share_link_in) are not reachable from tests/.
 #[cfg(test)]
 mod tests {
     use super::*;
