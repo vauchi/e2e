@@ -364,6 +364,26 @@ impl User {
         device.complete_exchange(qr_data).await
     }
 
+    /// Share a Link-mode exchange URL from the primary device (initiator).
+    pub async fn share_exchange_link(&self) -> E2eResult<String> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.share_exchange_link().await
+    }
+
+    /// Accept another user's Link-mode exchange URL on the primary device.
+    pub async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
+        let primary = self
+            .primary_device()
+            .ok_or_else(|| E2eError::user("No primary device"))?;
+
+        let device = primary.read().await;
+        device.accept_exchange_link(url).await
+    }
+
     /// Wait for an in-flight Link-mode exchange to complete on the initiator's
     /// primary device (which stays on its share screen while its live session
     /// polls the relay).

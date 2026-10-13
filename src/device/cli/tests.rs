@@ -400,6 +400,7 @@ async fn command_timeout_fires_with_command_description() {
         public_id: std::sync::Mutex::new(None),
         extra_env: HashMap::new(),
         command_timeout: std::time::Duration::from_secs(1),
+        link_initiator: tokio::sync::Mutex::new(None),
     };
 
     let error = device

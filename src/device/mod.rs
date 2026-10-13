@@ -233,6 +233,17 @@ pub trait Device: Send + Sync {
     /// Complete an exchange using a QR code from another user.
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()>;
 
+    /// Share this device's Link-mode exchange URL as the initiator. A device
+    /// whose QR step already shares a link (the TUI) keeps `generate_qr`.
+    async fn share_exchange_link(&self) -> E2eResult<String> {
+        self.generate_qr().await
+    }
+
+    /// Accept another user's Link-mode exchange URL as the responder.
+    async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
+        self.complete_exchange(url).await
+    }
+
     /// Wait for an in-flight Link-mode exchange to complete on the *initiator*
     /// side. In Link mode the initiator shares a URL and stays on its share
     /// screen while its live session polls the relay; a single ceremony gives

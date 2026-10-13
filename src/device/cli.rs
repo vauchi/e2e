@@ -93,7 +93,14 @@ pub struct CliDevice {
     /// relay's 60s idle cutoff so the two values are not correlated
     /// during debugging.
     command_timeout: std::time::Duration,
+    /// The `vauchi exchange link` process sharing this device's link, kept
+    /// running until [`Device::await_exchange_complete`] (private#670).
+    link_initiator: tokio::sync::Mutex<Option<tokio::process::Child>>,
 }
+
+/// Longest a Link-mode exchange may take: the CLI's own 300 s wait
+/// (ADR-035's link window) plus a margin for start-up.
+const LINK_EXCHANGE_BUDGET: std::time::Duration = std::time::Duration::from_secs(330);
 
 impl CliDevice {
     /// Create a new CLI device with an isolated data directory.
@@ -111,6 +118,7 @@ impl CliDevice {
             public_id: Mutex::new(None),
             extra_env: HashMap::new(),
             command_timeout: Self::command_timeout_from_env(),
+            link_initiator: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -130,6 +138,7 @@ impl CliDevice {
             public_id: Mutex::new(None),
             extra_env: HashMap::new(),
             command_timeout: Self::command_timeout_from_env(),
+            link_initiator: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -225,18 +234,9 @@ impl CliDevice {
             })
     }
 
-    /// Run a CLI command and return the output.
-    async fn run_command(&self, args: &[&str]) -> E2eResult<Output> {
-        self.run_command_with_env(args, &[]).await
-    }
-
-    /// Run a CLI command with extra environment variables. The CLI takes
-    /// secrets only from its environment, never argv (private#285).
-    async fn run_command_with_env(
-        &self,
-        args: &[&str],
-        envs: &[(&str, &str)],
-    ) -> E2eResult<Output> {
+    /// A `vauchi` invocation with this device's data dir, relay and
+    /// environment.
+    fn cli_command(&self, args: &[&str]) -> Command {
         let mut cmd = Command::new(&self.cli_path);
         cmd.arg("--data-dir")
             .arg(self.data_dir.path())
@@ -250,8 +250,23 @@ impl CliDevice {
             // job (problems/2026-07-19-e2e-multi-device-serialization-hang).
             // Guarded by scripts/check-test-timeouts.sh — do not remove.
             .kill_on_drop(true);
-
         configure_command_environment(&mut cmd, &self.extra_env);
+        cmd
+    }
+
+    /// Run a CLI command and return the output.
+    async fn run_command(&self, args: &[&str]) -> E2eResult<Output> {
+        self.run_command_with_env(args, &[]).await
+    }
+
+    /// Run a CLI command with extra environment variables. The CLI takes
+    /// secrets only from its environment, never argv (private#285).
+    async fn run_command_with_env(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &str)],
+    ) -> E2eResult<Output> {
+        let mut cmd = self.cli_command(args);
         cmd.envs(envs.iter().copied());
 
         debug!(
@@ -550,6 +565,68 @@ impl Device for CliDevice {
         self.run_command_success(&["exchange", "complete", qr_data])
             .await?;
         Ok(())
+    }
+
+    async fn share_exchange_link(&self) -> E2eResult<String> {
+        use tokio::io::{AsyncBufReadExt, BufReader};
+
+        let mut child = self
+            .cli_command(&["exchange", "link"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| E2eError::cli_execution(format!("spawn vauchi exchange link: {e}")))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| E2eError::cli_execution("exchange link: no stdout"))?;
+        let mut lines = BufReader::new(stdout).lines();
+        let url = tokio::time::timeout(self.command_timeout, async {
+            while let Some(line) = lines.next_line().await? {
+                if let Some(url) = line
+                    .split_whitespace()
+                    .find(|word| word.starts_with("https://vauchi.app/x#"))
+                {
+                    return Ok(Some(url.to_string()));
+                }
+            }
+            Ok::<_, std::io::Error>(None)
+        })
+        .await
+        .map_err(|_| E2eError::timeout("exchange link printed no link"))?
+        .map_err(|e| E2eError::cli_execution(format!("read exchange link output: {e}")))?
+        .ok_or_else(|| E2eError::cli_execution("exchange link exited without a link"))?;
+        // Keep draining, or the process meets a closed pipe on its next line.
+        tokio::spawn(async move { while let Ok(Some(_)) = lines.next_line().await {} });
+        *self.link_initiator.lock().await = Some(child);
+        Ok(url)
+    }
+
+    async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
+        self.run_command_success(&["exchange", "link", url, "--yes"])
+            .await?;
+        Ok(())
+    }
+
+    async fn await_exchange_complete(&self) -> E2eResult<()> {
+        let child = self
+            .link_initiator
+            .lock()
+            .await
+            .take()
+            .ok_or_else(|| E2eError::device("no link exchange in flight"))?;
+        let output = tokio::time::timeout(LINK_EXCHANGE_BUDGET, child.wait_with_output())
+            .await
+            .map_err(|_| E2eError::timeout("exchange link did not finish"))?
+            .map_err(|e| E2eError::cli_execution(format!("wait for exchange link: {e}")))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(E2eError::cli_execution(format!(
+                "exchange link failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )))
+        }
     }
 
     async fn start_device_link(&self) -> E2eResult<String> {

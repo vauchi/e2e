@@ -687,7 +687,7 @@ impl Orchestrator {
         // session begins polling the relay for the responder's deposit.
         let url = {
             let user = initiator.read().await;
-            user.generate_qr().await?
+            user.share_exchange_link().await?
         };
 
         // Drive both sides concurrently: the responder pastes and accepts
@@ -697,7 +697,7 @@ impl Orchestrator {
         // initiator must keep polling to deposit its card for the responder.
         let responder_complete = async {
             let user = responder.read().await;
-            user.complete_exchange(&url).await
+            user.accept_exchange_link(&url).await
         };
         let initiator_complete = async {
             let user = initiator.read().await;
