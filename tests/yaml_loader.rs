@@ -17,6 +17,7 @@ mod scenario_loader {
         file.write_all(content.as_bytes()).unwrap();
     }
 
+    // @internal
     #[test]
     fn test_load_scenario() {
         let temp_dir = TempDir::new().unwrap();
@@ -41,6 +42,7 @@ steps:
         assert_eq!(scenario.tags, vec!["smoke"]);
     }
 
+    // @internal
     #[test]
     fn test_load_by_path() {
         let temp_dir = TempDir::new().unwrap();
@@ -64,6 +66,7 @@ steps:
         assert_eq!(scenario.name, "Integration Test");
     }
 
+    // @internal
     #[test]
     fn test_list_scenarios() {
         let temp_dir = TempDir::new().unwrap();
