@@ -64,7 +64,7 @@ impl ScenarioLoader {
             E2eError::ScenarioLoad(format!("Failed to read {}: {}", path.display(), e))
         })?;
 
-        let scenario: Scenario = serde_yaml::from_str(&content).map_err(|e| {
+        let scenario: Scenario = serde_norway::from_str(&content).map_err(|e| {
             E2eError::ScenarioLoad(format!("Failed to parse {}: {}", path.display(), e))
         })?;
 
@@ -161,7 +161,7 @@ impl ScenarioLoader {
                 {
                     let content = std::fs::read_to_string(&path).ok();
                     let info = if let Some(content) = content {
-                        if let Ok(scenario) = serde_yaml::from_str::<Scenario>(&content) {
+                        if let Ok(scenario) = serde_norway::from_str::<Scenario>(&content) {
                             ScenarioInfo {
                                 name: scenario.name,
                                 path: format!(

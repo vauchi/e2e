@@ -523,7 +523,7 @@ impl ScenarioExecutor {
 
     fn get_param_string(
         &self,
-        params: &HashMap<String, serde_yaml::Value>,
+        params: &HashMap<String, serde_norway::Value>,
         key: &str,
     ) -> E2eResult<String> {
         params
@@ -535,7 +535,7 @@ impl ScenarioExecutor {
 
     fn get_param_usize(
         &self,
-        params: &HashMap<String, serde_yaml::Value>,
+        params: &HashMap<String, serde_norway::Value>,
         key: &str,
     ) -> E2eResult<usize> {
         params
@@ -547,13 +547,17 @@ impl ScenarioExecutor {
 
     fn get_param_bool(
         &self,
-        params: &HashMap<String, serde_yaml::Value>,
+        params: &HashMap<String, serde_norway::Value>,
         key: &str,
     ) -> Option<bool> {
         params.get(key).and_then(|v| v.as_bool())
     }
 
-    fn get_param_f32(&self, params: &HashMap<String, serde_yaml::Value>, key: &str) -> Option<f32> {
+    fn get_param_f32(
+        &self,
+        params: &HashMap<String, serde_norway::Value>,
+        key: &str,
+    ) -> Option<f32> {
         params.get(key).and_then(|v| v.as_f64()).map(|n| n as f32)
     }
 

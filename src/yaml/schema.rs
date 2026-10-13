@@ -197,7 +197,7 @@ pub struct ActionStep {
 
     /// Parameters for the action.
     #[serde(default)]
-    pub params: HashMap<String, serde_yaml::Value>,
+    pub params: HashMap<String, serde_norway::Value>,
 
     /// Variable to store output in.
     #[serde(default)]
@@ -374,7 +374,7 @@ pub struct AssertionStep {
 
     /// Parameters for the assertion.
     #[serde(default)]
-    pub params: HashMap<String, serde_yaml::Value>,
+    pub params: HashMap<String, serde_norway::Value>,
 
     /// Assertion-specific timeout.
     #[serde(default, with = "humantime_serde::option")]
@@ -565,7 +565,7 @@ manual_instructions:
   - "Verify: Both have 1 contact"
 "#;
 
-        let scenario: Scenario = serde_yaml::from_str(yaml).expect("Failed to parse YAML");
+        let scenario: Scenario = serde_norway::from_str(yaml).expect("Failed to parse YAML");
         assert_eq!(scenario.name, "Simple Exchange");
         assert_eq!(scenario.tags, vec!["smoke", "exchange"]);
         assert_eq!(scenario.timeout, Duration::from_secs(30));
@@ -594,7 +594,7 @@ steps:
       internet: false
 "#;
 
-        let scenario: Scenario = serde_yaml::from_str(yaml).expect("Failed to parse YAML");
+        let scenario: Scenario = serde_norway::from_str(yaml).expect("Failed to parse YAML");
         let alice_network = scenario.network_conditions.get("alice").unwrap();
         assert!(!alice_network.internet);
         assert_eq!(alice_network.mode, NetworkMode::Offline);
