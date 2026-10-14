@@ -588,20 +588,30 @@ impl Device for TuiDevice {
             .await?;
         self.session.send_alt('s').await?;
         // Core runs the catch-up synchronously inside the key handler and
-        // re-renders the chip: "Sync" becomes "Synced", "Sync failed", or
-        // "Sync in N s" when core's own throttle declines a repeat within a
-        // minute (core !1591) — that last one is core's decision, not a
-        // harness failure. ratatui redraws only the changed cells, so what
-        // reaches the PTY is the appended "ed", " failed" or " in N s" —
-        // never the whole label.
-        let outcome = self
-            .session
-            .wait_for_visible("failed| in |ed", Duration::from_secs(10))
-            .await?;
-        if outcome == "failed" {
-            return Err(E2eError::device(
-                "TUI sync failed (sync chip reports failure)",
-            ));
+        // re-renders the chip: "Synced", "Sync failed", or "Sync in N s" when
+        // core's own throttle declines a repeat (core !1591) — that last one
+        // is core's decision, not a harness failure. Read the whole repainted
+        // frame, not the redrawn cells: when the chip already counts down,
+        // a throttled press changes only digits, so no fixed fragment of the
+        // label reaches the PTY (seen once Core 0.82.0 synced at the drawn
+        // gap, private#603).
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let frame = strip_ansi(&self.session.redraw_screen().await?);
+            if frame.contains("Sync failed") {
+                return Err(E2eError::device(
+                    "TUI sync failed (sync chip reports failure)",
+                ));
+            }
+            if frame.contains("Synced") || frame.contains("Sync in ") {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(E2eError::device(
+                    "the sync chip showed no outcome within 10 s",
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
         Ok(())
