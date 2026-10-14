@@ -11,7 +11,6 @@ use vauchi_e2e_tests::orchestrator::Orchestrator;
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 // @internal
 #[tokio::test]
-#[ignore = "needs `vauchi exchange link` on cli main: cli!575, after the core release carrying core!1861 (private#670)"]
 async fn integration_cli_to_cli_link_exchange() {
     let mut orch = Orchestrator::new();
     orch.start().await.expect("start");
