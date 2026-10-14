@@ -595,8 +595,10 @@ test:tui-journey:
       JOB_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
       TUI_DIR="$JOB_DIR/tui"
       rm -rf "$JOB_DIR"
-      git clone --depth=1 --branch main \
+      git clone --depth=20 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
+      git -C "$TUI_DIR" checkout "${DIAG_TUI_REF:-main}"
+      git -C "$TUI_DIR" log --oneline -1
       # tui embeds themes/generated/tokens_ansi.json from a sibling checkout
       # (tui/src/theme.rs), so the sibling has to exist beside the clone.
       git clone --depth=1 --branch main \
@@ -614,8 +616,10 @@ test:tui-journey:
       # and the anchor ceremony CLI e2e provisions each relay's test anchor
       # with (#288). Without this the harness fell back to the sibling
       # ../relay workspace, another job's tree, which lacked the CLI.
-      git clone --depth=1 --branch main \
+      git clone --depth=20 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$JOB_DIR/relay"
+      git -C "$JOB_DIR/relay" checkout "${DIAG_RELAY_REF:-main}"
+      git -C "$JOB_DIR/relay" log --oneline -1
       cargo build --release --features e2e-test-clock --manifest-path "$JOB_DIR/relay/Cargo.toml"
       mkdir -p "$JOB_DIR/bin"
       cp "$JOB_DIR/relay/target/release/vauchi-relay" "$JOB_DIR/relay/target/release/vauchi-ohttp-anchor" "$JOB_DIR/bin/"
@@ -905,3 +909,14 @@ github-mirror:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+# DIAG, not for merge: split the 0.82.0 tui-journey regression between TUI and relay.
+diag:tui-journey-old-tui:
+  extends: test:tui-journey
+  variables:
+    DIAG_TUI_REF: d5fb915
+
+diag:tui-journey-old-relay:
+  extends: test:tui-journey
+  variables:
+    DIAG_RELAY_REF: 565e769
