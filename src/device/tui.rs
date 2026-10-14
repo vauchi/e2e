@@ -214,11 +214,9 @@ impl TuiSession {
         pty.expect_with_timeout(pattern, timeout)
     }
 
-    /// Poll the terminal until its *rendered* text (ANSI stripped, drawn
-    /// over a rolling buffer of recent frames) contains any of the `|`-
-    /// separated needles. Robust where `expect_timeout` is not: the TUI
-    /// redraws the whole screen each frame, so cursor-position escapes
-    /// split a title across the raw stream that `expectrl` matches.
+    /// Poll incremental terminal output for any of the `|`-separated needles.
+    /// Cursor-position escapes are stripped before matching text; unchanged
+    /// cells are absent from the stream.
     async fn wait_for_visible(&self, patterns: &str, timeout: Duration) -> E2eResult<String> {
         let needles: Vec<&str> = patterns.split('|').collect();
         let deadline = std::time::Instant::now() + timeout;
@@ -298,6 +296,23 @@ impl TuiSession {
             E2eError::device(format!("Navigation index {} out of digit range", index))
         })?;
         self.send_char(digit).await
+    }
+
+    async fn navigate_to_contacts(&self) -> E2eResult<()> {
+        self.navigate_to("Contacts").await?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let frame = strip_ansi(&self.redraw_screen().await?);
+            if frame.contains("Add Contact") || frame.contains("Contacts") {
+                return Ok(());
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(E2eError::device(
+                    "Contacts screen did not become visible within 10s",
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
     }
 
     async fn stop(&self) -> E2eResult<()> {
@@ -582,10 +597,7 @@ impl Device for TuiDevice {
         // The sync chrome chip sits on every top-level screen; Alt+S is the
         // terminal's key for it (other shells tap it). Core runs the relay
         // catch-up and re-renders with the chip's outcome label.
-        self.session.navigate_to("Contacts").await?;
-        self.session
-            .wait_for_visible("Add Contact|Contacts", Duration::from_secs(10))
-            .await?;
+        self.session.navigate_to_contacts().await?;
         self.session.send_alt('s').await?;
         // Core runs the catch-up synchronously inside the key handler and
         // re-renders the chip: "Synced", "Sync failed", or "Sync in N s" when
@@ -620,12 +632,7 @@ impl Device for TuiDevice {
     async fn list_contacts(&self) -> E2eResult<Vec<Contact>> {
         self.session.ensure_started().await?;
 
-        self.session.navigate_to("Contacts").await?;
-        self.session
-            .wait_for_visible("Add Contact|Contacts", Duration::from_secs(10))
-            .await?;
-        // The list is already painted by now, so a plain read sees nothing:
-        // repaint the frame and parse the list rows ("• Name" / "> Name").
+        self.session.navigate_to_contacts().await?;
         let frame = strip_ansi(&self.session.redraw_screen().await?);
 
         // Cursor moves become spaces in `strip_ansi`, so rows are not lines;

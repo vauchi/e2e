@@ -416,6 +416,37 @@ async fn test_tui_create_identity() {
     device.kill_app().await.expect("Failed to kill TUI");
 }
 
+// @internal
+#[tokio::test]
+#[cfg(feature = "tui")]
+async fn test_tui_list_contacts_when_contacts_are_already_visible() {
+    use vauchi_e2e_tests::device::{Device, TuiDevice};
+
+    let device = TuiDevice::new(
+        "Alice_TUI",
+        "ws://localhost:8080",
+        std::collections::HashMap::new(),
+    )
+    .expect("TUI binary not found. Run `just build tui` first.");
+    device
+        .create_identity("Alice")
+        .await
+        .expect("Failed to create identity in TUI");
+
+    for _ in 0..2 {
+        assert_eq!(
+            device
+                .list_contacts()
+                .await
+                .expect("The displayed Contacts screen should remain readable")
+                .len(),
+            0
+        );
+    }
+
+    device.kill_app().await.expect("Failed to kill TUI");
+}
+
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Integration test: CLI user shares their card with an Android device user.
 ///
