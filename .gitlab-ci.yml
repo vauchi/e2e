@@ -599,6 +599,10 @@ test:tui-journey:
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
       git -C "$TUI_DIR" checkout "${DIAG_TUI_REF:-main}"
       git -C "$TUI_DIR" log --oneline -1
+      if [ -n "${DIAG_CORE_REV:-}" ]; then
+        sed -i "s|tag = \"v0.82.0\", version = \"=0.82.0\"|rev = \"$DIAG_CORE_REV\"|" "$TUI_DIR/Cargo.toml"
+        grep -n "core.git" "$TUI_DIR/Cargo.toml"
+      fi
       # tui embeds themes/generated/tokens_ansi.json from a sibling checkout
       # (tui/src/theme.rs), so the sibling has to exist beside the clone.
       git clone --depth=1 --branch main \
@@ -911,12 +915,32 @@ github-mirror:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
 
 # DIAG, not for merge: split the 0.82.0 tui-journey regression between TUI and relay.
-diag:tui-journey-old-tui:
+diag:tui-journey-core-20-c06a6653:
   extends: test:tui-journey
   variables:
-    DIAG_TUI_REF: d5fb915
+    DIAG_CORE_REV: c06a6653
 
-diag:tui-journey-old-relay:
+diag:tui-journey-core-40-c203aad2:
   extends: test:tui-journey
   variables:
-    DIAG_RELAY_REF: 565e769
+    DIAG_CORE_REV: c203aad2
+
+diag:tui-journey-core-50-0aa58191:
+  extends: test:tui-journey
+  variables:
+    DIAG_CORE_REV: 0aa58191
+
+diag:tui-journey-core-61-c0cff6bd:
+  extends: test:tui-journey
+  variables:
+    DIAG_CORE_REV: c0cff6bd
+
+diag:tui-journey-core-63-a189b636:
+  extends: test:tui-journey
+  variables:
+    DIAG_CORE_REV: a189b636
+
+diag:tui-journey-core-68-e8cd3624:
+  extends: test:tui-journey
+  variables:
+    DIAG_CORE_REV: e8cd3624
