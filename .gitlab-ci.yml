@@ -563,7 +563,7 @@ test:release-rg15:
 # or runs. Without this job the harness's TUI tests go dark silently: that is
 # exactly what happened for weeks before tui !554 / e2e !187 repaired the
 # driver (problems/done/2026-09-09-tui-cannot-ingest-peer-exchange-payload).
-# Selected: test_tui_create_identity and integration_tui_to_tui_link_exchange
+# Selected: identity creation, repeated Contacts reads, and TUI Link exchange
 # — the camera-less pasted-peer-link route (core !1592, in 0.67.0) driven as
 # an asymmetric Link ceremony (Alice shares, Bob pastes), see
 # src/orchestrator.rs::exchange_link.
@@ -597,12 +597,7 @@ test:tui-journey:
       rm -rf "$JOB_DIR"
       git clone --depth=20 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
-      git -C "$TUI_DIR" checkout "${DIAG_TUI_REF:-main}"
       git -C "$TUI_DIR" log --oneline -1
-      if [ -n "${DIAG_CORE_REV:-}" ]; then
-        sed -i -E "s|tag = \"v[0-9.]+\", version = \"=[0-9.]+\"|rev = \"$DIAG_CORE_REV\"|" "$TUI_DIR/Cargo.toml"
-        grep -n "core.git" "$TUI_DIR/Cargo.toml"
-      fi
       # tui embeds themes/generated/tokens_ansi.json from a sibling checkout
       # (tui/src/theme.rs), so the sibling has to exist beside the clone.
       git clone --depth=1 --branch main \
@@ -622,7 +617,6 @@ test:tui-journey:
       # ../relay workspace, another job's tree, which lacked the CLI.
       git clone --depth=20 --branch main \
         "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$JOB_DIR/relay"
-      git -C "$JOB_DIR/relay" checkout "${DIAG_RELAY_REF:-main}"
       git -C "$JOB_DIR/relay" log --oneline -1
       cargo build --release --features e2e-test-clock --manifest-path "$JOB_DIR/relay/Cargo.toml"
       mkdir -p "$JOB_DIR/bin"
@@ -913,14 +907,3 @@ github-mirror:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-
-# DIAG, not for merge: split the 0.82.0 tui-journey regression between TUI and relay.
-diag:tui-journey-core-65-2c805be3:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: 2c805be3
-
-diag:tui-journey-core-66-67c09665:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: 67c09665
