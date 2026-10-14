@@ -915,32 +915,12 @@ github-mirror:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
 
 # DIAG, not for merge: split the 0.82.0 tui-journey regression between TUI and relay.
-diag:tui-journey-core-20-c06a6653:
+diag:tui-journey-core-65-2c805be3:
   extends: test:tui-journey
   variables:
-    DIAG_CORE_REV: c06a6653
+    DIAG_CORE_REV: 2c805be3
 
-diag:tui-journey-core-40-c203aad2:
+diag:tui-journey-core-66-67c09665:
   extends: test:tui-journey
   variables:
-    DIAG_CORE_REV: c203aad2
-
-diag:tui-journey-core-50-0aa58191:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: 0aa58191
-
-diag:tui-journey-core-61-c0cff6bd:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: c0cff6bd
-
-diag:tui-journey-core-63-a189b636:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: a189b636
-
-diag:tui-journey-core-68-e8cd3624:
-  extends: test:tui-journey
-  variables:
-    DIAG_CORE_REV: e8cd3624
+    DIAG_CORE_REV: 67c09665
