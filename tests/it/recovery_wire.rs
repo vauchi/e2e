@@ -7,21 +7,22 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
 use vauchi_core::identity::Identity;
-use vauchi_core::recovery::{RecoveryVoucher, VerificationResult};
+use vauchi_core::recovery::{RecoveryError, RecoveryVoucher, VerificationResult};
 use vauchi_core::{Contact, ContactCard, SymmetricKey, Vauchi, VauchiConfig};
 
 use crate::ohttp_helpers::spawn_ohttp_stack;
 
-// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Upload recovery proof to relay
 #[tokio::test(flavor = "multi_thread")]
 async fn recovery_wire_uploaded_proof_is_verifiable_by_an_existing_contact() {
     let (mut relays, mut forwarder, relay_url, ohttp_url) = spawn_ohttp_stack().await;
     let anchor = relays.relay(0).unwrap().ohttp_anchor().unwrap();
     let dir = tempfile::tempdir().unwrap();
     let config = VauchiConfig::with_storage_path(dir.path().join("replacement.db"))
+        .with_storage_key(SymmetricKey::generate())
         .with_relay(&relay_url, anchor)
         .with_ohttp_relay_url(ohttp_url);
-    let mut replacement = Vauchi::new(config).unwrap();
+    let mut replacement = Vauchi::new(config.clone()).unwrap();
     replacement.create_identity("Alice replacement").unwrap();
     let old = Identity::create("Alice", 0);
     let claim = replacement
@@ -50,6 +51,81 @@ async fn recovery_wire_uploaded_proof_is_verifiable_by_an_existing_contact() {
             ))
             .unwrap();
     }
+    let progress = replacement.get_recovery_progress().unwrap().unwrap();
+    let mut duplicate = progress.clone();
+    duplicate.vouchers[1] = duplicate.vouchers[0].clone();
+    let mut tampered = progress.clone();
+    let mut bytes = tampered.vouchers[0].to_bytes();
+    *bytes.last_mut().unwrap() ^= 1;
+    tampered.vouchers[0] = RecoveryVoucher::from_bytes(&bytes).unwrap();
+    let mut mismatched = progress.clone();
+    mismatched.vouchers[0] = RecoveryVoucher::create(
+        [7; 32],
+        *claim.new_pk(),
+        Identity::create("Impostor", 0).signing_keypair(),
+        None,
+        0,
+    );
+    for (invalid, expected) in [
+        (duplicate, RecoveryError::DuplicateVoucher),
+        (tampered, RecoveryError::InvalidSignature),
+        (mismatched, RecoveryError::MismatchedKeys),
+    ] {
+        replacement
+            .storage()
+            .recovery()
+            .save_recovery_progress(&invalid)
+            .unwrap();
+        match replacement.upload_recovery_proof().unwrap_err() {
+            vauchi_core::VauchiError::InvalidState(detail) => {
+                assert_eq!(detail, expected.to_string())
+            }
+            other => panic!("invalid progress must fail before transport: {other}"),
+        }
+        assert_eq!(
+            replacement
+                .get_recovery_progress()
+                .unwrap()
+                .unwrap()
+                .voucher_count(),
+            3
+        );
+    }
+    replacement
+        .storage()
+        .recovery()
+        .save_recovery_progress(&progress)
+        .unwrap();
+    forwarder.stop().await;
+    let failure = replacement.upload_recovery_proof().unwrap_err();
+    assert!(
+        matches!(failure, vauchi_core::VauchiError::Network(_)),
+        "{failure}"
+    );
+    assert_eq!(
+        replacement
+            .get_recovery_progress()
+            .unwrap()
+            .unwrap()
+            .voucher_count(),
+        3
+    );
+    let new_pk = *replacement.identity().unwrap().signing_public_key();
+    drop(replacement);
+    forwarder.spawn(&relay_url).await.unwrap();
+    let replacement = Vauchi::new(config.with_ohttp_relay_url(forwarder.url().unwrap())).unwrap();
+    assert_eq!(
+        replacement.identity().unwrap().signing_public_key(),
+        &new_pk
+    );
+    assert_eq!(
+        replacement
+            .get_recovery_progress()
+            .unwrap()
+            .unwrap()
+            .voucher_count(),
+        3
+    );
     replacement
         .upload_recovery_proof()
         .expect("upload completed recovery over OHTTP");
@@ -86,7 +162,9 @@ async fn recovery_wire_uploaded_proof_is_verifiable_by_an_existing_contact() {
             total_vouchers,
         } => {
             assert_eq!(total_vouchers, 3);
-            assert_eq!(mutual_vouchers.len(), 3);
+            let mut names = mutual_vouchers;
+            names.sort();
+            assert_eq!(names, ["Bob", "Carol", "Dave"]);
         }
         other => panic!("expected confidence from prepared contacts, got {other:?}"),
     }
