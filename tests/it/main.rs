@@ -49,6 +49,7 @@ mod ohttp_source_address;
 mod onboarding_flow;
 mod orchestrator_default_ohttp;
 mod recovery_flow;
+mod recovery_wire;
 mod relay_failover;
 mod resistance_features;
 mod seeded_contacts;
