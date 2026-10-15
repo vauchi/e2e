@@ -28,6 +28,7 @@ fn install_rustls_provider() {
 }
 
 mod action_family_oracles;
+mod backup_restore;
 mod cli_link_exchange;
 mod cli_signed_ohttp_key;
 mod contact_actions;
