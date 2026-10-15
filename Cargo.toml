@@ -21,7 +21,7 @@ flame = ["dep:tracing-flame"]
 
 # TUI device automation via expectrl (PTY stack). Off by default to keep the
 # default build graph free of nix 0.26 / bitflags 1.x / regex duplicates.
-tui = ["dep:expectrl"]
+tui = ["dep:expectrl", "dep:vt100"]
 
 # Build the seed-contacts helper bin. Off by default to keep fake/rand and the
 # darling 0.20 subtree out of the default integration-test build.
@@ -72,6 +72,7 @@ tracing-flame = { version = "0.2", optional = true }
 
 # PTY automation for TUI testing (optional — enable the `tui` feature)
 expectrl = { version = "0.7", optional = true }
+vt100 = { version = "0.16", optional = true }
 
 # HTTP client for Desktop test server (rustls to avoid native-tls/OpenSSL)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider"] }

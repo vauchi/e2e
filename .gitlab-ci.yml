@@ -578,6 +578,7 @@ test:tui-journey:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
           - "src/device/tui*.rs"
+          - "src/device/tui_pty/*.rs"
           - "tests/it/cross_platform.rs"
           - ".gitlab-ci.yml"
           - "Cargo.toml"
@@ -624,7 +625,7 @@ test:tui-journey:
       export E2E_BIN_DIR="$JOB_DIR/bin"
 
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
-        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/)' \
+        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/screen_snapshot/)' \
         2>&1 | tee tui-journey-results.txt
   after_script:
     # Persistent shell runners keep the workspace between jobs; the

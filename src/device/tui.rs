@@ -248,13 +248,12 @@ impl TuiSession {
         }
     }
 
-    /// Repaint and return the whole frame — see `PtySession::redraw_screen`.
-    async fn redraw_screen(&self) -> E2eResult<String> {
+    async fn read_screen_snapshot(&self) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
         let pty = pty_guard
             .as_mut()
             .ok_or_else(|| E2eError::device("TUI session not started"))?;
-        pty.redraw_screen()
+        pty.read_screen_snapshot()
     }
 
     async fn read_screen(&self) -> E2eResult<String> {
@@ -302,8 +301,11 @@ impl TuiSession {
         self.navigate_to("Contacts").await?;
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         loop {
-            let frame = strip_ansi(&self.redraw_screen().await?);
-            if frame.contains("Add Contact") || frame.contains("Contacts") {
+            let frame = self.read_screen_snapshot().await?;
+            // Navigation uses a double border and also contains "Contacts".
+            // Its dismissal, rather than that label alone, confirms selection.
+            if !frame.contains('╔') && (frame.contains("Add Contact") || frame.contains("Contacts"))
+            {
                 return Ok(());
             }
             if std::time::Instant::now() >= deadline {
@@ -599,17 +601,15 @@ impl Device for TuiDevice {
         // catch-up and re-renders with the chip's outcome label.
         self.session.navigate_to_contacts().await?;
         self.session.send_alt('s').await?;
-        // Core runs the catch-up synchronously inside the key handler and
-        // re-renders the chip: "Synced", "Sync failed", or "Sync in N s" when
-        // core's own throttle declines a repeat (core !1591) — that last one
-        // is core's decision, not a harness failure. Read the whole repainted
-        // frame, not the redrawn cells: when the chip already counts down,
-        // a throttled press changes only digits, so no fixed fragment of the
-        // label reaches the PTY (seen once Core 0.82.0 synced at the drawn
-        // gap, private#603).
+        // Sync runs synchronously in the input handler. A subsequent menu
+        // round-trip confirms that handler has returned before inspecting
+        // the chip, whose text may be identical to the previous outcome.
+        self.session.navigate_to_contacts().await?;
+        // Retain unchanged cells: a throttled press may redraw only digits
+        // in "Sync in N s" (private#603), rather than the whole chip label.
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         loop {
-            let frame = strip_ansi(&self.session.redraw_screen().await?);
+            let frame = self.session.read_screen_snapshot().await?;
             if frame.contains("Sync failed") {
                 return Err(E2eError::device(
                     "TUI sync failed (sync chip reports failure)",
@@ -633,11 +633,8 @@ impl Device for TuiDevice {
         self.session.ensure_started().await?;
 
         self.session.navigate_to_contacts().await?;
-        let frame = strip_ansi(&self.session.redraw_screen().await?);
+        let frame = self.session.read_screen_snapshot().await?;
 
-        // Cursor moves become spaces in `strip_ansi`, so rows are not lines;
-        // the box border ("│") is what bounds a cell. Two repaints may land
-        // in one read, hence the dedup.
         let mut seen = std::collections::HashSet::new();
         let contacts = frame
             .split('│')
@@ -837,6 +834,10 @@ fn share_link_in(screen: &str) -> Option<String> {
 
 // INLINE_TEST_REQUIRED: private helpers of the feature-gated tui module
 // (find_tui_binary_given, share_link_in) are not reachable from tests/.
+#[cfg(test)]
+#[path = "tui_session_tests.rs"]
+mod session_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;

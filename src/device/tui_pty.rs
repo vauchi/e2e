@@ -4,9 +4,9 @@
 
 //! Raw PTY plumbing under the TUI device driver: spawning the wrapper
 //! script inside an `expectrl` session, reading and matching its stream,
-//! and forcing a repaint when a read must see the whole frame.
+//! and retaining rendered terminal state across incremental redraws.
 
-use std::io::{Read, Write as IoWrite};
+use std::io::Write as IoWrite;
 use std::time::Duration;
 
 use expectrl::{Regex, Session};
@@ -20,6 +20,7 @@ pub(super) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 /// This is stored separately to avoid complex generics.
 pub(super) struct PtySession {
     session: Session,
+    screen: vt100::Parser,
 }
 
 impl PtySession {
@@ -79,7 +80,10 @@ exec "{}"
         // Set default timeout
         session.set_expect_timeout(Some(DEFAULT_TIMEOUT));
 
-        Ok(Self { session })
+        Ok(Self {
+            session,
+            screen: vt100::Parser::new(40, 160, 0),
+        })
     }
 
     pub(super) fn send_key(&mut self, key: u8) -> E2eResult<()> {
@@ -115,52 +119,35 @@ exec "{}"
             .expect(regex)
             .map_err(|e| E2eError::device(format!("Pattern '{}' not found: {}", pattern, e)))?;
 
+        self.screen.process(found.as_bytes());
         let matched = found.get(0).unwrap_or_else(|| found.as_bytes());
         Ok(String::from_utf8_lossy(matched).to_string())
     }
 
-    /// Force the TUI to repaint every cell and return the repainted frame.
-    ///
-    /// ratatui redraws only the cells that changed since the last frame, so
-    /// a screen that is already on display never reaches the PTY again — a
-    /// read after navigating to it yields nothing. A window-size change
-    /// makes the terminal clear and repaint the whole frame, which is the
-    /// one way to read what is on screen without a virtual terminal.
-    pub(super) fn redraw_screen(&mut self) -> E2eResult<String> {
-        let (cols, rows) = self
-            .session
-            .get_process()
-            .get_window_size()
-            .map_err(|e| E2eError::device(format!("Failed to read PTY size: {e}")))?;
-        for width in [cols.saturating_sub(1).max(20), cols] {
-            self.session
-                .get_process_mut()
-                .set_window_size(width, rows)
-                .map_err(|e| E2eError::device(format!("Failed to resize PTY: {e}")))?;
-            std::thread::sleep(Duration::from_millis(250));
-        }
-        // Bounded by time, not by silence: the TUI re-emits a hide-cursor
-        // sequence every frame, so the stream never goes quiet.
-        let mut frame = String::new();
-        let deadline = std::time::Instant::now() + Duration::from_millis(1500);
+    /// Read the visible screen without relying on a new full redraw.
+    pub(super) fn read_screen_snapshot(&mut self) -> E2eResult<String> {
+        let deadline = std::time::Instant::now() + Duration::from_millis(100);
         while std::time::Instant::now() < deadline {
-            frame.push_str(&self.read_available()?);
+            if self.read_available()?.is_empty() {
+                break;
+            }
         }
-        Ok(frame)
+        Ok(self.screen.screen().contents())
     }
 
     pub(super) fn read_available(&mut self) -> E2eResult<String> {
-        // Set very short timeout for non-blocking read
-        self.session
-            .set_expect_timeout(Some(Duration::from_millis(100)));
-
         let mut buffer = vec![0u8; 4096];
-        match self.session.read(&mut buffer) {
+        match self.session.try_read(&mut buffer) {
+            Ok(0) => Err(E2eError::device("TUI output closed unexpectedly")),
             Ok(n) => {
+                self.screen.process(&buffer[..n]);
                 let content = String::from_utf8_lossy(&buffer[..n]).to_string();
                 Ok(content)
             }
-            Err(_) => Ok(String::new()),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(String::new()),
+            Err(error) => Err(E2eError::device(format!(
+                "Failed to read TUI output: {error}"
+            ))),
         }
     }
 
@@ -200,3 +187,8 @@ pub(super) fn strip_ansi(screen: &str) -> String {
     }
     out
 }
+
+// INLINE_TEST_REQUIRED: PtySession is a private transport helper; real-PTY
+// regressions exercise it without exposing it through the public device API.
+#[cfg(test)]
+mod tests;
