@@ -24,7 +24,7 @@ async fn sync_pair(alice: &CliDevice, bob: &CliDevice) {
     bob.sync().await.unwrap();
 }
 
-// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
 #[tokio::test]
 async fn integration_full_backup_restore_preserves_sharing_and_two_way_updates() {
     let (mut relays, mut outer, relay_url, outer_url) = spawn_ohttp_stack().await;
