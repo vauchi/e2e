@@ -25,6 +25,8 @@ use crate::error::{E2eError, E2eResult};
 const ALLOW_DIRECT_ENV: &str = "VAUCHI_ALLOW_DIRECT";
 const TEST_CLOCK_ENV: &str = "VAUCHI_TEST_CLOCK_EPOCH";
 
+mod backup;
+
 /// One probe per binary per test process: each costs two CLI launches.
 fn honors_test_clock_cached(cli: &std::path::Path) -> bool {
     static PROBED: std::sync::OnceLock<Mutex<HashMap<PathBuf, bool>>> = std::sync::OnceLock::new();
@@ -928,23 +930,11 @@ impl Device for CliDevice {
     }
 
     async fn export_backup(&self, password: &str) -> E2eResult<String> {
-        let backup_path = self.data_dir.path().join("backup.vauchi");
-        let path_str = backup_path.to_string_lossy().to_string();
-        self.run_command_success_with_env(
-            &["export", &path_str],
-            &[("VAUCHI_BACKUP_PASSWORD", password)],
-        )
-        .await?;
-        Ok(path_str)
+        self.export_backup_file(password, false).await
     }
 
     async fn import_backup(&self, path: &str, password: &str) -> E2eResult<()> {
-        self.run_command_success_with_env(
-            &["import", path],
-            &[("VAUCHI_BACKUP_PASSWORD", password)],
-        )
-        .await?;
-        Ok(())
+        self.import_backup_file(path, password, false).await
     }
 }
 
