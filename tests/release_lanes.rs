@@ -126,6 +126,23 @@ fn rg3_release_lane_is_blocking_and_runs_the_exact_split_ohttp_journey() {
 
 // @internal
 #[test]
+fn full_backup_restore_is_a_blocking_merge_request_journey() {
+    let job = top_level_job("test:backup-restore");
+
+    assert!(job.contains("allow_failure: false"));
+    assert!(job.contains("job: test:smoke"));
+    assert!(job.contains("artifacts: true"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"merge_request_event\""));
+    assert!(job.contains("$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"));
+    assert!(job.contains("$CI_PIPELINE_SOURCE == \"schedule\""));
+    assert!(job.contains("export VAUCHI_E2E_NO_DEVICES=1"));
+    assert!(job.contains(
+        "test(=backup_restore::integration_full_backup_restore_preserves_sharing_and_two_way_updates)"
+    ));
+}
+
+// @internal
+#[test]
 fn rg4_rg5_release_lane_is_blocking_and_runs_the_six_device_journey() {
     let job = top_level_job("test:release-rg4-rg5");
 
@@ -244,6 +261,7 @@ fn rg15_release_lane_is_blocking_and_runs_the_continuity_journeys() {
 fn native_binary_producer_and_consumers_share_linux_runner() {
     for job_name in [
         "test:smoke",
+        "test:backup-restore",
         "test:release-rg3",
         "test:release-rg4-rg5",
         "test:release-rg6-observability",
