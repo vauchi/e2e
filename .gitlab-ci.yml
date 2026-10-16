@@ -73,6 +73,12 @@ stages:
   - deploy
 
 
+# Temporary containment for the allyson compiler stall (vauchi/private#198).
+# A tiny compile probe passed while real dependency compilation still hung.
+.self-hosted:
+  variables:
+    RUSTC_WRAPPER: ""
+
 variables:
   # Runtime helpers and structural templates must use the same commit.
   VAUCHI_SCRIPTS_REF: "ea3bfb1d139b56a6e2708f7f4757d48552aebd1d"
