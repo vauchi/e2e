@@ -23,7 +23,7 @@
 # Shared templates + GitLab Ultimate Templates
 include:
   - project: 'vauchi/scripts'
-    ref: ci-templates-v2026.10.04
+    ref: ea3bfb1d139b56a6e2708f7f4757d48552aebd1d
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -74,8 +74,8 @@ stages:
 
 
 variables:
-  # Pin fetched helper scripts independently from the structural templates.
-  VAUCHI_SCRIPTS_REF: "ci-templates-v2026.10.04"
+  # Runtime helpers and structural templates must use the same commit.
+  VAUCHI_SCRIPTS_REF: "ea3bfb1d139b56a6e2708f7f4757d48552aebd1d"
   # cargo audit runs with --deny warnings; the one entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   AUDIT_IGNORES: ""
@@ -129,12 +129,8 @@ lint:adr-046:
   needs: []
   before_script:
     - apk add --no-cache bash ripgrep git
-    - |
-      if [ ! -d ../scripts ]; then
-        git clone --depth=1 --branch "${VAUCHI_SCRIPTS_REF}" https://gitlab.com/vauchi/scripts.git ../scripts
-      else
-        git -C ../scripts pull --ff-only 2>/dev/null || true
-      fi
+    - bash ci/tests/fetch-scripts.test.sh
+    - bash ci/fetch-scripts.sh "${VAUCHI_SCRIPTS_REF}" ../scripts
   script:
     - bash ../scripts/scripts/check-aead.sh .
   rules:
