@@ -331,6 +331,37 @@ test:smoke:
   # release lanes.
   timeout: 1 hour
 
+# Full integration runs after merge; this restore regression must block MRs.
+test:backup-restore:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs:
+    - job: test:smoke
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  script:
+    - |
+      export VAUCHI_E2E_NO_DEVICES=1
+      export E2E_BIN_DIR="$(pwd)/.smoke-bin"
+      test -x "$E2E_BIN_DIR/vauchi-relay"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-anchor"
+      test -x "$E2E_BIN_DIR/vauchi"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
+      cargo nextest run --profile ci --run-ignored default -j 1 \
+        -E 'binary(=it) & test(=backup_restore::integration_full_backup_restore_preserves_sharing_and_two_way_updates)' \
+        2>&1 | tee backup-restore-results.txt
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    paths:
+      - backup-restore-results.txt
+    expire_in: 1 week
+
 # RG-4/RG-5 release certification — exact six-device convergence through
 # distinct outer OHTTP and application-relay hops. Owner-private-state
 # certification (RG-10) is a separate blocking lane below.
