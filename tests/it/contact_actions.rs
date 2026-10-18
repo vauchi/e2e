@@ -142,7 +142,7 @@ fn e2e_address_field_generates_directions_uri() {
 // E2E: Security — blocked URI schemes
 // Feature: contact_actions.feature @security
 
-/// @scenario: contact_actions:URLs are validated before opening (#45)
+/// @scenario: contact_actions:URLs are validated before opening
 ///
 /// Defense-in-depth: javascript: URIs are blocked at two layers:
 /// 1. Input validation: `add_own_field` rejects javascript: for Website fields
@@ -180,7 +180,7 @@ fn e2e_javascript_uri_blocked_after_exchange() {
     );
 }
 
-/// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
+/// @scenario: contact_actions:Only safe URI schemes are allowed
 #[test]
 fn e2e_file_uri_blocked_after_exchange() {
     let bob_fields = vec![ContactField::new(
@@ -202,7 +202,7 @@ fn e2e_file_uri_blocked_after_exchange() {
     );
 }
 
-/// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+/// @scenario: contact_actions:Allowed URI schemes whitelist
 // @scenario: contact_actions.feature:Allowed URI schemes whitelist
 #[test]
 fn e2e_allowed_schemes_work_after_exchange() {

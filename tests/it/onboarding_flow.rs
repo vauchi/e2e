@@ -75,10 +75,10 @@ async fn test_welcome_screen_value_proposition() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-// @scenario: onboarding:Guided card creation wizard
+// @scenario: onboarding:Guided card creation
 /// Integration test: Card creation wizard completes all 4 steps.
 /// Tags: integration, onboarding, card-creation
-/// Traces: onboarding.feature:55-61 "Guided card creation wizard"
+/// Traces: onboarding.feature:55-61 "Guided card creation"
 /// Traces: onboarding.feature:64-69 "Minimum viable card"
 /// Traces: onboarding.feature:72-77 "Quick add phone and email"
 /// Traces: onboarding.feature:80-85 "Card preview before finishing"
