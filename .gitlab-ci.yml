@@ -616,7 +616,7 @@ test:tui-journey:
           - ".gitlab-ci.yml"
           - "Cargo.toml"
           - "Cargo.lock"
-  allow_failure: true
+  allow_failure: false
   script:
     - |
       # Build the TUI in a job-private directory and hand the harness the
