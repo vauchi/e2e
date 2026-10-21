@@ -279,3 +279,80 @@ async fn integration_cli_users_in_delayed_mode_receive_updates() {
     assert!(held > 0, "the CLI clients fetched through the delayed path");
     orch.stop().await.expect("stop");
 }
+
+/// CLI users who never asked for the delayed path: their first sync learns
+/// the outer relay's advertised window, and every fetch after it goes
+/// through the delayed path. `vauchi sync` must still collect those
+/// answers before the process exits, or an update never arrives.
+// @internal
+#[tokio::test]
+async fn integration_cli_users_receive_updates_after_learning_the_window() {
+    let mut config = vauchi_e2e_tests::orchestrator::OrchestratorConfig::default();
+    config.ohttp_relay_config.log_filter = Some("vauchi_ohttp_relay=debug".to_string());
+    config.ohttp_relay_config.forward_delay_max_secs = 2;
+    let mut orch = vauchi_e2e_tests::orchestrator::Orchestrator::with_config(config);
+    orch.start().await.expect("start");
+    // Faster collects than the defaults; VAUCHI_OHTTP_DELAYED stays unset.
+    let wait_env: std::collections::HashMap<String, String> = [
+        ("VAUCHI_OHTTP_DELAYED_POLL_SECS", "1"),
+        ("VAUCHI_OHTTP_DELAYED_WAIT_SECS", "20"),
+    ]
+    .into_iter()
+    .map(|(name, value)| (name.to_string(), value.to_string()))
+    .collect();
+    for name in ["Alice", "Bob"] {
+        orch.add_user_split_ohttp_with_device_envs(name, vec![wait_env.clone()])
+            .expect("user");
+    }
+    orch.create_all_identities().await.expect("identities");
+    orch.exchange("Alice", "Bob").await.expect("exchange");
+    let alice = orch.user("Alice").expect("Alice");
+    let bob = orch.user("Bob").expect("Bob");
+    {
+        let alice = alice.read().await;
+        let a1 = alice.device(0).expect("A1").clone();
+        let a1 = a1.read().await;
+        a1.add_field("phone", "WindowPhone", "+12025550629")
+            .await
+            .expect("add field");
+        a1.unhide_field_to_contact("Bob", "WindowPhone")
+            .await
+            .expect("show it to Bob");
+    }
+
+    let mut arrived = false;
+    for _ in 0..4 {
+        alice.read().await.sync_all().await.expect("Alice sync");
+        bob.read().await.sync_all().await.expect("Bob sync");
+        let card = bob
+            .read()
+            .await
+            .get_contact_card("Alice")
+            .await
+            .expect("Bob reads Alice's card");
+        if card.is_some_and(|card| {
+            card.fields
+                .iter()
+                .any(|field| field.label == "WindowPhone" && field.value == "+12025550629")
+        }) {
+            arrived = true;
+            break;
+        }
+    }
+
+    let held = orch
+        .ohttp_relay_captured_output()
+        .expect("outer relay output")
+        .iter()
+        .filter(|line| line.contains(HELD))
+        .count();
+    assert!(
+        held > 0,
+        "fetches switched to the delayed path on their own"
+    );
+    assert!(
+        arrived,
+        "Alice's update reached Bob after both learned the window"
+    );
+    orch.stop().await.expect("stop");
+}
