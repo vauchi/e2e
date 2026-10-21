@@ -3027,8 +3027,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.84.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.84.1#e579cf767cfb94409d80fb974895b43c550ea469"
+version = "0.85.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.85.0#ecd56be640d999ed2cc2944e81daa698a869c9f9"
 dependencies = [
  "base64",
  "hex",
@@ -3046,8 +3046,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.84.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.84.1#e579cf767cfb94409d80fb974895b43c550ea469"
+version = "0.85.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.85.0#ecd56be640d999ed2cc2944e81daa698a869c9f9"
 dependencies = [
  "argon2",
  "base64",
@@ -3080,7 +3080,7 @@ dependencies = [
  "ureq",
  "url",
  "uuid",
- "vauchi-protocol 0.84.1",
+ "vauchi-protocol 0.85.0",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -3119,7 +3119,7 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.84.1",
+ "vauchi-protocol 0.85.0",
  "vauchi-relay",
  "vt100",
 ]
@@ -3136,8 +3136,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.84.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.84.1#e579cf767cfb94409d80fb974895b43c550ea469"
+version = "0.85.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.85.0#ecd56be640d999ed2cc2944e81daa698a869c9f9"
 dependencies = [
  "serde",
  "serde_json",
