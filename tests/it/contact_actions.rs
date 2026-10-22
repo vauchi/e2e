@@ -78,7 +78,7 @@ fn e2e_phone_field_generates_tel_uri_after_exchange() {
 
     let bob_contact = &contacts[0];
     let phone_field = &bob_contact.card().fields()[0];
-    let uri = phone_field.to_uri();
+    let uri = phone_field.to_uri(&vauchi_app::social::active_registry());
     assert!(uri.is_some(), "phone field must generate a URI");
     assert!(
         uri.unwrap().starts_with("tel:"),
@@ -100,7 +100,7 @@ fn e2e_phone_secondary_actions_include_call_sms_copy() {
 
     let contacts = alice.list_contacts().unwrap();
     let phone_field = &contacts[0].card().fields()[0];
-    let actions = phone_field.to_secondary_actions();
+    let actions = phone_field.to_secondary_actions(&vauchi_app::social::active_registry());
 
     assert_eq!(actions.len(), 3, "phone should have Call, SendSms, Copy");
     assert!(matches!(&actions[0], ContactAction::Call(_)));
@@ -171,7 +171,7 @@ fn e2e_javascript_uri_blocked_after_exchange() {
 
     let contacts = alice.list_contacts().unwrap();
     let field = &contacts[0].card().fields()[0];
-    let uri = field.to_uri();
+    let uri = field.to_uri(&vauchi_app::social::active_registry());
 
     assert!(
         uri.is_none(),
@@ -193,7 +193,7 @@ fn e2e_file_uri_blocked_after_exchange() {
 
     let contacts = alice.list_contacts().unwrap();
     let field = &contacts[0].card().fields()[0];
-    let uri = field.to_uri();
+    let uri = field.to_uri(&vauchi_app::social::active_registry());
 
     assert!(
         uri.is_none(),
@@ -219,7 +219,7 @@ fn e2e_allowed_schemes_work_after_exchange() {
 
     // All fields must generate valid URIs
     for field in fields {
-        let uri = field.to_uri();
+        let uri = field.to_uri(&vauchi_app::social::active_registry());
         assert!(
             uri.is_some(),
             "field '{}' ({:?}) must generate a URI",
@@ -259,7 +259,7 @@ fn e2e_mastodon_federated_handle_generates_correct_url() {
 
     let contacts = alice.list_contacts().unwrap();
     let social_field = &contacts[0].card().fields()[0];
-    let uri = social_field.to_uri();
+    let uri = social_field.to_uri(&vauchi_app::social::active_registry());
 
     assert!(uri.is_some(), "Mastodon field must generate a URI");
     let uri_str = uri.unwrap();
