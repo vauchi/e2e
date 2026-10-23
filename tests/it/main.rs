@@ -43,6 +43,7 @@ mod offline_catchup;
 mod ohttp_advanced;
 mod ohttp_delayed;
 mod ohttp_fail_closed_matrix;
+mod ohttp_fetch_size_ladder;
 mod ohttp_helpers;
 mod ohttp_integration;
 mod ohttp_signed_key;
