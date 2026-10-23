@@ -684,3 +684,52 @@ async fn integration_tui_to_tui_link_exchange() {
 
     orch.stop().await.expect("Failed to stop orchestrator");
 }
+
+// @scenario: device_management:Link new device via QR code
+/// Integration test: a fresh TUI joins the identity of another TUI through
+/// Core's relay-brokered device link (vauchi/private#319).
+///
+/// The joining terminal pastes the invitation the existing one prints, both
+/// show the same confirmation code, and the existing one confirms it.
+///
+/// Tags: integration, device-linking, tui
+/// Feature: device_management.feature
+// @internal
+#[tokio::test]
+#[cfg(feature = "tui")]
+async fn integration_tui_to_tui_device_link() {
+    let mut orch = Orchestrator::new();
+    orch.start().await.expect("Failed to start orchestrator");
+
+    orch.add_user_with_tui_devices("Dana", 2)
+        .expect("Failed to add Dana with two TUI devices");
+
+    orch.create_all_identities()
+        .await
+        .expect("Failed to create Dana's identity on her first TUI");
+
+    let dana = orch.user("Dana").unwrap();
+    {
+        let dana = dana.read().await;
+        let joiner = dana.device(1).unwrap().read().await;
+        assert!(
+            !joiner.has_identity().await,
+            "The second TUI should start without an identity"
+        );
+    }
+
+    orch.link_all_devices()
+        .await
+        .expect("The second TUI should join Dana's identity over the device link");
+
+    {
+        let dana = dana.read().await;
+        let joiner = dana.device(1).unwrap().read().await;
+        assert!(
+            joiner.has_identity().await,
+            "The second TUI should hold Dana's identity after the link"
+        );
+    }
+
+    orch.stop().await.expect("Failed to stop orchestrator");
+}

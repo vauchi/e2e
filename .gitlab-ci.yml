@@ -668,7 +668,7 @@ test:tui-journey:
       test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
 
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
-        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/screen_snapshot/)' \
+        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/cross_platform::integration_tui_to_tui_device_link/) + test(/screen_snapshot/)' \
         2>&1 | tee tui-journey-results.txt
   after_script:
     # Persistent shell runners keep the workspace between jobs; the
