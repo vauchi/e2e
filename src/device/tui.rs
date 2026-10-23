@@ -248,6 +248,25 @@ impl TuiSession {
         }
     }
 
+    /// Poll the retained frame for any of the `|`-separated needles. Unlike
+    /// [`Self::wait_for_visible`] it sees text drawn before the wait began,
+    /// and a timeout reports the whole frame, not a stream tail.
+    async fn wait_for_frame(&self, patterns: &str, timeout: Duration) -> E2eResult<String> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let frame = self.read_screen_snapshot().await?;
+            if let Some(found) = patterns.split('|').find(|needle| frame.contains(needle)) {
+                return Ok(found.to_string());
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(E2eError::device(format!(
+                    "none of [{patterns}] was on screen within {timeout:?}; frame:\n{frame}"
+                )));
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    }
+
     async fn read_screen_snapshot(&self) -> E2eResult<String> {
         let mut pty_guard = self.pty.lock().await;
         let pty = pty_guard
@@ -526,50 +545,111 @@ impl Device for TuiDevice {
         Ok(())
     }
 
+    /// Core's relay-brokered device link, not the CLI's hand-carried one:
+    /// the terminal prints the invitation URL under its QR label, and that
+    /// URL is what the joining device pastes.
     async fn start_device_link(&self) -> E2eResult<String> {
         self.session.ensure_started().await?;
+        self.session.navigate_to("Devices").await?;
+        self.session
+            .wait_for_visible("Link New Device", Duration::from_secs(10))
+            .await?;
+        self.session.activate_primary().await?;
+        self.session
+            .wait_for_visible(DEVICE_LINK_PREFIX, Duration::from_secs(30))
+            .await?;
+        let frame = self.session.read_screen_snapshot().await?;
+        device_link_invitation_in(&frame).ok_or_else(|| {
+            let shown: Vec<&str> = frame
+                .lines()
+                .skip_while(|line| !line.contains(DEVICE_LINK_PREFIX))
+                .take(3)
+                .collect();
+            E2eError::device(format!(
+                "Could not extract the device-link invitation from the TUI; shown: {shown:?}"
+            ))
+        })
+    }
 
-        // Navigate to Devices screen
-        self.session.send_char('d').await?;
+    /// Fresh terminal: Welcome → "Link this device" → paste the invitation
+    /// at the scan prompt → name the device. Returns the confirmation code
+    /// Core shows while it waits for the existing device to approve.
+    async fn join_identity(&self, qr_data: &str, device_name: &str) -> E2eResult<String> {
+        self.session.ensure_started().await?;
+        self.session
+            .wait_for_visible(
+                "Welcome to Vauchi|Create new identity",
+                Duration::from_secs(15),
+            )
+            .await?;
+        // The welcome screen's first row is "Link this device".
+        self.session.send_char('1').await?;
+        self.session
+            .wait_for_visible("Scan QR Code", Duration::from_secs(10))
+            .await?;
+        // A terminal answers the scan request with a paste prompt; what is
+        // pasted reaches Core as the scanned QR.
+        self.session.activate_primary().await?;
+        self.session
+            .wait_for_visible("Paste QR data", Duration::from_secs(10))
+            .await?;
+        self.session.send_text(qr_data).await?;
+        // Same pause as the exchange paste: Return before every character is
+        // applied lands on a half-filled prompt.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        self.session.send_enter().await?;
+        self.session
+            .wait_for_visible("Name for this device", Duration::from_secs(15))
+            .await?;
+        self.session.send_text(device_name).await?;
+        // Tab leaves the field so Return reaches Confirm, as on the name step
+        // of onboarding.
+        self.session.send_tab().await?;
+        self.session.activate_primary().await?;
+        self.session
+            .wait_for_visible("Verify this code matches", Duration::from_secs(30))
+            .await?;
+        let frame = self.session.read_screen_snapshot().await?;
+        confirmation_code_in(&frame).ok_or_else(|| {
+            E2eError::device("Could not read the confirmation code on the joining TUI")
+        })
+    }
 
-        // Press 'l' to generate device link
-        self.session.send_char('l').await?;
-
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // Read screen for link data
-        let screen = self.session.read_screen().await?;
-
-        // Look for "Link code:" in status
-        if screen.contains("Link code:") {
-            for line in screen.lines() {
-                if line.contains("Link code:")
-                    && let Some(code_start) = line.find(':')
-                {
-                    return Ok(line[code_start + 1..].trim().to_string());
-                }
-            }
+    /// Existing terminal: the code it shows must be the one the joining
+    /// device shows before it confirms, which is the check a user makes.
+    async fn complete_device_link(&self, request_data: &str) -> E2eResult<String> {
+        self.session
+            .wait_for_frame("Device Wants to Link", Duration::from_secs(60))
+            .await?;
+        let frame = self.session.read_screen_snapshot().await?;
+        let shown = confirmation_code_in(&frame).ok_or_else(|| {
+            E2eError::device("Could not read the confirmation code on the existing TUI")
+        })?;
+        if shown != request_data {
+            return Err(E2eError::device(format!(
+                "Confirmation codes differ: existing device shows {shown}, joining device {request_data}"
+            )));
         }
-
-        Err(E2eError::device("Could not extract device link from TUI"))
+        self.session.activate_primary().await?;
+        self.session
+            .wait_for_frame(
+                "Device linked successfully|Device Linked",
+                Duration::from_secs(60),
+            )
+            .await?;
+        Ok(shown)
     }
 
-    async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual QR entry. Use CLI.".into(),
-        ))
-    }
-
-    async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual interaction. Use CLI.".into(),
-        ))
-    }
-
+    /// Core may pass "Device Linked" by and open the joined identity's own
+    /// card, whose "can see this card" line exists only once it holds one.
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "TUI device linking requires manual interaction. Use CLI.".into(),
-        ))
+        self.session
+            .wait_for_frame(
+                "Device Linked|Successfully joined|can see this card",
+                Duration::from_secs(60),
+            )
+            .await?;
+        Ok(())
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {
@@ -819,6 +899,50 @@ impl Device for TuiDevice {
 /// The exchange link on a Link share screen: Core's
 /// `https://vauchi.app/x#…` form since 0.81.0 (vauchi/private#277), or the
 /// `vauchi://exchange?…` form older builds print.
+const DEVICE_LINK_PREFIX: &str = "vauchi://device-link?";
+
+/// The device-link invitation URL the terminal prints under its QR label.
+///
+/// The URL is longer than a terminal row, so the renderer hard-wraps it
+/// inside the surface border: a row that runs up to the border continues
+/// on the next one, and a row padded before the border ends the URL.
+fn device_link_invitation_in(screen: &str) -> Option<String> {
+    let mut rows = screen
+        .lines()
+        .skip_while(|row| !row.contains(DEVICE_LINK_PREFIX));
+    let first = rows.next()?;
+    let mut segment = &first[first.find(DEVICE_LINK_PREFIX)?..];
+    let mut link = String::new();
+    loop {
+        let inner = segment.strip_suffix('│').unwrap_or(segment);
+        let piece: String = inner.chars().take_while(|c| !c.is_whitespace()).collect();
+        let ended = piece.len() < inner.len();
+        link.push_str(&piece);
+        if ended {
+            break;
+        }
+        let Some(next) = rows.next() else { break };
+        segment = next.strip_prefix('│').unwrap_or(next);
+    }
+    link.contains("code=").then_some(link)
+}
+
+/// The `ddd-ddd` code both devices show during a device link.
+fn confirmation_code_in(screen: &str) -> Option<String> {
+    screen
+        .split(|c: char| !(c.is_ascii_digit() || c == '-'))
+        .find(|token| {
+            let bytes = token.as_bytes();
+            bytes.len() == 7
+                && bytes[3] == b'-'
+                && bytes
+                    .iter()
+                    .enumerate()
+                    .all(|(i, b)| i == 3 || b.is_ascii_digit())
+        })
+        .map(str::to_string)
+}
+
 fn share_link_in(screen: &str) -> Option<String> {
     const LINK_PREFIXES: [&str; 2] = ["https://vauchi.app/x#", "vauchi://exchange?"];
     screen.split_whitespace().find_map(|token| {
@@ -901,6 +1025,55 @@ mod tests {
     fn a_screen_without_an_exchange_link_yields_none() {
         assert_eq!(share_link_in("Visit https://vauchi.app/x for help"), None);
         assert_eq!(share_link_in("Exchange Mode — Pick a way"), None);
+    }
+
+    // @internal
+    /// Rows as the TUI drew them on 2026-10-23: the invitation hard-wrapped
+    /// inside the surface border, the second row padded before it.
+    #[test]
+    fn a_device_link_invitation_wrapped_inside_the_border_is_joined() {
+        let screen = "│[QR] Scan on new device│\n\
+                      │  vauchi://device-link?qr=AAAA│\n\
+                      │BBBB&code=MDkx      │\n\
+                      │Expires at 1792731197│";
+        assert_eq!(
+            device_link_invitation_in(screen).as_deref(),
+            Some("vauchi://device-link?qr=AAAABBBB&code=MDkx")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_device_link_invitation_on_one_row_ends_at_its_padding() {
+        let screen = "│  vauchi://device-link?qr=AAAA&code=MDkx   │";
+        assert_eq!(
+            device_link_invitation_in(screen).as_deref(),
+            Some("vauchi://device-link?qr=AAAA&code=MDkx")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_screen_without_a_complete_device_link_invitation_yields_none() {
+        assert_eq!(
+            device_link_invitation_in("Generating link... Progress 25%"),
+            None
+        );
+        assert_eq!(
+            device_link_invitation_in("│  vauchi://device-link?qr=AAAA   │"),
+            None
+        );
+    }
+
+    // @internal
+    #[test]
+    fn the_confirmation_code_is_the_three_dash_three_digit_token() {
+        assert_eq!(
+            confirmation_code_in("│Device Wants to Link│\n│  042-917  │\n│Expires at 1792731197│")
+                .as_deref(),
+            Some("042-917")
+        );
+        assert_eq!(confirmation_code_in("Progress 25% 2026-10-23"), None);
     }
 
     #[test]
