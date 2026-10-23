@@ -126,7 +126,7 @@ fn on_ladder(size: usize) -> bool {
         .any(|rung| size == rung + OHTTP_RESPONSE_OVERHEAD)
 }
 
-// @scenario: sealed_mailbox.feature:Fetch responses come in a few fixed sizes
+// @scenario: sealed_mailbox :: Fetch responses come in a few fixed sizes
 #[tokio::test(flavor = "multi_thread")]
 async fn every_fetch_response_an_observer_sees_is_a_ladder_size() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_url, ohttp_url) = spawn_ohttp_stack().await;
