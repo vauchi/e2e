@@ -451,10 +451,23 @@ impl Orchestrator {
     /// Add a user whose primary device is the TUI controlled via PTY automation.
     #[cfg(feature = "tui")]
     pub fn add_user_with_tui(&mut self, name: impl Into<String>) -> E2eResult<Arc<RwLock<User>>> {
+        self.add_user_with_tui_devices(name, 1)
+    }
+
+    /// Add a user with `count` TUI devices; the first is the primary.
+    #[cfg(feature = "tui")]
+    pub fn add_user_with_tui_devices(
+        &mut self,
+        name: impl Into<String>,
+        count: usize,
+    ) -> E2eResult<Arc<RwLock<User>>> {
         let name = name.into();
         let relay_url = self.primary_cli_relay_url()?;
 
-        info!("Adding TUI user '{}' (relay: {})", name, relay_url);
+        info!(
+            "Adding TUI user '{}' with {} device(s) (relay: {})",
+            name, count, relay_url
+        );
 
         // Give the TUI the same OHTTP overrides the CLI devices get, so it can
         // encap to the locally-spawned relay's ephemeral gateway key instead
@@ -472,7 +485,9 @@ impl Orchestrator {
         }
 
         let mut user = User::with_relay(&name, &relay_url);
-        user.add_tui_device(&relay_url, &extra_env)?;
+        for _ in 0..count {
+            user.add_tui_device(&relay_url, &extra_env)?;
+        }
 
         let user = Arc::new(RwLock::new(user));
         self.users.insert(name, user.clone());
