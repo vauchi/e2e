@@ -655,7 +655,17 @@ test:tui-journey:
       cargo build --release --features e2e-test-clock --manifest-path "$JOB_DIR/relay/Cargo.toml"
       mkdir -p "$JOB_DIR/bin"
       cp "$JOB_DIR/relay/target/release/vauchi-relay" "$JOB_DIR/relay/target/release/vauchi-ohttp-anchor" "$JOB_DIR/bin/"
+
+      # The orchestrator routes through an OHTTP relay by default; without
+      # this binary it fell back to the sibling ../ohttp-relay tree and
+      # failed once that tree was gone (private#755).
+      git clone --depth=20 --branch main \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$JOB_DIR/ohttp-relay"
+      git -C "$JOB_DIR/ohttp-relay" log --oneline -1
+      cargo build --release --manifest-path "$JOB_DIR/ohttp-relay/Cargo.toml"
+      cp "$JOB_DIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$JOB_DIR/bin/"
       export E2E_BIN_DIR="$JOB_DIR/bin"
+      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
 
       cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
         -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/screen_snapshot/)' \
