@@ -95,6 +95,16 @@ pub enum MaestroPlatform {
     Android,
 }
 
+impl MaestroPlatform {
+    /// The app the platform's flows drive; each flow names it as `appId`.
+    fn app_id(self) -> &'static str {
+        match self {
+            MaestroPlatform::Ios => "app.vauchi.ios",
+            MaestroPlatform::Android => "com.vauchi",
+        }
+    }
+}
+
 impl std::fmt::Display for MaestroPlatform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -209,7 +219,7 @@ impl MaestroDevice {
             name,
             MaestroPlatform::Ios,
             simulator_name,
-            "app.vauchi.ios",
+            MaestroPlatform::Ios.app_id(),
             relay_url,
         )
     }
@@ -224,7 +234,7 @@ impl MaestroDevice {
             name,
             MaestroPlatform::Android,
             emulator_name,
-            "com.vauchi",
+            MaestroPlatform::Android.app_id(),
             relay_url,
         )
     }
@@ -804,6 +814,34 @@ mod tests {
 
     const EXCHANGE: &str = "vauchi://exchange?d=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
     const INVITATION: &str = "vauchi://device-link?v=1&d=device-link-invitation-fixture";
+
+    // @internal
+    #[test]
+    fn test_maestro_every_flow_drives_the_app_the_harness_launches() {
+        for platform in [MaestroPlatform::Ios, MaestroPlatform::Android] {
+            let flows_dir = MaestroDevice::find_flows_dir(platform).expect("flows dir");
+            let mut flows: Vec<_> = std::fs::read_dir(&flows_dir)
+                .expect("read flows")
+                .map(|entry| entry.expect("flow entry").path())
+                .filter(|path| path.extension().is_some_and(|ext| ext == "yaml"))
+                .collect();
+            flows.sort();
+            assert!(!flows.is_empty(), "no {platform} flows");
+            for flow in flows {
+                let yaml = std::fs::read_to_string(&flow).expect("read flow");
+                let app_id = yaml
+                    .lines()
+                    .find_map(|line| line.strip_prefix("appId:"))
+                    .map(str::trim);
+                assert_eq!(
+                    app_id,
+                    Some(platform.app_id()),
+                    "{} names another app",
+                    flow.display()
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_maestro_platform_display() {
