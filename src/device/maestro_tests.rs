@@ -452,3 +452,78 @@ async fn test_maestro_ios_device_join_is_unsupported_until_its_flows_exist() {
         }
     }
 }
+
+// @internal
+#[tokio::test]
+async fn test_maestro_edit_field_runs_its_flow_with_the_label_and_new_value() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["edit_field"]);
+
+    device
+        .edit_field("ConcurrentPhone", "+12025550901")
+        .await
+        .expect("edited");
+
+    assert_eq!(
+        fake.last_run(),
+        (
+            "edit_field".to_string(),
+            vec![
+                "FIELD_LABEL=ConcurrentPhone".to_string(),
+                "FIELD_VALUE=+12025550901".to_string(),
+            ]
+        )
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_remove_field_runs_its_flow_with_the_label() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["remove_field"]);
+
+    device.remove_field("BobPhone").await.expect("removed");
+
+    assert_eq!(
+        fake.last_run(),
+        (
+            "remove_field".to_string(),
+            vec!["FIELD_LABEL=BobPhone".to_string()]
+        )
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_edit_name_runs_its_flow_with_the_new_name() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["edit_name"]);
+
+    device.edit_name("Alice Renamed").await.expect("renamed");
+
+    assert_eq!(
+        fake.last_run(),
+        (
+            "edit_name".to_string(),
+            vec!["NAME=Alice Renamed".to_string()]
+        )
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_ios_card_edits_are_unsupported_until_their_flows_exist() {
+    let device = test_device(MaestroWorkspace::new().expect("workspace"));
+    let expected = "Maestro device: the iOS card-edit flows are not written yet";
+
+    for error in [
+        device.edit_field("Work", "x").await.unwrap_err(),
+        device.remove_field("Work").await.unwrap_err(),
+        device.edit_name("Alice").await.unwrap_err(),
+    ] {
+        match error {
+            E2eError::DeviceNotSupported(message) => assert_eq!(message, expected),
+            other => panic!("expected DeviceNotSupported, got {other:?}"),
+        }
+    }
+}
