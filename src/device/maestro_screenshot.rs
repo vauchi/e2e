@@ -190,7 +190,8 @@ mod tests {
         let output = tempfile::tempdir().expect("output dir");
         let nested = output
             .path()
-            .join("2026-10-24_070000")
+            .join("2026-10-24_092300")
+            .join("link_device")
             .join("takeScreenshot");
         std::fs::create_dir_all(&nested).expect("nest");
         std::fs::write(nested.join("device_link_qr.png"), b"png").expect("write");

@@ -34,8 +34,8 @@ impl FakeMaestro {
                 let png = dir.path().join("screen.png");
                 std::fs::write(&png, qr_screen_png(payload)).expect("write screen");
                 format!(
-                    "mkdir -p \"$out/2026-10-24_070000/takeScreenshot\"\n\
-                     cp '{}' \"$out/2026-10-24_070000/takeScreenshot/{name}.png\"\n",
+                    "mkdir -p \"$out/2026-10-24_092300/flow/takeScreenshot\"\n\
+                     cp '{}' \"$out/2026-10-24_092300/flow/takeScreenshot/{name}.png\"\n",
                     png.display()
                 )
             }
