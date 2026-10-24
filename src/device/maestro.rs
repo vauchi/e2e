@@ -115,8 +115,16 @@ impl std::fmt::Display for MaestroPlatform {
 }
 
 /// Why the flows cannot run on a phone set to `locale`, if they cannot.
-fn locale_blocks_flows(_device: &str, _locale: &str) -> Option<String> {
-    None
+/// The flows find the app's controls by their English labels; an
+/// unreadable locale does not block them.
+fn locale_blocks_flows(device: &str, locale: &str) -> Option<String> {
+    let locale = locale.trim();
+    if locale.is_empty() || locale == "en" || locale.starts_with("en-") {
+        return None;
+    }
+    Some(format!(
+        "Maestro device: {device} is set to {locale}, but the flows match English labels; switch its language to English"
+    ))
 }
 
 /// The `takeScreenshot` names the QR flows save under.
@@ -327,6 +335,13 @@ impl MaestroDevice {
         env_vars: &[(&str, &str)],
         test_output_dir: Option<&Path>,
     ) -> E2eResult<String> {
+        if self.platform == MaestroPlatform::Android {
+            let locale = self.android_locale().await;
+            if let Some(reason) = locale_blocks_flows(&self.device_name, &locale) {
+                return Err(E2eError::DeviceNotSupported(reason));
+            }
+        }
+
         let flow_path = self.flows_dir.join(format!("{}.yaml", flow_name));
 
         if !flow_path.exists() {
@@ -464,6 +479,24 @@ impl MaestroDevice {
     }
 
     /// Run a platform-specific app lifecycle command.
+    /// The phone's system locale, or "" when adb cannot say.
+    async fn android_locale(&self) -> String {
+        Command::new("adb")
+            .args([
+                "-s",
+                &self.device_name,
+                "shell",
+                "getprop",
+                "persist.sys.locale",
+            ])
+            .output()
+            .await
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default()
+    }
+
     async fn run_app_command(&self, action: &str) -> E2eResult<()> {
         let output = match self.platform {
             MaestroPlatform::Ios => {
