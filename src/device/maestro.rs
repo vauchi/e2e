@@ -417,6 +417,16 @@ impl MaestroDevice {
         Ok(output_dir)
     }
 
+    async fn run_card_edit(&self, flow_name: &str, env_vars: &[(&str, &str)]) -> E2eResult<()> {
+        if self.platform == MaestroPlatform::Ios {
+            return Err(E2eError::DeviceNotSupported(
+                "Maestro device: the iOS card-edit flows are not written yet".into(),
+            ));
+        }
+        self.run_flow_with_artifacts(flow_name, env_vars).await?;
+        Ok(())
+    }
+
     fn ios_device_join_unsupported() -> E2eError {
         E2eError::DeviceNotSupported(
             "Maestro device: the iOS device-link joining flows are not written yet".into(),
@@ -663,22 +673,21 @@ impl Device for MaestroDevice {
         Ok(())
     }
 
-    async fn edit_field(&self, _label: &str, _value: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_field requires dedicated flow".into(),
-        ))
+    async fn edit_field(&self, label: &str, value: &str) -> E2eResult<()> {
+        self.run_card_edit(
+            "edit_field",
+            &[("FIELD_LABEL", label), ("FIELD_VALUE", value)],
+        )
+        .await
     }
 
-    async fn remove_field(&self, _label: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: remove_field requires dedicated flow".into(),
-        ))
+    async fn remove_field(&self, label: &str) -> E2eResult<()> {
+        self.run_card_edit("remove_field", &[("FIELD_LABEL", label)])
+            .await
     }
 
-    async fn edit_name(&self, _name: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: edit_name requires dedicated flow".into(),
-        ))
+    async fn edit_name(&self, name: &str) -> E2eResult<()> {
+        self.run_card_edit("edit_name", &[("NAME", name)]).await
     }
 
     async fn set_network(&self, config: NetworkConfig) -> E2eResult<()> {
