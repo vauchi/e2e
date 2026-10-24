@@ -381,6 +381,61 @@ async fn test_android_device_exchange() {
         .expect("Android device create_identity flow should succeed");
 }
 
+// @scenario: device_management:User links a new device
+/// Two Android phones link over Core's device link, driven by Maestro
+/// (vauchi/private#319): the host's QR is read off a screenshot, the
+/// joiner opens it as the deep link a camera would, and the host approves
+/// only the code the joiner shows.
+///
+/// Runs only on the rig: set `VAUCHI_E2E_ANDROID_HOST` to the adb serial of
+/// a phone that holds an identity and `VAUCHI_E2E_ANDROID_JOINER` to one
+/// with a fresh install, both with the app in English.
+// @internal
+#[tokio::test]
+async fn test_android_phone_joins_another_phones_identity() {
+    use vauchi_e2e_tests::device::MaestroDevice;
+
+    let (Ok(host_serial), Ok(joiner_serial)) = (
+        std::env::var("VAUCHI_E2E_ANDROID_HOST"),
+        std::env::var("VAUCHI_E2E_ANDROID_JOINER"),
+    ) else {
+        return;
+    };
+    if !vauchi_e2e_tests::device::devices_allowed() {
+        return;
+    }
+
+    let _guard = MAESTRO_SERIAL.lock().await;
+    let host = MaestroDevice::android("Host_Android", &host_serial, "unused")
+        .expect("Maestro CLI must be installed");
+    let joiner = MaestroDevice::android("Joiner_Android", &joiner_serial, "unused")
+        .expect("Maestro CLI must be installed");
+
+    let invitation = host.start_device_link().await.expect("host shows a QR");
+    assert!(
+        invitation.starts_with("vauchi://device-link?"),
+        "the host QR is a device-link invitation"
+    );
+    let code = joiner
+        .join_identity(&invitation, "Rig Joiner")
+        .await
+        .expect("joiner shows a confirmation code");
+    assert!(
+        code.len() == 7 && code.as_bytes()[3] == b'-',
+        "confirmation code {code:?} is ddd-ddd"
+    );
+    assert_eq!(
+        host.complete_device_link(&code)
+            .await
+            .expect("host approves"),
+        code
+    );
+    joiner
+        .finish_device_join(&code)
+        .await
+        .expect("joiner holds the identity");
+}
+
 // @scenario: contact_exchange:Two users exchange contact cards via QR code
 /// Smoke test: TUI can create an identity through the generic presentation
 /// protocol.
