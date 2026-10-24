@@ -571,13 +571,13 @@ impl Device for MaestroDevice {
 
     async fn export_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: export_identity not supported (mobile uses cloud backup)".into(),
+            "Maestro device: a phone exports through the system save/share sheet, which UI tests may not drive (CC-23)".into(),
         ))
     }
 
     async fn import_identity(&self, _path: &str) -> E2eResult<()> {
         Err(E2eError::DeviceNotSupported(
-            "Maestro device: import_identity not supported (mobile uses cloud backup)".into(),
+            "Maestro device: a phone imports through the system file picker, which UI tests may not drive (CC-23)".into(),
         ))
     }
 
@@ -770,28 +770,12 @@ impl Device for MaestroDevice {
         self.run_app_command("launch").await
     }
 
-    async fn start_proximity_verification(&self) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not automatable in simulator".into(),
-        ))
-    }
-
-    async fn verify_proximity(&self, _challenge: &str) -> E2eResult<bool> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: proximity verification not automatable in simulator".into(),
-        ))
-    }
-
     fn supports_network_simulation(&self) -> bool {
         false // Network simulation requires manual setup
     }
 
     fn supports_lifecycle_control(&self) -> bool {
         true
-    }
-
-    fn supports_proximity_verification(&self) -> bool {
-        false // Not automatable in simulator
     }
 }
 
