@@ -74,12 +74,13 @@
 //! let qr = device.generate_qr().await?;
 //! ```
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use async_trait::async_trait;
 use tokio::process::Command;
 
+use super::maestro_screenshot;
 use super::{Contact, ContactCard, Device, DeviceType, NetworkConfig};
 use crate::error::{E2eError, E2eResult};
 
@@ -151,6 +152,25 @@ impl MaestroWorkspace {
             }
         }
         Ok(path)
+    }
+
+    /// An empty directory for one run's Maestro artifacts, so nothing an
+    /// earlier run saved can be read back as this run's.
+    fn fresh_test_output_dir(&self) -> E2eResult<PathBuf> {
+        let dir = self.directory.path().join("test-output");
+        match std::fs::remove_dir_all(&dir) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(E2eError::device(format!(
+                    "Failed to clear stale Maestro artifacts: {error}"
+                )));
+            }
+        }
+        std::fs::create_dir(&dir).map_err(|error| {
+            E2eError::device(format!("Failed to create Maestro artifacts dir: {error}"))
+        })?;
+        Ok(dir)
     }
 }
 
@@ -283,6 +303,15 @@ impl MaestroDevice {
     /// to ensure correct device targeting on Android when both an emulator and
     /// a simulator are running simultaneously.
     async fn run_flow(&self, flow_name: &str, env_vars: &[(&str, &str)]) -> E2eResult<String> {
+        self.run_flow_saving_to(flow_name, env_vars, None).await
+    }
+
+    async fn run_flow_saving_to(
+        &self,
+        flow_name: &str,
+        env_vars: &[(&str, &str)],
+        test_output_dir: Option<&Path>,
+    ) -> E2eResult<String> {
         let flow_path = self.flows_dir.join(format!("{}.yaml", flow_name));
 
         if !flow_path.exists() {
@@ -317,6 +346,9 @@ impl MaestroDevice {
             .arg(format!("VAUCHI_RELAY_URL={}", self.relay_url));
         for (key, value) in env_vars {
             cmd.arg("-e").arg(format!("{key}={value}"));
+        }
+        if let Some(dir) = test_output_dir {
+            cmd.arg("--test-output-dir").arg(dir);
         }
 
         cmd.arg(&flow_path)
@@ -359,6 +391,17 @@ impl MaestroDevice {
         self.run_flow(flow_name, &flow_env).await?;
         std::fs::read_to_string(self.workspace.output_path(output))
             .map_err(|e| E2eError::device(format!("Failed to read fresh Maestro output: {e}")))
+    }
+
+    /// The payload of the QR the flow saved as `screenshot`.
+    async fn run_qr_flow(&self, flow_name: &str, screenshot: &str) -> E2eResult<String> {
+        let output_dir = self.workspace.fresh_test_output_dir()?;
+        self.run_flow_saving_to(flow_name, &[], Some(&output_dir))
+            .await?;
+        let path = maestro_screenshot::screenshot_in(&output_dir, screenshot)?;
+        let png = std::fs::read(&path)
+            .map_err(|e| E2eError::device(format!("Failed to read Maestro screenshot: {e}")))?;
+        maestro_screenshot::qr_payload_in(&png)
     }
 
     fn parse_contacts(content: &str) -> Vec<Contact> {
@@ -464,9 +507,16 @@ impl Device for MaestroDevice {
     }
 
     async fn generate_qr(&self) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: QR payload extraction is not supported".into(),
-        ))
+        match self.platform {
+            MaestroPlatform::Android => {
+                self.run_qr_flow("generate_qr", EXCHANGE_QR_SCREENSHOT)
+                    .await
+            }
+            MaestroPlatform::Ios => Err(E2eError::DeviceNotSupported(
+                "Maestro device: the iOS simulator exchanges by link, not QR (Glance needs Bluetooth)"
+                    .into(),
+            )),
+        }
     }
 
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
@@ -476,9 +526,16 @@ impl Device for MaestroDevice {
     }
 
     async fn start_device_link(&self) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: device-link payload extraction is not supported".into(),
-        ))
+        match self.platform {
+            MaestroPlatform::Android => {
+                self.run_qr_flow("link_device", DEVICE_LINK_QR_SCREENSHOT)
+                    .await
+            }
+            MaestroPlatform::Ios => Err(E2eError::DeviceNotSupported(
+                "Maestro device: the iOS link_device flow does not save the device-link QR yet"
+                    .into(),
+            )),
+        }
     }
 
     async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {

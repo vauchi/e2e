@@ -8,20 +8,72 @@
 //! OS clipboard, and an accessible element would recite it to every
 //! accessibility service.
 
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
+
+use image::{ImageFormat, ImageReader, Limits};
+use vauchi_core::qr_decode::{ScannerBackend, scan_qr_from_luma};
 
 use crate::error::{E2eError, E2eResult};
 
+/// Larger than any phone screen; refused before the pixels are decoded.
 const MAX_SCREENSHOT_SIDE_PX: u32 = 4096;
 
-/// The QR payload in a PNG screenshot.
-pub(super) fn qr_payload_in(_png: &[u8]) -> E2eResult<String> {
-    Err(E2eError::device("not yet"))
+/// The QR payload in a PNG screenshot. Raw rqrr, not the camera pipeline:
+/// a screenshot is pixel-exact, and rqrr reports every code in the frame,
+/// so a second QR on screen is caught rather than silently ignored.
+pub(super) fn qr_payload_in(png: &[u8]) -> E2eResult<String> {
+    let unreadable = |e: image::ImageError| E2eError::device(format!("unreadable screenshot: {e}"));
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_SCREENSHOT_SIDE_PX);
+    limits.max_image_height = Some(MAX_SCREENSHOT_SIDE_PX);
+    let mut reader = ImageReader::with_format(Cursor::new(png), ImageFormat::Png);
+    reader.limits(limits);
+    let screen = reader.decode().map_err(unreadable)?.to_luma8();
+
+    let (width, height) = screen.dimensions();
+    let mut payloads =
+        scan_qr_from_luma(ScannerBackend::RqrrRaw, screen.as_raw(), width, height).decoded_all;
+    payloads.dedup();
+    match payloads.len() {
+        0 => Err(E2eError::device("the screenshot shows no QR code")),
+        1 => Ok(payloads.remove(0)),
+        n => Err(E2eError::device(format!(
+            "the screenshot shows {n} different QR codes"
+        ))),
+    }
 }
 
 /// The one `<name>.png` Maestro wrote somewhere under `output_dir`.
-pub(super) fn screenshot_in(_output_dir: &Path, _name: &str) -> E2eResult<PathBuf> {
-    Err(E2eError::device("not yet"))
+pub(super) fn screenshot_in(output_dir: &Path, name: &str) -> E2eResult<PathBuf> {
+    let file_name = format!("{name}.png");
+    let mut found = Vec::new();
+    collect_named(output_dir, &file_name, &mut found)?;
+    match found.len() {
+        0 => Err(E2eError::device(format!("Maestro wrote no {file_name}"))),
+        1 => Ok(found.remove(0)),
+        n => Err(E2eError::device(format!(
+            "Maestro wrote {n} {file_name} files"
+        ))),
+    }
+}
+
+fn collect_named(dir: &Path, file_name: &str, found: &mut Vec<PathBuf>) -> E2eResult<()> {
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| E2eError::device(format!("Failed to read Maestro output: {e}")))?;
+    for entry in entries {
+        let entry =
+            entry.map_err(|e| E2eError::device(format!("Failed to read Maestro output: {e}")))?;
+        let kind = entry
+            .file_type()
+            .map_err(|e| E2eError::device(format!("Failed to read Maestro output: {e}")))?;
+        if kind.is_dir() {
+            collect_named(&entry.path(), file_name, found)?;
+        } else if kind.is_file() && entry.file_name() == file_name {
+            found.push(entry.path());
+        }
+    }
+    Ok(())
 }
 
 // INLINE_TEST_REQUIRED: the readers are private to the device module

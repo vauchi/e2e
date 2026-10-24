@@ -6,7 +6,8 @@ appId: app.vauchi
 name: Generate QR Code (Android)
 ---
 # Generate a QR code for contact exchange
-# Output: presentation-only screenshot in Maestro's run artifacts
+# Output: exchange_qr.png under --test-output-dir, which the harness
+# decodes back to the exchange payload
 #
 # The flow navigates to the exchange screen and captures QR data
 # either via screenshot or by reading the displayed code.
@@ -37,8 +38,9 @@ name: Generate QR Code (Android)
 # The QR label doubles as the status caption while waiting for a peer.
 - assertVisible: "Show this to exchange"
 
-# Take screenshot for QR extraction
-- takeScreenshot: vauchi_qr_screenshot
+# The harness decodes the QR from this screenshot (vauchi/private#300);
+# the name is EXCHANGE_QR_SCREENSHOT in src/device/maestro.rs.
+- takeScreenshot: exchange_qr
 
 # Post-state assertion — Layer 3 gate (plan Task 3.2). The
 # exchange screen must still be active after the QR is rendered;

@@ -34,3 +34,10 @@ appId: app.vauchi
 - extendedWaitUntil:
     notVisible: "Generating link..."
     timeout: 30000
+
+# The invitation QR is on screen once its label is.
+- assertVisible: "Scan on new device"
+
+# The harness decodes the QR from this screenshot (vauchi/private#300);
+# the name is DEVICE_LINK_QR_SCREENSHOT in src/device/maestro.rs.
+- takeScreenshot: device_link_qr
