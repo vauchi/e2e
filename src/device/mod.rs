@@ -11,6 +11,7 @@
 
 mod cli;
 mod maestro;
+mod maestro_screenshot;
 #[cfg(feature = "tui")]
 mod tui;
 #[cfg(feature = "tui")]

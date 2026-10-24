@@ -81,6 +81,10 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] 
 # Hex encoding (orchestrator-injected OHTTP bundled key for cli subprocesses)
 hex = "0.4"
 
+# Maestro screenshots decoded back to the QR payload they show (#300);
+# the same crate and version Core decodes camera frames with.
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 # Random number generation for seeding contacts (optional — enable `seed-contacts` feature)
 rand = { version = "0.8", optional = true }
 
@@ -110,6 +114,9 @@ sha2 = "0.10"
 
 # Bind-time socket options for port-allocation tests (SO_REUSEADDR)
 socket2 = { version = "0.5", features = ["all"] }
+
+# QR fixtures for the Maestro screenshot reader
+qrcode = { version = "0.14", default-features = false }
 
 [[bin]]
 name = "seed-contacts"
