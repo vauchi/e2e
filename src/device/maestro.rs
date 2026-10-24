@@ -38,7 +38,7 @@
 //!
 //! ```yaml
 //! # create_identity.yaml
-//! appId: com.vauchi  # Android: com.vauchi, iOS: app.vauchi.ios
+//! appId: app.vauchi  # Android: app.vauchi, iOS: app.vauchi.ios
 //! ---
 //! - launchApp
 //! - tapOn: "Create Identity"
@@ -100,7 +100,7 @@ impl MaestroPlatform {
     fn app_id(self) -> &'static str {
         match self {
             MaestroPlatform::Ios => "app.vauchi.ios",
-            MaestroPlatform::Android => "com.vauchi",
+            MaestroPlatform::Android => "app.vauchi",
         }
     }
 }

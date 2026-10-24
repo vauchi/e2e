@@ -342,7 +342,7 @@ maestro --platform android hierarchy  # Android
 
 # Check app bundle IDs
 # iOS: app.vauchi.ios
-# Android: com.vauchi
+# Android: app.vauchi
 
 # Use Maestro Studio for visual debugging
 maestro studio
