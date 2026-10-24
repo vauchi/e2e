@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: remove_field
+---
+# Delete an entry from the user's own card (vauchi/private#319).
+# Input: FIELD_LABEL — the entry's display name.
+
+# Fail on an unset input before touching the app.
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof FIELD_LABEL !== 'undefined' && String(FIELD_LABEL) !== 'undefined' && String(FIELD_LABEL).length > 0}
+    label: "FIELD_LABEL must be set (unset becomes the literal string \"undefined\")"
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    text: "More"
+    optional: true
+- tapOn: "My Card"
+- waitForAnimationToEnd
+
+# The card lists each entry's value and label; the label opens the entry.
+- scrollUntilVisible:
+    element: ${FIELD_LABEL}
+- tapOn: ${FIELD_LABEL}
+- waitForAnimationToEnd
+
+# Delete asks inline, below the entry, before it removes anything.
+- tapOn: "Delete"
+# Its Cancel and Delete sit below the fold, under the panel's title.
+- scrollUntilVisible:
+    element: "Cancel"
+- assertVisible: "Confirm deleting this entry"
+- tapOn: "Delete"
+
+- extendedWaitUntil:
+    notVisible: ${FIELD_LABEL}
+    timeout: 10000

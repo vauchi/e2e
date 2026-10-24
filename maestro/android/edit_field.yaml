@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: edit_field
+---
+# Change the value of an entry on the user's own card (vauchi/private#319).
+# Input: FIELD_LABEL — the entry's display name; FIELD_VALUE — its new value.
+
+# Fail on an unset input before touching the app.
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof FIELD_LABEL !== 'undefined' && String(FIELD_LABEL) !== 'undefined' && String(FIELD_LABEL).length > 0}
+    label: "FIELD_LABEL must be set (unset becomes the literal string \"undefined\")"
+- assertTrue:
+    condition: ${typeof FIELD_VALUE !== 'undefined' && String(FIELD_VALUE) !== 'undefined' && String(FIELD_VALUE).length > 0}
+    label: "FIELD_VALUE must be set (unset becomes the literal string \"undefined\")"
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    text: "More"
+    optional: true
+- tapOn: "My Card"
+- waitForAnimationToEnd
+
+# The card lists each entry's value and label; the label opens the entry.
+- tapOn: ${FIELD_LABEL}
+- waitForAnimationToEnd
+- tapOn: "Edit"
+- assertVisible: "Editing: ${FIELD_LABEL}"
+
+- tapOn: "Value"
+# eraseText deletes backwards from the cursor, and the tap leaves the
+# cursor where it landed; Down moves it to the end of a one-line field.
+- pressKey: Remote Dpad Down
+- eraseText: 200
+- inputText: ${FIELD_VALUE}
+# After the value field hideKeyboard closes only the keyboard (see
+# add_field.yaml).
+- hideKeyboard
+- waitForAnimationToEnd
+# A Save tap was lost in 1 of 5 rig runs, likely while the keyboard was
+# still closing (Pixel 3a, 2026-10-24); tap again until the form closes.
+# Once it has closed nothing is tapped again, so nothing saves twice.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Save"
+      - extendedWaitUntil:
+          notVisible: "Edit Field"
+          timeout: 5000
+# The new value must show, not just the form close. Maestro matches text
+# as a regex against the whole line ("<value> (<label>)" on the entry
+# screen), so regex characters in the value are escaped (phone numbers
+# carry "+"), and case is ignored because the IME may auto-capitalise.
+# The escaping avoids "$" and braces, which break Maestro's ${...}.
+- extendedWaitUntil:
+    visible: '(?i).*${FIELD_VALUE.split("").map(c => ".*+?^()|[]\\".indexOf(c) >= 0 ? "\\" + c : c).join("")}.*'
+    timeout: 10000

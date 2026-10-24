@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: edit_name
+---
+# Change the user's display name (vauchi/private#319).
+# Input: NAME — the new display name.
+
+# Fail on an unset input before touching the app.
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof NAME !== 'undefined' && String(NAME) !== 'undefined' && String(NAME).length > 0}
+    label: "NAME must be set (unset becomes the literal string \"undefined\")"
+
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    text: "More"
+    optional: true
+- tapOn: "Settings"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Display Name"
+- tapOn: "Display Name"
+- assertVisible: "Edit Display Name"
+
+- tapOn: "Display Name"
+# eraseText deletes backwards from the cursor, and the tap leaves the
+# cursor where it landed; Down moves it to the end of a one-line field.
+- pressKey: Remote Dpad Down
+- eraseText: 200
+- inputText: ${NAME}
+- hideKeyboard
+- waitForAnimationToEnd
+# A Save tap was lost in 1 of 5 rig runs, likely while the keyboard was
+# still closing (Pixel 3a, 2026-10-24); tap again until the form closes.
+# Once it has closed nothing is tapped again, so nothing saves twice.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Save"
+      - extendedWaitUntil:
+          notVisible: "Edit Display Name"
+          timeout: 5000
+
+# The new name must show, not just the form close (see edit_field.yaml
+# for the escaping). It is matched as the whole line, so renaming to a
+# longer form of the old name cannot pass on the old one.
+- extendedWaitUntil:
+    visible: '(?i)${NAME.split("").map(c => ".*+?^()|[]\\".indexOf(c) >= 0 ? "\\" + c : c).join("")}'
+    timeout: 10000
