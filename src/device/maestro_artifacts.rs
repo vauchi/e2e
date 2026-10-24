@@ -61,6 +61,13 @@ pub(super) fn screenshot_in(output_dir: &Path, name: &str) -> E2eResult<PathBuf>
     }
 }
 
+/// The value a flow logged as `console.log('VAUCHI_OUTPUT <key>=<value>')`.
+/// Maestro writes a flow's console to `logs/maestro.log` in its output
+/// dir, not to stdout.
+pub(super) fn flow_output_in(_output_dir: &Path, _key: &str) -> E2eResult<String> {
+    Err(E2eError::device("not yet"))
+}
+
 fn collect_named(dir: &Path, file_name: &str, found: &mut Vec<PathBuf>) -> E2eResult<()> {
     let entries = std::fs::read_dir(dir)
         .map_err(|e| E2eError::device(format!("Failed to read Maestro output: {e}")))?;
@@ -234,6 +241,78 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "Device error: Maestro wrote 2 device_link_qr.png files"
+        );
+    }
+
+    fn run_log(lines: &[&str]) -> tempfile::TempDir {
+        let output = tempfile::tempdir().expect("output dir");
+        let logs = output
+            .path()
+            .join("2026-10-24_094952")
+            .join("join_identity")
+            .join("logs");
+        std::fs::create_dir_all(&logs).expect("nest");
+        std::fs::write(logs.join("maestro.log"), lines.join("\n")).expect("write log");
+        output
+    }
+
+    const CONSOLE: &str = "09:50:16.690 [ INFO] maestro.orchestra.Orchestra.executeCommands$lambda$23$lambda$21: JsConsole: ";
+
+    // @internal
+    #[test]
+    fn a_value_the_flow_logged_reads_back_by_its_key() {
+        let output = run_log(&[
+            "09:50:16.600 [ INFO] maestro.cli.runner: Run ${console.log('VAUCHI_OUTPUT confirmation_code=' + maestro.copiedText)}",
+            &format!("{CONSOLE}VAUCHI_OUTPUT confirmation_code_note=ignored"),
+            &format!("{CONSOLE}VAUCHI_OUTPUT confirmation_code=224-580"),
+            &format!("{CONSOLE}something else"),
+        ]);
+
+        assert_eq!(
+            flow_output_in(output.path(), "confirmation_code").expect("logged"),
+            "224-580"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_key_the_flow_never_logged_is_named_in_the_error() {
+        let output = run_log(&[&format!("{CONSOLE}VAUCHI_OUTPUT other=1")]);
+
+        let error = flow_output_in(output.path(), "confirmation_code").unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Device error: the flow logged no confirmation_code"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_key_logged_twice_is_refused_as_ambiguous() {
+        let output = run_log(&[
+            &format!("{CONSOLE}VAUCHI_OUTPUT confirmation_code=224-580"),
+            &format!("{CONSOLE}VAUCHI_OUTPUT confirmation_code=224-580"),
+        ]);
+
+        let error = flow_output_in(output.path(), "confirmation_code").unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Device error: the flow logged confirmation_code 2 times"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn a_run_without_a_log_names_the_missing_file() {
+        let output = tempfile::tempdir().expect("output dir");
+
+        let error = flow_output_in(output.path(), "confirmation_code").unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Device error: Maestro wrote no maestro.log"
         );
     }
 }
