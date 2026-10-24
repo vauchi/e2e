@@ -80,7 +80,7 @@ use std::process::Stdio;
 use async_trait::async_trait;
 use tokio::process::Command;
 
-use super::maestro_screenshot;
+use super::maestro_artifacts;
 use super::{Contact, ContactCard, Device, DeviceType, NetworkConfig};
 use crate::error::{E2eError, E2eResult};
 
@@ -408,10 +408,10 @@ impl MaestroDevice {
         let output_dir = self.workspace.fresh_test_output_dir()?;
         self.run_flow_saving_to(flow_name, &[], Some(&output_dir))
             .await?;
-        let path = maestro_screenshot::screenshot_in(&output_dir, screenshot)?;
+        let path = maestro_artifacts::screenshot_in(&output_dir, screenshot)?;
         let png = std::fs::read(&path)
             .map_err(|e| E2eError::device(format!("Failed to read Maestro screenshot: {e}")))?;
-        maestro_screenshot::qr_payload_in(&png)
+        maestro_artifacts::qr_payload_in(&png)
     }
 
     fn parse_contacts(content: &str) -> Vec<Contact> {

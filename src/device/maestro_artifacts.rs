@@ -2,9 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The payload a mobile shell shows as a QR, read back from a Maestro
-//! screenshot (vauchi/private#300). The shell is not asked to expose the
-//! payload any other way: a copy action would put a device-link key on the
+//! What a Maestro run leaves in its `--test-output-dir`, read back by the
+//! harness.
+//!
+//! The payload a mobile shell shows as a QR is read from a screenshot
+//! (vauchi/private#300). The shell is not asked to expose the payload any
+//! other way: a copy action would put a device-link key on the
 //! OS clipboard, and an accessible element would recite it to every
 //! accessibility service.
 
