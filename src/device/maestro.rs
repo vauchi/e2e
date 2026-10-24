@@ -114,6 +114,11 @@ impl std::fmt::Display for MaestroPlatform {
     }
 }
 
+/// Why the flows cannot run on a phone set to `locale`, if they cannot.
+fn locale_blocks_flows(_device: &str, _locale: &str) -> Option<String> {
+    None
+}
+
 /// The `takeScreenshot` names the QR flows save under.
 const EXCHANGE_QR_SCREENSHOT: &str = "exchange_qr";
 const DEVICE_LINK_QR_SCREENSHOT: &str = "device_link_qr";

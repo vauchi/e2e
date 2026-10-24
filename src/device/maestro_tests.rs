@@ -527,3 +527,35 @@ async fn test_maestro_ios_card_edits_are_unsupported_until_their_flows_exist() {
         }
     }
 }
+
+// @internal
+#[test]
+fn test_maestro_an_english_phone_runs_the_flows() {
+    for locale in ["en-US", "en-GB", "en"] {
+        assert_eq!(locale_blocks_flows("034AY1UQS9", locale), None, "{locale}");
+    }
+}
+
+// @internal
+#[test]
+fn test_maestro_a_phone_in_another_language_is_refused_with_its_locale() {
+    assert_eq!(
+        locale_blocks_flows("9886784a544a484938", "fr-CH"),
+        Some(
+            "Maestro device: 9886784a544a484938 is set to fr-CH, but the flows match English labels; switch its language to English"
+                .to_string()
+        )
+    );
+}
+
+// @internal
+#[test]
+fn test_maestro_an_unreadable_locale_does_not_block_the_flows() {
+    for locale in ["", "  ", "\r\n"] {
+        assert_eq!(
+            locale_blocks_flows("034AY1UQS9", locale),
+            None,
+            "{locale:?}"
+        );
+    }
+}
