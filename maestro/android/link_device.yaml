@@ -20,7 +20,11 @@ appId: app.vauchi
 # surface plus the context bar, so the old path — Settings → Linked
 # Devices — named two affordances that no longer exist anywhere in the
 # app. Addressing is settled in ../README.md.
-- tapOn: "More"
+# Narrow phones put the destination behind "More"; the Pixel 3a on
+# android 0.1.4 (2026-10-24) shows it in the bottom bar directly.
+- tapOn:
+    text: "More"
+    optional: true
 - tapOn: "Devices"
 - tapOn: "Link New Device"
 

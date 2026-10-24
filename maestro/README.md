@@ -26,8 +26,11 @@ This directory contains Maestro YAML flows for automated mobile testing.
   destinations live behind the context bar's navigation role button —
   `tapOn: "More"` then the destination (`My Card`, `Contacts`,
   `Exchange`, `Groups`, `Settings`, `Recovery`, `Devices`, `Backup`,
-  `Privacy`, `Support`). Surface-specific actions such as `Add Entry` are
-  under the secondary role button: `tapOn: "Actions"` first. Destructive
+  `Privacy`, `Support`). The Pixel 3a on android 0.1.4 (2026-10-24)
+  shows `Contacts`, `My Card`, `Exchange`, `Devices` and `Settings` in
+  the bottom bar with no "More", so tap "More" with `optional: true`.
+  Surface-specific actions such as `Add Entry` are under the secondary
+  role button: `tapOn: "Actions"` first. Destructive
   actions live under **Settings → Advanced** (Danger Zone: Emergency
   Wipe, Wipe All Data); **Delete Identity** lives under **More → Privacy**
   (GDPR screen). The iOS flows still use `tab.*` ids and have not been
