@@ -49,9 +49,31 @@ pub(super) fn qr_payload_in(png: &[u8]) -> E2eResult<String> {
 
 /// The one `<name>.png` Maestro wrote somewhere under `output_dir`.
 pub(super) fn screenshot_in(output_dir: &Path, name: &str) -> E2eResult<PathBuf> {
-    let file_name = format!("{name}.png");
+    artifact_in(output_dir, &format!("{name}.png"))
+}
+
+/// The value a flow logged as `console.log('VAUCHI_OUTPUT <key>=<value>')`.
+/// Maestro writes a flow's console to `logs/maestro.log` in its output
+/// dir, not to stdout.
+pub(super) fn flow_output_in(output_dir: &Path, key: &str) -> E2eResult<String> {
+    let log = std::fs::read_to_string(artifact_in(output_dir, "maestro.log")?)
+        .map_err(|e| E2eError::device(format!("Failed to read the Maestro log: {e}")))?;
+    let marker = format!("JsConsole: VAUCHI_OUTPUT {key}=");
+    let mut values: Vec<&str> = log
+        .lines()
+        .filter_map(|line| line.split_once(marker.as_str()).map(|(_, value)| value))
+        .collect();
+    match values.len() {
+        0 => Err(E2eError::device(format!("the flow logged no {key}"))),
+        1 => Ok(values.remove(0).to_string()),
+        n => Err(E2eError::device(format!("the flow logged {key} {n} times"))),
+    }
+}
+
+/// The one file named `file_name` Maestro wrote somewhere under `output_dir`.
+fn artifact_in(output_dir: &Path, file_name: &str) -> E2eResult<PathBuf> {
     let mut found = Vec::new();
-    collect_named(output_dir, &file_name, &mut found)?;
+    collect_named(output_dir, file_name, &mut found)?;
     match found.len() {
         0 => Err(E2eError::device(format!("Maestro wrote no {file_name}"))),
         1 => Ok(found.remove(0)),
@@ -59,13 +81,6 @@ pub(super) fn screenshot_in(output_dir: &Path, name: &str) -> E2eResult<PathBuf>
             "Maestro wrote {n} {file_name} files"
         ))),
     }
-}
-
-/// The value a flow logged as `console.log('VAUCHI_OUTPUT <key>=<value>')`.
-/// Maestro writes a flow's console to `logs/maestro.log` in its output
-/// dir, not to stdout.
-pub(super) fn flow_output_in(_output_dir: &Path, _key: &str) -> E2eResult<String> {
-    Err(E2eError::device("not yet"))
 }
 
 fn collect_named(dir: &Path, file_name: &str, found: &mut Vec<PathBuf>) -> E2eResult<()> {
