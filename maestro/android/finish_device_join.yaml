@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: finish_device_join
+---
+# The joining device finishes once the existing device approved it
+# (vauchi/private#319), picking up where join_identity left the app.
+
+# No launchApp: it stops the app first, which would end the ceremony.
+# Core may pass "Device Linked" by and open the joined identity's card,
+# whose "can see this card" line exists only once it holds one.
+- extendedWaitUntil:
+    visible: "Device Linked|.*can see this card"
+    timeout: 60000

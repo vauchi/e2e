@@ -404,10 +404,27 @@ impl MaestroDevice {
     }
 
     /// The payload of the QR the flow saved as `screenshot`.
-    async fn run_qr_flow(&self, flow_name: &str, screenshot: &str) -> E2eResult<String> {
+    /// Runs `flow_name` with its artifacts in a fresh directory, returned
+    /// for reading back what the flow left there.
+    async fn run_flow_with_artifacts(
+        &self,
+        flow_name: &str,
+        env_vars: &[(&str, &str)],
+    ) -> E2eResult<PathBuf> {
         let output_dir = self.workspace.fresh_test_output_dir()?;
-        self.run_flow_saving_to(flow_name, &[], Some(&output_dir))
+        self.run_flow_saving_to(flow_name, env_vars, Some(&output_dir))
             .await?;
+        Ok(output_dir)
+    }
+
+    fn ios_device_join_unsupported() -> E2eError {
+        E2eError::DeviceNotSupported(
+            "Maestro device: the iOS device-link joining flows are not written yet".into(),
+        )
+    }
+
+    async fn run_qr_flow(&self, flow_name: &str, screenshot: &str) -> E2eResult<String> {
+        let output_dir = self.run_flow_with_artifacts(flow_name, &[]).await?;
         let path = maestro_artifacts::screenshot_in(&output_dir, screenshot)?;
         let png = std::fs::read(&path)
             .map_err(|e| E2eError::device(format!("Failed to read Maestro screenshot: {e}")))?;
@@ -548,22 +565,40 @@ impl Device for MaestroDevice {
         }
     }
 
-    async fn join_identity(&self, _qr_data: &str, _device_name: &str) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: join_identity requires device-specific flow".into(),
-        ))
+    /// Fresh install: the invitation arrives as the deep link its QR
+    /// encodes, which a phone camera would open; returns the confirmation
+    /// code the joining device then shows.
+    async fn join_identity(&self, qr_data: &str, device_name: &str) -> E2eResult<String> {
+        if self.platform == MaestroPlatform::Ios {
+            return Err(Self::ios_device_join_unsupported());
+        }
+        let output_dir = self
+            .run_flow_with_artifacts(
+                "join_identity",
+                &[("INVITATION", qr_data), ("DEVICE_NAME", device_name)],
+            )
+            .await?;
+        maestro_artifacts::flow_output_in(&output_dir, "confirmation_code")
     }
 
-    async fn complete_device_link(&self, _request_data: &str) -> E2eResult<String> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: complete_device_link requires device-specific flow".into(),
-        ))
+    /// Existing device: approves only if it shows the code the joining
+    /// device showed, which is the check a user makes.
+    async fn complete_device_link(&self, request_data: &str) -> E2eResult<String> {
+        if self.platform == MaestroPlatform::Ios {
+            return Err(Self::ios_device_join_unsupported());
+        }
+        self.run_flow_with_artifacts("complete_device_link", &[("EXPECTED_CODE", request_data)])
+            .await?;
+        Ok(request_data.to_string())
     }
 
     async fn finish_device_join(&self, _response_data: &str) -> E2eResult<()> {
-        Err(E2eError::DeviceNotSupported(
-            "Maestro device: finish_device_join requires device-specific flow".into(),
-        ))
+        if self.platform == MaestroPlatform::Ios {
+            return Err(Self::ios_device_join_unsupported());
+        }
+        self.run_flow_with_artifacts("finish_device_join", &[])
+            .await?;
+        Ok(())
     }
 
     async fn list_devices(&self) -> E2eResult<Vec<String>> {

@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+appId: app.vauchi
+name: join_identity
+---
+# A fresh install joins an existing identity (vauchi/private#319).
+# Input: INVITATION — the vauchi://device-link URL the host's QR encodes;
+#        DEVICE_NAME — the name to give this device.
+# Output: the confirmation code, logged as
+#         "VAUCHI_OUTPUT confirmation_code=<code>" (MaestroDevice reads it
+#         from the run's maestro.log).
+
+# Fail on an unset input before touching the app. Maestro interpolates
+# ${VAR} as JavaScript, so an unset variable is typed as the literal
+# string "undefined".
+# See backlog/2026-08-09-maestro-flows-accept-unset-inputs.md
+- assertTrue:
+    condition: ${typeof INVITATION !== 'undefined' && String(INVITATION) !== 'undefined' && String(INVITATION).length > 0}
+    label: "INVITATION must be set (unset becomes the literal string \"undefined\")"
+- assertTrue:
+    condition: ${typeof DEVICE_NAME !== 'undefined' && String(DEVICE_NAME) !== 'undefined' && String(DEVICE_NAME).length > 0}
+    label: "DEVICE_NAME must be set (unset becomes the literal string \"undefined\")"
+
+- launchApp
+- waitForAnimationToEnd
+
+# The invitation opens as the deep link a phone camera would open from
+# the host's QR; Core routes it to the join screen on a device with no
+# identity yet.
+- openLink: ${INVITATION}
+- extendedWaitUntil:
+    visible: "Join Existing Identity"
+    timeout: 30000
+
+- tapOn: "Name for this device"
+- inputText: ${DEVICE_NAME}
+- hideKeyboard
+- tapOn: "Confirm"
+
+- extendedWaitUntil:
+    visible: "Verify this code matches on your new device"
+    timeout: 60000
+
+# Codes are "ddd-ddd" (vauchi-core device_link/types.rs).
+- copyTextFrom:
+    text: "[0-9]{3}-[0-9]{3}"
+- evalScript: ${console.log('VAUCHI_OUTPUT confirmation_code=' + maestro.copiedText)}
