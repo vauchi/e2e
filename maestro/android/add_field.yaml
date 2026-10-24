@@ -32,32 +32,45 @@ name: Add Card Field (Android)
 - waitForAnimationToEnd
 
 # Navigate to own card. ADR-066 navigation, addressed by label — see maestro/README.md.
-- tapOn: "More"
+# Narrow phones put the destination behind "More"; the Pixel 3a on
+# android 0.1.4 (2026-10-24) shows it in the bottom bar directly.
+- tapOn:
+    text: "More"
+    optional: true
 - tapOn: "My Card"
 
 # Wait for card to load
 - waitForAnimationToEnd
 
-# Start adding a new entry — the action lives in the secondary overlay.
-- tapOn: "Actions"
+# Start adding a new entry. android 0.1.4 shows "Add Entry" on the card;
+# other layouts keep it in the secondary "Actions" overlay.
+- runFlow:
+    when:
+      notVisible: "Add Entry"
+    commands:
+      - tapOn: "Actions"
 - tapOn: "Add Entry"
 
 # Select field type
 - assertVisible: "Add to your card"
-- tapOn: ${FIELD_TYPE}
+# A tap on a type was lost on the Pixel 3a (2026-10-24); tap again if the
+# screen did not change.
+- tapOn:
+    text: ${FIELD_TYPE}
+    retryTapIfNoChange: true
 
 # Confirm the correct entry form opened
 - assertVisible: "Add ${FIELD_TYPE}"
 
-# Enter value
+# Display name first, value last: hideKeyboard after the value field
+# closes only the keyboard, while after the display name field it closed
+# the form too, and a Back press there left the form with "Something
+# went wrong" (Pixel 3a, android 0.1.4, 2026-10-24).
+- tapOn: "Display Name (optional)"
+- inputText: ${FIELD_LABEL}
 - assertVisible: "Value"
 - tapOn: "Value"
 - inputText: ${FIELD_VALUE}
-- hideKeyboard
-
-# Enter display name (label)
-- tapOn: "Display Name (optional)"
-- inputText: ${FIELD_LABEL}
 - hideKeyboard
 
 # Make sure the keyboard is fully dismissed before tapping Save,
@@ -72,11 +85,9 @@ name: Add Card Field (Android)
 - waitForAnimationToEnd:
     timeout: 5000
 
-# Post-state: we must be back on the card view after the save completed.
-# The card lists the saved entry as "<value> (<label>)"; "Exchange Now"
-# only appears while the identity has no contacts, so it cannot identify
-# the card view once an exchange has happened. Match on the label: the
-# IME may auto-capitalise the typed value (backlog
+# Post-state: back on the card, which lists each entry's value and label
+# as separate lines (android 0.1.4). Match on the label: the IME may
+# auto-capitalise the typed value (backlog
 # 2026-09-09-android-entry-value-input-autocapitalises).
-- assertVisible: ".*\\(${FIELD_LABEL}\\)"
+- assertVisible: ${FIELD_LABEL}
 - assertNotVisible: "Add ${FIELD_TYPE}"
