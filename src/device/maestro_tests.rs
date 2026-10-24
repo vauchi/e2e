@@ -18,15 +18,24 @@ fn test_device(workspace: MaestroWorkspace) -> MaestroDevice {
     }
 }
 
-/// A stand-in for the Maestro CLI that, like a flow's `takeScreenshot`,
-/// saves `screenshot` under the run's `--test-output-dir`, nested the
-/// way Maestro nests its artifacts. With no screenshot it saves nothing.
+/// A stand-in for the Maestro CLI that, like a flow's `takeScreenshot`
+/// and `console.log`, saves `screenshot` and writes `console` lines to
+/// `maestro.log` under the run's `--test-output-dir`, nested the way
+/// Maestro 2.8.0 nests its artifacts. It records the arguments it ran with.
 struct FakeMaestro {
     dir: tempfile::TempDir,
 }
 
 impl FakeMaestro {
     fn saving(screenshot: Option<(&str, &str)>) -> Self {
+        Self::running(screenshot, &[])
+    }
+
+    fn logging(console: &[&str]) -> Self {
+        Self::running(None, console)
+    }
+
+    fn running(screenshot: Option<(&str, &str)>, console: &[&str]) -> Self {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().expect("fake Maestro dir");
         let save = match screenshot {
@@ -41,10 +50,23 @@ impl FakeMaestro {
             }
             None => String::new(),
         };
+        let log = dir.path().join("maestro.log");
+        let console: Vec<String> = console
+            .iter()
+            .map(|line| {
+                format!("09:50:16.690 [ INFO] maestro.orchestra.Orchestra: JsConsole: {line}")
+            })
+            .collect();
+        std::fs::write(&log, console.join("\n")).expect("write console");
+        let args = dir.path().join("args");
         let script = format!(
-            "#!/bin/sh\nout=\nwhile [ $# -gt 0 ]; do\n  \
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\nout=\nwhile [ $# -gt 0 ]; do\n  \
              if [ \"$1\" = --test-output-dir ]; then out=$2; shift; fi\n  shift\n\
-             done\n[ -n \"$out\" ] || exit 64\n{save}"
+             done\n[ -n \"$out\" ] || exit 64\n{save}\
+             mkdir -p \"$out/2026-10-24_092300/flow/logs\"\n\
+             cp '{}' \"$out/2026-10-24_092300/flow/logs/maestro.log\"\n",
+            args.display(),
+            log.display()
         );
         let program = dir.path().join("maestro");
         std::fs::write(&program, script).expect("write fake Maestro");
@@ -55,6 +77,24 @@ impl FakeMaestro {
 
     fn program(&self) -> PathBuf {
         self.dir.path().join("maestro")
+    }
+
+    /// The flow it last ran and the `-e` parameters it was given.
+    fn last_run(&self) -> (String, Vec<String>) {
+        let args = std::fs::read_to_string(self.dir.path().join("args")).expect("ran");
+        let args: Vec<&str> = args.lines().collect();
+        let params = args
+            .windows(2)
+            .filter(|pair| pair[0] == "-e")
+            .map(|pair| pair[1].to_string())
+            .filter(|param| !param.starts_with("VAUCHI_RELAY_URL="))
+            .collect();
+        let flow = Path::new(args.last().expect("flow path"))
+            .file_stem()
+            .expect("flow name")
+            .to_string_lossy()
+            .into_owned();
+        (flow, params)
     }
 }
 
@@ -316,5 +356,99 @@ async fn test_maestro_ios_generate_qr_is_unsupported_because_the_simulator_shows
             "Maestro device: the iOS simulator exchanges by link, not QR (Glance needs Bluetooth)"
         ),
         other => panic!("expected DeviceNotSupported, got {other:?}"),
+    }
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_join_identity_opens_the_invitation_and_returns_the_code_it_shows() {
+    let fake = FakeMaestro::logging(&["VAUCHI_OUTPUT confirmation_code=224-580"]);
+    let (device, _flows) = android_device(&fake, &["join_identity"]);
+
+    let code = device
+        .join_identity(INVITATION, "Rig Phone")
+        .await
+        .expect("joined");
+
+    assert_eq!(code, "224-580");
+    assert_eq!(
+        fake.last_run(),
+        (
+            "join_identity".to_string(),
+            vec![
+                format!("INVITATION={INVITATION}"),
+                "DEVICE_NAME=Rig Phone".to_string(),
+            ]
+        )
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_join_identity_fails_when_the_flow_shows_no_code() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["join_identity"]);
+
+    let error = device
+        .join_identity(INVITATION, "Rig Phone")
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Device error: the flow logged no confirmation_code"
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_complete_device_link_approves_only_the_code_the_joiner_shows() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["complete_device_link"]);
+
+    let code = device
+        .complete_device_link("224-580")
+        .await
+        .expect("approved");
+
+    assert_eq!(code, "224-580");
+    assert_eq!(
+        fake.last_run(),
+        (
+            "complete_device_link".to_string(),
+            vec!["EXPECTED_CODE=224-580".to_string()]
+        )
+    );
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_finish_device_join_waits_on_the_joining_device() {
+    let fake = FakeMaestro::logging(&[]);
+    let (device, _flows) = android_device(&fake, &["finish_device_join"]);
+
+    device.finish_device_join("224-580").await.expect("joined");
+
+    assert_eq!(fake.last_run(), ("finish_device_join".to_string(), vec![]));
+}
+
+// @internal
+#[tokio::test]
+async fn test_maestro_ios_device_join_is_unsupported_until_its_flows_exist() {
+    let device = test_device(MaestroWorkspace::new().expect("workspace"));
+    let expected = "Maestro device: the iOS device-link joining flows are not written yet";
+
+    for error in [
+        device
+            .join_identity(INVITATION, "Rig Phone")
+            .await
+            .unwrap_err(),
+        device.complete_device_link("224-580").await.unwrap_err(),
+        device.finish_device_join("224-580").await.unwrap_err(),
+    ] {
+        match error {
+            E2eError::DeviceNotSupported(message) => assert_eq!(message, expected),
+            other => panic!("expected DeviceNotSupported, got {other:?}"),
+        }
     }
 }
