@@ -29,9 +29,22 @@ fn blobs_stored(metrics: &str) -> f64 {
 // @scenario: sync_updates :: Sync via relay
 // @scenario: sync_updates :: Relay stores updates for offline contacts
 // @scenario: sync_updates :: Receive update while offline
+// @scenario: release_privacy_multidevice_certification :: Exact two-user update propagates through both privacy hops
 #[tokio::test]
 async fn integration_an_update_made_while_bob_is_offline_waits_on_the_relay_and_reaches_him() {
-    let mut orch = Orchestrator::new();
+    let mut orch = Orchestrator::with_config(OrchestratorConfig {
+        // Both hops log at info so their captures prove they observed the
+        // live processes before the no-plaintext assertions run.
+        relay_config: RelayConfig {
+            log_filter: Some("info".to_string()),
+            ..Default::default()
+        },
+        ohttp_relay_config: OhttpRelayConfig {
+            log_filter: Some("info".to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
     orch.start().await.expect("start orchestrator");
     orch.add_user("Alice", 1).expect("add Alice");
     orch.add_user("Bob", 1).expect("add Bob");
@@ -73,7 +86,23 @@ async fn integration_an_update_made_while_bob_is_offline_waits_on_the_relay_and_
         .relay_captured_output(0)
         .expect("relay output")
         .join("\n");
-    for (hop, seen) in [("relay output", &relay_output), ("relay metrics", &metrics)] {
+    let ohttp_relay_output = orch
+        .ohttp_relay_captured_output()
+        .expect("the default topology routes through the OHTTP relay")
+        .join("\n");
+    assert!(
+        relay_output.contains("OHTTP gateway enabled"),
+        "the relay capture must observe the live process"
+    );
+    assert!(
+        ohttp_relay_output.contains("vauchi-ohttp-relay starting"),
+        "the OHTTP relay capture must observe the live process"
+    );
+    for (hop, seen) in [
+        ("relay output", &relay_output),
+        ("relay metrics", &metrics),
+        ("OHTTP relay output", &ohttp_relay_output),
+    ] {
         assert!(!seen.contains(ALICE_EMAIL), "{hop} exposes the plaintext");
     }
 
