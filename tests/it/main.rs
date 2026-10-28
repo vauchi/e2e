@@ -56,6 +56,7 @@ mod relay_failover;
 mod resistance_features;
 mod seeded_contacts;
 mod six_device;
+mod sync_via_relay;
 mod version_enforcement_tests;
 mod visibility_labels;
 mod yaml_scenarios;
