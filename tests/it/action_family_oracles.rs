@@ -13,11 +13,10 @@
 //!    copy). Pin that every step completes against hostile plaintext
 //!    relay endpoints while making ZERO requests to either hop — any
 //!    direct dial is a fail-open regression.
-//! 2. Panic shred: emergency erasure must complete locally even when
-//!    the relay endpoints are hostile, and must not dial either hop
-//!    when there is nothing to notify — and WITH a staged contact the
-//!    revocation delivery and relay purge must traverse the outer hop
-//!    only while the contact observes the revocation.
+//! 2. Panic shred: emergency erasure concerns this device only. It must
+//!    complete locally even when the relay endpoints are hostile and
+//!    dial neither hop — and WITH a staged contact it still sends
+//!    nothing, so the contact keeps the identity (vauchi/private#910).
 //! 3. Scheduled hard shred: after the 7-day grace period (pinned test
 //!    clock), the execute-deletion fan-out must likewise traverse only
 //!    the outer hop and the contact must observe the revocation.
@@ -289,15 +288,10 @@ fn panic_shred_completes_local_erasure_without_network() {
         "panic shred must not dial the application relay: {:?}",
         app.recorded()
     );
-    // The shred's purge leg is allowed to contact the outer hop — but
-    // only as an opaque OHTTP-encapsulated POST. Every other request
-    // line is a leak.
-    let outer_dials = outer.recorded();
     assert!(
-        outer_dials
-            .iter()
-            .all(|line| line.starts_with("POST /v2/ohttp ")),
-        "panic shred may contact the outer relay only via the encapsulated OHTTP path: {outer_dials:?}"
+        outer.recorded().is_empty(),
+        "panic shred must not dial the outer relay either: {:?}",
+        outer.recorded()
     );
 }
 
@@ -397,16 +391,14 @@ fn contacts_list(data_dir: &Path, hop: &[&str]) -> String {
 }
 
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
-/// Panic shred WITH a staged contact: the per-contact revocation
-/// delivery and the relay purge must traverse the OHTTP outer hop
-/// only. The application-relay endpoint the CLI is configured with is
-/// a hostile recorder — any direct dial (connect, purge, delivery)
-/// trips the oracle. Bob must observe the revocation: his sync
-/// processes the delivered blob and Alice disappears from his
-/// contacts.
-// @internal
+/// Panic shred WITH a staged contact sends nothing: no relay purge, no
+/// revocation (vauchi/private#910). Alice's identity may live on in her
+/// other devices, so Bob keeps her after his next sync. The
+/// application-relay endpoint the CLI is configured with is a hostile
+/// recorder — any direct dial trips the oracle.
+// @scenario: privacy_compliance :: Panic shred destroys this device's data and tells no one
 #[tokio::test]
-async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
+async fn panic_shred_with_contacts_sends_nothing_and_the_contact_keeps_me() {
     let (mut relay_mgr, mut ohttp_mgr, _relay_http_url, ohttp_url) = spawn_ohttp_stack().await;
     let app = HostileServer::start(KeyMode::Garbage);
     let app_url = app.url();
@@ -431,9 +423,7 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
         "Alice should have Bob staged as a contact"
     );
 
-    // Alice panic-shreds. The fan-out (relay purge + Bob's revocation
-    // delivery) must go through the outer hop; the report must show
-    // both legs delivered.
+    // Alice panic-shreds; the report must show that nothing was sent.
     let outcome = run_cli_pty(
         &with_hop(&["gdpr", "panic-shred"], &hop),
         "PANIC\n",
@@ -450,23 +440,22 @@ async fn panic_shred_with_contacts_fanout_over_outer_hop_only() {
         outcome.stdout
     );
     assert!(
-        outcome.stdout.contains("Relay purge sent:       true"),
-        "relay purge must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout.contains("Relay purge sent:       false"),
+        "a panic shred must not purge the relay, got stdout: {}",
         outcome.stdout
     );
     assert!(
-        outcome.stdout.contains("Contacts notified:      1"),
-        "Bob's revocation delivery must be sent through the OHTTP path, got stdout: {}",
+        outcome.stdout.contains("Contacts notified:      0"),
+        "a panic shred must not revoke Alice to her contacts, got stdout: {}",
         outcome.stdout
     );
 
-    // Bob syncs: the delivered revocation crypto-shreds Alice's CEK and
-    // removes her contact row.
+    // Bob syncs and still has Alice: nothing told him she is gone.
     sync_cli(bob.path(), &hop);
     let bob_contacts = contacts_list(bob.path(), &hop);
     assert!(
-        !bob_contacts.contains("Alice"),
-        "Bob must observe Alice's revocation (contact removed), got: {bob_contacts}"
+        bob_contacts.contains("Alice"),
+        "Bob must keep Alice after her device's panic shred, got: {bob_contacts}"
     );
 
     // Privacy leg: nothing may have dialed the application-relay
