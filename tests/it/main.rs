@@ -55,6 +55,7 @@ mod recovery_wire;
 mod relay_failover;
 mod resistance_features;
 mod seeded_contacts;
+mod shred_purge_relay;
 mod six_device;
 mod sync_via_relay;
 mod version_enforcement_tests;
