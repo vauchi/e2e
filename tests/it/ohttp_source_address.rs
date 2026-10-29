@@ -58,6 +58,7 @@ fn end_user_client() -> reqwest::Client {
         .expect("client bound to the end-user address")
 }
 
+// @claim: S3
 // @scenario: release_privacy_multidevice_certification.feature:Application relay sees the gateway under a distinct operator
 // @internal
 #[tokio::test]

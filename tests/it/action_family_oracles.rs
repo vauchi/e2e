@@ -168,6 +168,7 @@ fn device_join_request(qr: &str, data_dir: &Path, relay: &str, ohttp: &str) -> S
     scrape_token(&outcome.stdout, "Send this request")
 }
 
+// @claim: S3
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
 /// The whole device-link chain completes against hostile plaintext
 /// endpoints while recording ZERO requests on either hop.
@@ -470,6 +471,7 @@ async fn panic_shred_with_contacts_sends_nothing_and_the_contact_keeps_me() {
     relay_mgr.stop_all().await;
 }
 
+// @claim: S12
 // @scenario: privacy_compliance.feature:Execute deletion after grace period sends revocations and purge
 /// Scheduled hard shred WITH a staged contact: after the 7-day grace
 /// period, `execute-deletion` must deliver Bob's revocation and the

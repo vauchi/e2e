@@ -118,6 +118,7 @@ async fn integration_ohttp_send_and_fetch() {
     relay_mgr.stop_all().await;
 }
 
+// @claim: S1
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
 /// The application relay's process output and Prometheus metrics must not
 /// expose an OHTTP-protected update payload or its recipient routing ID.

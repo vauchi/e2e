@@ -330,6 +330,7 @@ fn origin_boundary_probes_fail_closed() {
     }
 }
 
+// @claim: S3
 // @scenario: release_privacy_multidevice_certification.feature:Neither relay can decrypt or identify application users
 /// Hostile bootstrap: poisoned `/v2/ohttp-key-signed` responses must not
 /// poison the client, and the application relay must see zero direct
