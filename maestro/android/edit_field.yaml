@@ -26,6 +26,9 @@ name: edit_field
 - waitForAnimationToEnd
 
 # The card lists each entry's value and label; the label opens the entry.
+# It may sit below the fold (see add_field.yaml).
+- scrollUntilVisible:
+    element: ${FIELD_LABEL}
 - tapOn: ${FIELD_LABEL}
 - waitForAnimationToEnd
 - tapOn: "Edit"

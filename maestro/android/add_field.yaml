@@ -88,6 +88,9 @@ name: Add Card Field (Android)
 # Post-state: back on the card, which lists each entry's value and label
 # as separate lines (android 0.1.4). Match on the label: the IME may
 # auto-capitalise the typed value (backlog
-# 2026-09-09-android-entry-value-input-autocapitalises).
-- assertVisible: ${FIELD_LABEL}
+# 2026-09-09-android-entry-value-input-autocapitalises). Scrolled to, since
+# from the third entry on a new one lands below the fold (Pixel 3a,
+# 2026-11-01).
+- scrollUntilVisible:
+    element: ${FIELD_LABEL}
 - assertNotVisible: "Add ${FIELD_TYPE}"
