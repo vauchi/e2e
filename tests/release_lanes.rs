@@ -5,8 +5,11 @@
 const CI_CONFIG: &str = include_str!("../.gitlab-ci.yml");
 const RG3_TEST: &str =
     "orchestrator_default_ohttp::integration_ohttp_split_relay_config_routes_via_ohttp_relay";
-const OHTTP_E2E_FAULT_BUILD: &str = "cargo build --release --features e2e-faults --manifest-path \"$BUILD_TMPDIR/ohttp-relay/Cargo.toml\"";
-const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=\"e2e-faults-v1\"";
+// The pinned-set build script builds the lanes' binaries (private#1032).
+const BUILD_SCRIPT: &str = include_str!("../ci/build-pinned-binaries.sh");
+const OHTTP_E2E_FAULT_BUILD: &str =
+    "cargo build --release --features e2e-faults --manifest-path \"$work/ohttp-relay/Cargo.toml\"";
+const OHTTP_E2E_FAULT_PROFILE: &str = "OHTTP_BUILD_PROFILE=e2e-faults-v1";
 const RG6_TEST: &str =
     "ohttp_integration::integration_ohttp_relay_observations_exclude_update_content";
 const RG7_TEST: &str =
@@ -158,24 +161,27 @@ fn rg4_rg5_release_lane_is_blocking_and_runs_the_six_device_journey() {
 // @internal
 #[test]
 fn native_e2e_binary_builds_the_feature_gated_ohttp_fault_controller() {
-    assert_eq!(CI_CONFIG.matches(OHTTP_E2E_FAULT_BUILD).count(), 2);
+    assert_eq!(BUILD_SCRIPT.matches(OHTTP_E2E_FAULT_BUILD).count(), 1);
+    for job in ["test:smoke", "test:integration"] {
+        assert!(
+            top_level_job(job).contains("sh ci/build-pinned-binaries.sh .smoke-bin"),
+            "{job} must build its binaries through ci/build-pinned-binaries.sh"
+        );
+    }
 }
 
 // @internal
 #[test]
 fn ohttp_fault_build_profile_invalidates_incompatible_cached_binaries() {
-    let smoke = top_level_job("test:smoke");
-    assert!(smoke.contains(OHTTP_E2E_FAULT_PROFILE));
-    assert!(smoke.contains(".smoke-bin/ohttp.build-profile"));
-    assert!(smoke.contains("echo \"$OHTTP_BUILD_PROFILE\" > .smoke-bin/ohttp.build-profile"));
-
-    let integration = top_level_job("test:integration");
-    assert!(integration.contains(OHTTP_E2E_FAULT_PROFILE));
-    assert!(integration.contains("$E2E_BIN_DIR/ohttp.build-profile"));
+    assert!(BUILD_SCRIPT.contains(OHTTP_E2E_FAULT_PROFILE));
+    // A cached binary is reused only when its profile marker matches, and a
+    // rebuilt one records the profile it was built with.
+    assert!(BUILD_SCRIPT.contains("cached ohttp \"$OHTTP_RELAY_SHA\" \"$OHTTP_BUILD_PROFILE\""));
     assert!(
-        integration
-            .contains("echo \"$OHTTP_BUILD_PROFILE\" > \"$E2E_BIN_DIR/ohttp.build-profile\"")
+        BUILD_SCRIPT.contains("[ \"$(cat \"$bin_dir/$c_name.build-profile\")\" = \"$c_profile\" ]")
     );
+    assert!(BUILD_SCRIPT.contains("mark ohttp \"$OHTTP_RELAY_SHA\" \"$OHTTP_BUILD_PROFILE\""));
+    assert!(BUILD_SCRIPT.contains("echo \"$3\" > \"$bin_dir/$1.build-profile\""));
 }
 
 // @internal
