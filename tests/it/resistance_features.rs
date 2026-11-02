@@ -394,12 +394,14 @@ fn test_emergency_broadcast_honors_blocked_status() {
     // Block Charlie after configuration
     vauchi.block_contact(&charlie_id).unwrap();
 
-    // Send emergency broadcast — should skip Charlie (blocked)
     let result = vauchi.send_emergency_broadcast().unwrap();
 
-    // Total = 2 contacts in config, sent <= 1 (Charlie skipped due to block)
-    assert_eq!(result.total, 2);
-    assert!(result.sent <= 1, "Blocked contacts should be skipped");
+    // Blocking takes Charlie off the trusted list (ADR-056, private#889).
+    assert_eq!(
+        result.total, 1,
+        "a blocked contact leaves the emergency list"
+    );
+    assert_eq!(result.sent, 1, "the alert still reaches Bob");
 }
 
 // Comprehensive: Duress with Hidden and Decoy Contacts
