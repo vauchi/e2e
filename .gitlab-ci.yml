@@ -973,7 +973,9 @@ verify:upstream-prerelease:
 
 test:maestro-ios:
   stage: test
-  tags: [macos, self-hosted]
+  # nell's shell runner, as before; it needs a hand-started simulator there
+  # and builds no app (vauchi/private#309).
+  tags: [macos-host, self-hosted]
   resource_group: ios-simulator
   rules:
     - if: $VAUCHI_DEVICE_TESTS == "1"
