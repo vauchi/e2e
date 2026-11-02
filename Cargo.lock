@@ -3027,8 +3027,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.96.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.96.1#fea897f8f1483aa857fcb9d2cd9ee91ba8db7e5d"
+version = "0.97.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.97.0#966c24248cd966a200fe8551c9e1937aef13761d"
 dependencies = [
  "base64",
  "flate2",
@@ -3048,8 +3048,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-contract"
-version = "0.95.1"
-source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.95.1#097757f7dcc0ee969bb3bdc57302614dc7248e1e"
+version = "0.96.2"
+source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.96.2#1f6c1b971bef1edb6fffab21c0bbdaa6664729fa"
 dependencies = [
  "serde",
  "serde_json",
@@ -3059,8 +3059,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.96.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.96.1#fea897f8f1483aa857fcb9d2cd9ee91ba8db7e5d"
+version = "0.97.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.97.0#966c24248cd966a200fe8551c9e1937aef13761d"
 dependencies = [
  "argon2",
  "base64",
@@ -3094,7 +3094,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol",
+ "vauchi-protocol 0.97.0",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -3135,7 +3135,7 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol",
+ "vauchi-protocol 0.97.0",
  "vauchi-relay",
  "vt100",
 ]
@@ -3144,6 +3144,16 @@ dependencies = [
 name = "vauchi-protocol"
 version = "0.96.1"
 source = "git+https://gitlab.com/vauchi/core.git?tag=v0.96.1#fea897f8f1483aa857fcb9d2cd9ee91ba8db7e5d"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "vauchi-protocol"
+version = "0.97.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.97.0#966c24248cd966a200fe8551c9e1937aef13761d"
 dependencies = [
  "serde",
  "serde_json",
@@ -3181,7 +3191,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol",
+ "vauchi-protocol 0.96.1",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
