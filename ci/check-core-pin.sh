@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A pinned set runs one Core (vauchi/private#1032): every Core crate a
 # manifest takes from git must name the set's tag. Before the set, e2e's
