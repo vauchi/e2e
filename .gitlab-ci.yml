@@ -97,16 +97,18 @@ variables:
 check:branch-refs:
   extends: .check-git-branch-refs
 
-# The pinned set holds together (vauchi/private#1032): pins well formed,
-# e2e's own Core and relay pins equal to the set's, no lane building a
-# component from a main head, and check-core-pin.sh able to fail.
-check:pins:
+# The CI contracts (vauchi/private#1032): the pinned set holds together
+# (pins well formed, e2e's own Core and relay pins equal to the set's, no
+# lane building from a main head, the helper scripts able to fail), and
+# every release lane triggers on merge requests by what it exercises.
+check:ci-contracts:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
   tags: [docker]
   needs: []
   script:
     - sh ci/tests/pins.test.sh
+    - sh ci/tests/lane-paths.test.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -273,6 +275,25 @@ test:backup-restore:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/backup_restore.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -309,6 +330,25 @@ test:release-rg3:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/orchestrator_default_ohttp.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -341,6 +381,25 @@ test:release-rg4-rg5:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/multi_device_sync.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -373,6 +432,25 @@ test:release-rg6-observability:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/ohttp_integration.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -403,6 +481,25 @@ test:release-rg7:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/ohttp_source_address.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -435,6 +532,26 @@ test:release-rg8:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/ohttp_fail_closed_matrix.rs"
+          - "tests/it/action_family_oracles.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -470,6 +587,25 @@ test:release-rg10:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/multi_device_sync.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -504,6 +640,26 @@ test:release-rg15:
       artifacts: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      # By path on MRs, in full on main, nightly and tags (private#1032, D6).
+      changes:
+        paths:
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/longitudinal_continuity.rs"
+          - "tests/it/multi_device_sync.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
   allow_failure: false
@@ -543,12 +699,22 @@ test:tui-journey:
       changes:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
-          - "src/device/tui*.rs"
-          - "src/device/tui_pty/*.rs"
-          - "tests/it/cross_platform.rs"
-          - ".gitlab-ci.yml"
+          - "src/**/*"
+          - "tests/it/main.rs"
+          - "tests/it/ohttp_helpers.rs"
+          - "tests/it/six_device.rs"
+          - "tests/*.rs"
+          - "tests/fixtures/**/*"
           - "Cargo.toml"
           - "Cargo.lock"
+          - "rust-toolchain.toml"
+          - ".config/**/*"
+          - "ci/pins.env"
+          - "ci/build-pinned-binaries.sh"
+          - "ci/point-core-at.sh"
+          - "ci/check-core-pin.sh"
+          - ".gitlab-ci.yml"
+          - "tests/it/cross_platform.rs"
   allow_failure: false
   script:
     - |
