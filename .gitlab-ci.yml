@@ -106,9 +106,13 @@ check:ci-contracts:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
   tags: [docker]
   needs: []
+  before_script:
+    - apk add --no-cache git python3 > /dev/null
   script:
     - sh ci/tests/pins.test.sh
     - sh ci/tests/lane-paths.test.sh
+    - sh ci/tests/update-pins.test.sh
+    - sh ci/tests/pins-bot.test.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -841,6 +845,21 @@ test:integration:
     paths:
       - integration-results.txt
     expire_in: 1 week
+
+# The pins bot (vauchi/private#1032 decision D7, private#1034): nightly,
+# moves each component of the pinned set to the head of its main once that
+# head's pipeline passed and, for the relay and the CLI, it pins the set's
+# Core tag, and opens one MR whose pipeline runs the set against them. A
+# Core release's bump MR moves CORE_TAG with Cargo.toml; this bot moves the
+# relay and CLI after their own bump MRs merge.
+bump:pins:
+  extends: [.linux-runner, .timeout-standard]
+  stage: test
+  needs: []
+  script:
+    - sh ci/pins-bot.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
 
 # The nightly heads lane (vauchi/private#1032, decision D5): the
 # integration filter with the relay, OHTTP relay and CLI at their mains
