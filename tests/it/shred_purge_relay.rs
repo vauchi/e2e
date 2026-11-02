@@ -88,7 +88,6 @@ impl PurgeSender for RelayPurge {
             .http
             .purge(
                 &public_key,
-                &public_key,
                 &hex::encode(purge.purge_token),
                 &hex::encode(&purge.signature),
                 purge.timestamp,

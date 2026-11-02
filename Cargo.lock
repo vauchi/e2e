@@ -748,7 +748,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1195,7 +1195,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -2161,7 +2161,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2566,7 +2566,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3094,7 +3094,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol 0.96.1",
+ "vauchi-protocol",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -3135,19 +3135,9 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.96.1",
+ "vauchi-protocol",
  "vauchi-relay",
  "vt100",
-]
-
-[[package]]
-name = "vauchi-protocol"
-version = "0.75.1"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.75.1#861f8fcbf5a8de632dbee28b62af3895eb80b05f"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
 ]
 
 [[package]]
@@ -3163,12 +3153,13 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
-source = "git+https://gitlab.com/vauchi/relay.git?branch=main#3b475a7cb3b8390f35267893a2429020289ceed4"
+source = "git+https://gitlab.com/vauchi/relay.git?branch=main#5f3fff43919199602aa316ed6bc68d3ac25bfaef"
 dependencies = [
  "aws-lc-rs",
  "axum",
  "base64",
  "ed25519-dalek",
+ "flate2",
  "hex",
  "hyper",
  "hyper-util",
@@ -3179,6 +3170,7 @@ dependencies = [
  "rusqlite",
  "rustls",
  "rustls-pemfile",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "sha2",
@@ -3189,7 +3181,8 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol 0.75.1",
+ "vauchi-protocol",
+ "webpki-roots",
  "x25519-dalek",
  "zeroize",
 ]
