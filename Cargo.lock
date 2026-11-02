@@ -1195,7 +1195,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3153,7 +3153,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
-source = "git+https://gitlab.com/vauchi/relay.git?branch=main#5f3fff43919199602aa316ed6bc68d3ac25bfaef"
+source = "git+https://gitlab.com/vauchi/relay.git?rev=5f3fff43919199602aa316ed6bc68d3ac25bfaef#5f3fff43919199602aa316ed6bc68d3ac25bfaef"
 dependencies = [
  "aws-lc-rs",
  "axum",
