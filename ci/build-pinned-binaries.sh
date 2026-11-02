@@ -136,7 +136,13 @@ fi
 
 {
     echo "mode=$mode"
-    echo "core=${E2E_CORE_DIR:-$CORE_TAG}"
+    if [ -n "${E2E_CORE_DIR:-}" ]; then
+        echo "core=$E2E_CORE_DIR"
+    elif [ "$mode" = heads ]; then
+        echo "core=each component's own pin"
+    else
+        echo "core=$CORE_TAG"
+    fi
     echo "relay=$RELAY_SHA"
     echo "ohttp_relay=$OHTTP_RELAY_SHA"
     echo "cli=$CLI_SHA"
