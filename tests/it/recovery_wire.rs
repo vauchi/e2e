@@ -30,6 +30,16 @@ async fn recovery_wire_uploaded_proof_is_verifiable_by_an_existing_contact() {
         .unwrap();
     let mut recipient = Vauchi::in_memory().unwrap();
     recipient.create_identity("Recipient").unwrap();
+    // The relay holds the proof sealed to the old key, so only someone who
+    // has Alice's old identity as a contact can open it (private#936).
+    recipient
+        .add_contact(Contact::from_exchange(
+            *old.signing_public_key(),
+            ContactCard::new("Alice"),
+            SymmetricKey::generate(),
+            0,
+        ))
+        .unwrap();
     for name in ["Bob", "Carol", "Dave"] {
         let helper = Identity::create(name, 0);
         let voucher = RecoveryVoucher::create_from_claim(
