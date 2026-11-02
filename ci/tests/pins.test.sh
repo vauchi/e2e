@@ -128,6 +128,33 @@ else
     pass "check-core-pin fails a manifest with no Core from git"
 fi
 
+# point-core-at.sh (decision D8): a Core MR's job points the pinned
+# components at its checkout; the known line shape is rewritten with its
+# features kept, any other shape or a non-Core directory fails loudly.
+mkdir -p "$fixtures/core/vauchi-core" "$fixtures/not-core"
+cat > "$fixtures/to-point.toml" <<'EOF'
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v1.2.3", version = "=1.2.3" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v1.2.3", version = "=1.2.3", features = ["x"] }
+EOF
+if sh ci/point-core-at.sh "$fixtures/core" "$fixtures/to-point.toml" > /dev/null 2>&1 &&
+    grep -qx "vauchi-core = { path = \"$fixtures/core/vauchi-core\" }" "$fixtures/to-point.toml" &&
+    grep -qx "vauchi-app = { path = \"$fixtures/core/vauchi-app\", features = \[\"x\"\] }" "$fixtures/to-point.toml"; then
+    pass "point-core-at rewrites Core crates to the checkout and keeps their features"
+else
+    fail "point-core-at must rewrite Core crates to path dependencies, keeping features"
+fi
+printf 'vauchi-core = { tag = "v1", git = "https://gitlab.com/vauchi/core.git" }\n' > "$fixtures/odd.toml"
+if sh ci/point-core-at.sh "$fixtures/core" "$fixtures/odd.toml" > /dev/null 2>&1; then
+    fail "point-core-at must fail a Core line it cannot rewrite"
+else
+    pass "point-core-at fails a Core line of another shape"
+fi
+if sh ci/point-core-at.sh "$fixtures/not-core" "$fixtures/on-tag.toml" > /dev/null 2>&1; then
+    fail "point-core-at must refuse a directory that is not a Core checkout"
+else
+    pass "point-core-at refuses a directory without vauchi-core/"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "$failures failure(s)" >&2
     exit 1

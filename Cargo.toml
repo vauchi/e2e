@@ -29,9 +29,9 @@ seed-contacts = ["dep:fake", "dep:rand"]
 
 [dependencies]
 # Core library — git dependency for CI; patched to local path via .cargo/config.toml
-# Tracks the tag `cli` ships (cli/Cargo.toml), because CI builds the E2E
-# CLI binary from cli main — a pin behind it certifies a core the CLI
-# under test is not running.
+# Equals CORE_TAG in ci/pins.env: the relay and CLI e2e builds sit at
+# commits that pin this same tag, so the set runs one Core
+# (vauchi/private#1032; ci/tests/pins.test.sh holds them equal).
 vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.96.1", version = "=0.96.1" }
 vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.96.1", version = "=0.96.1", features = ["network-native-tls"] }
 # Force vauchi-relay's transitive protocol dependency to the same Core tag
@@ -95,8 +95,9 @@ fake = { version = "3", features = ["derive"], optional = true }
 base64 = "0.22"
 toml = "0.9"
 
-# Relay for integration tests - use git dependency for CI, patched to local path via .cargo/config.toml
-vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", branch = "main" }
+# Relay for integration tests - git dependency for CI, patched to local path via .cargo/config.toml
+# At RELAY_SHA in ci/pins.env, the commit the relay binary is built from.
+vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "dcaf1b11dd53a16c48e491f70dd2aaf4e0fc14a6" }
 
 # Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
 # pinned to the Core tag above like vauchi-core.
