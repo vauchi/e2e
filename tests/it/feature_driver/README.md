@@ -4,7 +4,7 @@
 # Shared feature-driver pilot
 
 The Link scenario in the features repository's `link_exchange.feature`
-runs through the same Cucumber step definitions with two drivers:
+runs through the same Cucumber step definitions with three drivers:
 
 - Contract: AppEngine receives generic events with ids resolved from its
   emitted presentation. Only boot requests a snapshot; subsequent state
@@ -12,8 +12,11 @@ runs through the same Cucumber step definitions with two drivers:
   a loopback escrow adapter backed by the production escrow store.
 - CLI: the existing subprocess adapter runs the real CLI and local
   relay/OHTTP services. Assertions use CLI contact-list output.
+- TUI: the existing terminal adapter operates real TUI processes through
+  their interfaces. It uses the same relay/OHTTP orchestrator and domain
+  assertions as CLI.
 
-Both paths require Alice to observe only Bob and Bob to observe only Alice
+Every path requires Alice to observe only Bob and Bob to observe only Alice
 in their contact lists. A separate test blocks all escrow requests and
 requires an exchange error and empty contact lists on both sides.
 Another drops presentation updates after boot and requires failure before
@@ -35,6 +38,17 @@ just exec-in-repo e2e \
   'cargo test --test it integration_cli_to_cli_link_exchange'
 ```
 
+To run the same scenario through terminals, build the TUI and set
+`VAUCHI_TUI_BIN` to its executable:
+
+```sh
+just exec-in-repo e2e \
+  'cargo test --features tui --test it integration_tui_to_tui_link_exchange'
+```
+
+The TUI CI job builds its own binary and fetches the canonical feature
+source explicitly. A missing explicit TUI executable fails the scenario.
+
 The helper records the cohort in `.smoke-bin/set.txt`. A version string
 alone does not establish a binary's source commit.
 
@@ -54,7 +68,13 @@ compatibility tests remain separate. Extend the interface when another
 scenario demonstrates a shared operation; do not add speculative Device
 methods or copy exchange policy into a driver.
 
-The minimal model covers one primary surface and explicit overlay
-dismissal. It currently retains overlays until dismissal; a scenario that
-replaces a surface while an overlay is open needs a model extension and
-its own regression test before reuse.
+The model covers one primary surface. Like the reference TUI projection,
+an accepted surface replacement clears its contextual controls and
+overlays, including on a same-revision redraw. Core can present a new
+overlay afterward in that batch. Older replacements are ignored;
+contextual and overlay commands must match the current surface revision.
+Dismissals match surface and overlay kind and are idempotent.
+
+Focused regressions protect those lifetimes through command/event
+observations. Multiple surfaces, GTK rendering and physical-device input
+remain outside this pilot.
