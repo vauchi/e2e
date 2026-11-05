@@ -111,6 +111,7 @@ check:ci-contracts:
   script:
     - sh ci/tests/pins.test.sh
     - sh ci/tests/fetch-features.test.sh
+    - sh ci/tests/audit-order.test.sh
     - sh ci/tests/lane-paths.test.sh
     - sh ci/tests/update-pins.test.sh
     - sh ci/tests/pins-bot.test.sh
@@ -176,22 +177,14 @@ lint:adr-046:
 # Extends shared template for auto-install of cargo-audit
 security:audit:
   extends: [.rust-runner-readonly, .security-audit-job]
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  needs: []
 
 # Full cargo-deny check: advisories, licenses, bans, sources
 # Extends shared template for auto-install of cargo-deny.
 security:deny:
   extends: [.rust-runner-readonly, .security-deny-job]
   stage: security
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  needs: []
 
 # ============================================================
 # Test Stage — Smoke Suite (PI-05)
@@ -734,6 +727,8 @@ test:tui-journey:
       # 2026-09-12: tui build:release lost its rlib, this job lost an
       # object file, minutes apart). `find_tui_binary()` honours
       # VAUCHI_TUI_BIN before any sibling guess.
+      sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
+      export VAUCHI_FEATURES_DIR="$(pwd)/.feature-specs"
       JOB_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
       TUI_DIR="$JOB_DIR/tui"
       rm -rf "$JOB_DIR"
