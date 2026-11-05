@@ -27,6 +27,8 @@ data/
 # CI local testing
 .gitlab-ci-local/
 .feature-specs/
+.smoke-bin/
+.heads-bin/
 
 # Secrets & credentials (never commit)
 .env
