@@ -9,6 +9,7 @@ mod cli;
 mod contract;
 mod escrow;
 mod model;
+mod model_tests;
 mod presentation;
 
 #[async_trait]

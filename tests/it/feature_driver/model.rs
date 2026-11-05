@@ -12,22 +12,24 @@ impl PresentationModel {
     pub(super) fn apply(&mut self, batch: &[Command]) {
         for command in batch {
             match command {
-                Command::ReplaceSurface { surface } => {
-                    self.current.retain(|old| match old {
-                        Command::ReplaceSurface { .. } => false,
-                        Command::SetContextBar { surface_id, .. } => {
-                            *surface_id == surface.surface_id
-                        }
-                        _ => true,
-                    });
+                Command::ReplaceSurface { .. } => {
+                    self.current.clear();
                     self.current.push(command.clone());
                 }
-                Command::SetContextBar { .. } => {
+                Command::SetContextBar {
+                    surface_id,
+                    revision,
+                    ..
+                } if self.is_current_revision(surface_id, *revision) => {
                     self.current
                         .retain(|old| !matches!(old, Command::SetContextBar { .. }));
                     self.current.push(command.clone());
                 }
-                Command::PresentOverlay { .. } => {
+                Command::PresentOverlay {
+                    surface_id,
+                    revision,
+                    ..
+                } if self.is_current_revision(surface_id, *revision) => {
                     self.current
                         .retain(|old| !matches!(old, Command::PresentOverlay { .. }));
                     self.current.push(command.clone());
@@ -44,6 +46,13 @@ impl PresentationModel {
                 _ => {}
             }
         }
+    }
+
+    fn is_current_revision(&self, id: &SurfaceId, revision: u64) -> bool {
+        self.current.iter().any(|command| {
+            matches!(command, Command::ReplaceSurface { surface }
+                if &surface.surface_id == id && surface.revision == revision)
+        })
     }
 
     pub(super) fn action(&self, label: &str) -> Option<Event> {
