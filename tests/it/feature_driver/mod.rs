@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use cucumber::{World, given, then, when, writer::Stats as _};
 
-mod cli;
+mod app;
 mod contract;
 mod escrow;
 mod model;
@@ -24,6 +24,8 @@ trait FeatureDriver: Send {
 pub(super) enum Backend {
     Contract,
     Cli,
+    #[cfg(feature = "tui")]
+    Tui,
 }
 
 #[derive(Default, World)]
@@ -92,9 +94,17 @@ pub(super) async fn run(backend: Backend) {
                     Backend::Contract => {
                         Box::new(contract::ContractDriver::start().expect("start contract driver"))
                     }
-                    Backend::Cli => {
-                        Box::new(cli::CliDriver::start().await.expect("start CLI driver"))
-                    }
+                    Backend::Cli => Box::new(
+                        app::AppDriver::start(app::AppKind::Cli)
+                            .await
+                            .expect("start CLI driver"),
+                    ),
+                    #[cfg(feature = "tui")]
+                    Backend::Tui => Box::new(
+                        app::AppDriver::start(app::AppKind::Tui)
+                            .await
+                            .expect("start TUI driver"),
+                    ),
                 });
             })
         })

@@ -6,8 +6,8 @@
 //!
 //! Provides a trait-based abstraction over different device types:
 //! - CLI: Command-line based control (fully implemented)
-//! - TUI: Terminal UI control (stub - requires expectrl)
-//! - Maestro: Mobile app control (stub - requires Maestro CLI)
+//! - TUI: Terminal UI control via portable-pty (enable the tui feature)
+//! - Maestro: Mobile app control through the Maestro CLI
 
 mod cli;
 mod maestro;

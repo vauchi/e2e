@@ -10,8 +10,8 @@
 //! 3. Eve on iOS links Android and CLI devices
 //! 4. Verify all exchanges work across platforms
 //!
-//! Note: Phase 1 only supports CLI devices. This test serves as a
-//! placeholder for future platform integration tests.
+//! CLI and TUI flows use real subprocesses. Mobile flows require their
+//! respective simulator or emulator automation runtimes.
 //!
 //! ## Test Tiers
 //! - `smoke_*`: Fast tests for every push (< 5 min total)
@@ -442,7 +442,7 @@ async fn test_android_phone_joins_another_phones_identity() {
 ///
 /// Requirements:
 /// - TUI binary built (`just build tui`)
-/// - expectrl crate for PTY automation
+/// - PTY automation enabled with the tui feature
 ///
 /// The TuiDevice is implemented at `e2e/src/device/tui.rs`
 // @internal
@@ -689,55 +689,15 @@ async fn integration_cli_to_ios_exchange() {
 ///
 /// Requirements:
 /// - TUI binary built (`just build tui`)
-/// - expectrl crate for PTY automation
+/// - PTY automation enabled with the tui feature
 ///
 /// Tags: integration, exchange, cross-platform, tui
-/// Feature: contact_exchange.feature
-// @internal
+/// Feature: link_exchange.feature
+// @scenario: link_exchange :: Two users exchange contact cards using a link
 #[tokio::test]
 #[cfg(feature = "tui")]
 async fn integration_tui_to_tui_link_exchange() {
-    // Both sides are terminals; a camera-less TUI can only exchange over
-    // Link (share the URL, or paste the peer's). Alice shares as the
-    // initiator, Bob pastes as the responder — one asymmetric ceremony.
-    let mut orch = Orchestrator::new();
-    orch.start().await.expect("Failed to start orchestrator");
-
-    orch.add_user_with_tui("Alice")
-        .expect("Failed to add Alice with TUI");
-    orch.add_user_with_tui("Bob")
-        .expect("Failed to add Bob with TUI");
-
-    orch.create_all_identities()
-        .await
-        .expect("Failed to create identities");
-
-    // Alice initiates (shares her Link URL, stays on the share screen), Bob
-    // responds (pastes it, accepts). One ceremony; both converge.
-    orch.exchange_link("Alice", "Bob")
-        .await
-        .expect("Alice (initiator) and Bob (responder) should converge over Link");
-
-    let bob = orch.user("Bob").unwrap();
-    let bob = bob.read().await;
-    let contacts = bob.list_contacts().await.expect("Bob should list contacts");
-    assert!(
-        contacts.iter().any(|c| c.name == "Alice"),
-        "Bob should have Alice as a contact after the TUI Link exchange"
-    );
-
-    let alice = orch.user("Alice").unwrap();
-    let alice = alice.read().await;
-    let contacts = alice
-        .list_contacts()
-        .await
-        .expect("Alice should list contacts");
-    assert!(
-        contacts.iter().any(|c| c.name == "Bob"),
-        "Alice should have Bob as a contact after the TUI Link exchange"
-    );
-
-    orch.stop().await.expect("Failed to stop orchestrator");
+    super::feature_driver::run(super::feature_driver::Backend::Tui).await;
 }
 
 // @scenario: device_management:Link new device via QR code

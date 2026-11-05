@@ -6,22 +6,33 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use vauchi_e2e_tests::orchestrator::Orchestrator;
 
-pub(super) struct CliDriver {
-    orchestrator: Orchestrator,
+pub(super) enum AppKind {
+    Cli,
+    #[cfg(feature = "tui")]
+    Tui,
 }
 
-impl CliDriver {
-    pub(super) async fn start() -> Result<Self> {
+pub(super) struct AppDriver {
+    orchestrator: Orchestrator,
+    kind: AppKind,
+}
+
+impl AppDriver {
+    pub(super) async fn start(kind: AppKind) -> Result<Self> {
         let mut orchestrator = Orchestrator::new();
         orchestrator.start().await?;
-        Ok(Self { orchestrator })
+        Ok(Self { orchestrator, kind })
     }
 }
 
 #[async_trait]
-impl FeatureDriver for CliDriver {
+impl FeatureDriver for AppDriver {
     async fn add_user(&mut self, name: &str) -> Result<()> {
-        let user = self.orchestrator.add_user(name, 1)?;
+        let user = match self.kind {
+            AppKind::Cli => self.orchestrator.add_user(name, 1)?,
+            #[cfg(feature = "tui")]
+            AppKind::Tui => self.orchestrator.add_user_with_tui(name)?,
+        };
         user.read().await.create_identity().await?;
         Ok(())
     }
