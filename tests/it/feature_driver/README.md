@@ -47,3 +47,8 @@ GTK rendering or device input. Renderer fixtures and message-shape
 compatibility tests remain separate. Extend the interface when another
 scenario demonstrates a shared operation; do not add speculative Device
 methods or copy exchange policy into a driver.
+
+The minimal model covers one primary surface and explicit overlay
+dismissal. It currently retains overlays until dismissal; a scenario that
+replaces a surface while an overlay is open needs a model extension and
+its own regression test before reuse.
