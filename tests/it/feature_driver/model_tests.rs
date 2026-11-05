@@ -92,6 +92,18 @@ fn a_replacement_batch_can_present_a_new_overlay() {
 
 // @internal
 #[test]
+fn an_older_surface_replacement_cannot_expire_the_current_overlay() {
+    let mut model = PresentationModel::default();
+    model.apply(&[
+        surface("primary", 2),
+        overlay("primary", 2, OverlayKind::Navigation, "current"),
+    ]);
+    model.apply(&[surface("primary", 1)]);
+    assert_eq!(model.action("current"), activation("primary", "current"));
+}
+
+// @internal
+#[test]
 fn overlays_for_missing_or_noncurrent_surface_revisions_are_ignored() {
     for (id, revision) in [("missing", 2), ("primary", 1), ("primary", 3)] {
         let mut model = PresentationModel::default();

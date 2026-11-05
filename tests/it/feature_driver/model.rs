@@ -12,7 +12,14 @@ impl PresentationModel {
     pub(super) fn apply(&mut self, batch: &[Command]) {
         for command in batch {
             match command {
-                Command::ReplaceSurface { .. } => {
+                Command::ReplaceSurface { surface } => {
+                    if self.current.iter().any(|command| {
+                        matches!(command, Command::ReplaceSurface { surface: current }
+                            if current.surface_id == surface.surface_id
+                                && current.revision > surface.revision)
+                    }) {
+                        continue;
+                    }
                     self.current.clear();
                     self.current.push(command.clone());
                 }
