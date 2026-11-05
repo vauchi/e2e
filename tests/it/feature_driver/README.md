@@ -23,14 +23,20 @@ when Core emits a new scheduling command.
 Missing specifications, unbound steps, parser failures and hook failures
 fail the pilot instead of producing skipped coverage.
 
-From the workspace root, with the existing E2E binaries built:
+From the workspace root, build and select the pinned binary cohort:
 
 ```sh
-VAUCHI_E2E_NO_DEVICES=1 just exec-in-repo e2e \
+just exec-in-repo e2e 'sh ci/build-pinned-binaries.sh .smoke-bin'
+export VAUCHI_E2E_NO_DEVICES=1
+export E2E_BIN_DIR="$PWD/e2e/.smoke-bin"
+just exec-in-repo e2e \
   'cargo test --test it integration_shared_driver'
-VAUCHI_E2E_NO_DEVICES=1 just exec-in-repo e2e \
+just exec-in-repo e2e \
   'cargo test --test it integration_cli_to_cli_link_exchange'
 ```
+
+The helper records the cohort in `.smoke-bin/set.txt`. A version string
+alone does not establish a binary's source commit.
 
 The default feature source is the sibling features checkout. CI fetches
 features at `main`, logs the checked-out commit and sets
