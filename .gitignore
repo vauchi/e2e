@@ -26,6 +26,7 @@ data/
 
 # CI local testing
 .gitlab-ci-local/
+.feature-specs/
 
 # Secrets & credentials (never commit)
 .env

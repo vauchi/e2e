@@ -101,6 +101,28 @@ impl FeatureDriver for ContractDriver {
 
 // @internal
 #[tokio::test]
+async fn integration_shared_driver_dropped_presentation_cannot_complete() {
+    let mut driver = ContractDriver::start().expect("controlled driver");
+    driver.add_user("Alice").await.expect("Alice");
+    driver.add_user("Bob").await.expect("Bob");
+    driver
+        .actors
+        .get_mut("Alice")
+        .expect("Alice actor")
+        .drop_presentation_updates = true;
+    let error = driver
+        .exchange_link("Alice", "Bob")
+        .await
+        .expect_err("dropped presentation must not be healed by hidden snapshots");
+    assert_eq!(
+        error.to_string(),
+        "no presented enabled action named \"Exchange\""
+    );
+    assert_eq!(driver.relay.requests(), 0);
+}
+
+// @internal
+#[tokio::test]
 async fn integration_shared_driver_without_delivery_never_adds_contacts() {
     let mut driver = ContractDriver::start().expect("controlled driver");
     driver.add_user("Alice").await.expect("Alice");

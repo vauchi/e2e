@@ -98,10 +98,10 @@ pub(super) async fn run(backend: Backend) {
         })
         .after(|_, _, _, _, world| {
             Box::pin(async move {
-                if let Some(world) = world {
-                    if let Some(mut driver) = world.driver.take() {
-                        driver.stop().await.expect("stop scenario driver");
-                    }
+                if let Some(world) = world
+                    && let Some(mut driver) = world.driver.take()
+                {
+                    driver.stop().await.expect("stop scenario driver");
                 }
             })
         })

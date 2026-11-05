@@ -110,6 +110,7 @@ check:ci-contracts:
     - apk add --no-cache git python3 > /dev/null
   script:
     - sh ci/tests/pins.test.sh
+    - sh ci/tests/fetch-features.test.sh
     - sh ci/tests/lane-paths.test.sh
     - sh ci/tests/update-pins.test.sh
     - sh ci/tests/pins-bot.test.sh
@@ -249,11 +250,15 @@ test:smoke:
       sh ci/build-pinned-binaries.sh .smoke-bin
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
 
-      echo "Running smoke tests..."
+      sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
+      export VAUCHI_FEATURES_DIR="$PWD/.feature-specs"
+
+      echo "Running smoke tests and the shared-driver pilot..."
       # Relay-backed tests are capped at four workers by
       # .config/nextest.toml; match that tested capacity instead of
       # serializing every smoke scenario.
-      cargo nextest run --profile ci --run-ignored default -j 4 -- smoke_ 2>&1 | tee smoke-results.txt
+      cargo nextest run --profile ci --run-ignored default -j 4 \
+        -E 'test(smoke_) | test(feature_driver::) | test(cli_link_exchange::)' 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
   artifacts:
@@ -822,6 +827,8 @@ test:integration:
       export E2E_BIN_DIR="$(pwd)/.smoke-bin"
 
       echo "Running integration tests (comprehensive — every non-ignored ::it test)..."
+      sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
+      export VAUCHI_FEATURES_DIR="$PWD/.feature-specs"
       # Filter is the single source of truth in ci/integration-test-filter
       # and must stay comprehensive: the check:test-lane-coverage guard
       # fails the pipeline if any non-ignored ::it test is not selected
@@ -880,6 +887,8 @@ test:heads:
   script:
     - sh ci/build-pinned-binaries.sh .heads-bin
     - export E2E_BIN_DIR="$(pwd)/.heads-bin"
+    - sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
+    - export VAUCHI_FEATURES_DIR="$PWD/.feature-specs"
     - cargo nextest run --profile ci --run-ignored default -E "$(cat ci/integration-test-filter)" 2>&1 | tee heads-results.txt
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"

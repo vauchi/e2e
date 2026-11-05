@@ -13,6 +13,8 @@ pub(super) struct Actor {
     pub(super) clock: Arc<FakeClock>,
     current: Vec<Command>,
     pub(super) emitted: Vec<Command>,
+    pending_wakeup: Option<u32>,
+    pub(super) drop_presentation_updates: bool,
     pub(super) _storage: tempfile::TempDir,
 }
 
@@ -27,21 +29,71 @@ impl Actor {
             clock,
             current: Vec::new(),
             emitted: Vec::new(),
+            pending_wakeup: None,
+            drop_presentation_updates: false,
             _storage: storage,
         };
-        actor.refresh()?;
+        let initial = actor.engine.initial_commands()?;
+        actor.apply(initial);
         Ok(actor)
     }
 
-    fn refresh(&mut self) -> Result<()> {
-        self.current = self.engine.initial_commands()?;
-        self.emitted.extend(self.current.clone());
-        Ok(())
+    fn apply(&mut self, batch: Vec<Command>) {
+        for command in &batch {
+            match command {
+                Command::ReplaceSurface { surface } => {
+                    self.current.retain(|old| match old {
+                        Command::ReplaceSurface { .. } => false,
+                        Command::SetContextBar { surface_id, .. } => {
+                            *surface_id == surface.surface_id
+                        }
+                        _ => true,
+                    });
+                    self.current.push(command.clone());
+                }
+                Command::SetContextBar { .. } => {
+                    self.current
+                        .retain(|old| !matches!(old, Command::SetContextBar { .. }));
+                    self.current.push(command.clone());
+                }
+                Command::PresentOverlay { .. } => {
+                    self.current
+                        .retain(|old| !matches!(old, Command::PresentOverlay { .. }));
+                    self.current.push(command.clone());
+                }
+                Command::DismissOverlay {
+                    surface_id, kind, ..
+                } => {
+                    self.current.retain(|old| {
+                        !matches!(old,
+                        Command::PresentOverlay { surface_id: old_surface, overlay, .. }
+                        if old_surface == surface_id && overlay.kind == *kind)
+                    });
+                }
+                Command::ScheduleWakeup { delay_millis, .. } => {
+                    self.pending_wakeup = Some(*delay_millis)
+                }
+                _ => {}
+            }
+        }
+        self.emitted.extend(batch);
     }
 
     pub(super) fn dispatch(&mut self, event: Event) -> Result<()> {
-        self.emitted.extend(self.engine.dispatch(event)?);
-        self.refresh()
+        let mut batch = self.engine.dispatch(event)?;
+        if self.drop_presentation_updates {
+            batch.retain(|command| {
+                !matches!(
+                    command,
+                    Command::ReplaceSurface { .. }
+                        | Command::SetContextBar { .. }
+                        | Command::PresentOverlay { .. }
+                        | Command::DismissOverlay { .. }
+                )
+            });
+        }
+        self.apply(batch);
+        Ok(())
     }
 
     pub(super) fn activate(&mut self, label: &str) -> Result<()> {
@@ -58,10 +110,8 @@ impl Actor {
             _ => None,
         });
         if let Some(event) = navigation {
-            let batch = self.engine.dispatch(event)?;
-            let requested = action(&batch, label);
-            self.emitted.extend(batch);
-            if let Some(event) = requested {
+            self.dispatch(event)?;
+            if let Some(event) = action(&self.current, label) {
                 return self.dispatch(event);
             }
         }
@@ -70,13 +120,8 @@ impl Actor {
 
     pub(super) fn wake(&mut self) -> Result<()> {
         let delay = self
-            .emitted
-            .iter()
-            .rev()
-            .find_map(|command| match command {
-                Command::ScheduleWakeup { delay_millis, .. } => Some(*delay_millis),
-                _ => None,
-            })
+            .pending_wakeup
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Core did not schedule an exchange wakeup"))?;
         self.clock.advance(Duration::from_millis(u64::from(delay)));
         self.dispatch(Event::WakeupFired)
