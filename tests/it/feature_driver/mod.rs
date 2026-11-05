@@ -8,6 +8,7 @@ use cucumber::{World, given, then, when, writer::Stats as _};
 mod cli;
 mod contract;
 mod escrow;
+mod model;
 mod presentation;
 
 #[async_trait]
