@@ -92,6 +92,8 @@ rand = { version = "0.8", optional = true }
 fake = { version = "3", features = ["derive"], optional = true }
 
 [dev-dependencies]
+cucumber = "0.21"
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.99.1", version = "=0.99.1", features = ["testing"] }
 base64 = "0.22"
 toml = "0.9"
 

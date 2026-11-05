@@ -36,6 +36,7 @@ mod cross_platform;
 mod delivery_pipeline;
 mod device_opt_out;
 mod exchange_error_paths;
+mod feature_driver;
 mod five_user_exchange;
 mod longitudinal_continuity;
 mod multi_device_sync;
