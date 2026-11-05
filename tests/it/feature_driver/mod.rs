@@ -7,6 +7,8 @@ use cucumber::{World, given, then, when, writer::Stats as _};
 
 mod cli;
 mod contract;
+mod escrow;
+mod presentation;
 
 #[async_trait]
 trait FeatureDriver: Send {
@@ -73,7 +75,7 @@ pub(super) async fn run(backend: Backend) {
     let feature = std::env::var_os("VAUCHI_FEATURES_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../features"))
-        .join("contact_exchange.feature");
+        .join("link_exchange.feature");
     assert!(
         feature.is_file(),
         "missing canonical feature: {}",
@@ -85,7 +87,9 @@ pub(super) async fn run(backend: Backend) {
         .before(move |_, _, _, world| {
             Box::pin(async move {
                 world.driver = Some(match backend {
-                    Backend::Contract => Box::new(contract::ContractDriver),
+                    Backend::Contract => {
+                        Box::new(contract::ContractDriver::start().expect("start contract driver"))
+                    }
                     Backend::Cli => {
                         Box::new(cli::CliDriver::start().await.expect("start CLI driver"))
                     }
@@ -110,7 +114,7 @@ pub(super) async fn run(backend: Backend) {
     assert_eq!((stats.passed, stats.failed, stats.skipped), (1, 0, 0));
 }
 
-// @scenario: contact_exchange :: Two users exchange contact cards using a link
+// @scenario: link_exchange :: Two users exchange contact cards using a link
 #[tokio::test]
 async fn integration_shared_driver_contract_link_exchange() {
     run(Backend::Contract).await;

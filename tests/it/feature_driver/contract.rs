@@ -2,23 +2,128 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::FeatureDriver;
-use anyhow::{Result, bail};
+use super::{escrow::EscrowAdapter, presentation::Actor};
+use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use vauchi_app::ui::AppEngine;
+use vauchi_core::clock::FakeClock;
+use vauchi_core::rng::OsSecureRng;
+use vauchi_core::{Event, Vauchi, VauchiConfig};
 
-pub(super) struct ContractDriver;
+pub(super) struct ContractDriver {
+    relay: EscrowAdapter,
+    actors: BTreeMap<String, Actor>,
+}
+
+impl ContractDriver {
+    pub(super) fn start() -> Result<Self> {
+        Ok(Self {
+            relay: EscrowAdapter::start()?,
+            actors: BTreeMap::new(),
+        })
+    }
+}
 
 #[async_trait]
 impl FeatureDriver for ContractDriver {
-    async fn add_user(&mut self, _name: &str) -> Result<()> {
-        bail!("contract scenario driver has not been implemented")
+    async fn add_user(&mut self, name: &str) -> Result<()> {
+        ensure!(!self.actors.contains_key(name), "duplicate scenario actor");
+        let storage = tempfile::tempdir()?;
+        let mut config = VauchiConfig::with_storage_path(storage.path().join("vauchi.db"))
+            .with_relay_url(self.relay.url.clone());
+        config.ohttp.allow_direct = true;
+        config.content_updates = vauchi_core::settings::ContentUpdates::Off;
+        let clock = Arc::new(FakeClock::new(
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+        ));
+        let mut core = Vauchi::new_with(config, clock.clone(), OsSecureRng::shared(), None)?;
+        core.create_identity(name)?;
+        self.actors.insert(
+            name.into(),
+            Actor::new(AppEngine::new(core), clock, storage)?,
+        );
+        Ok(())
     }
-    async fn exchange_link(&mut self, _initiator: &str, _responder: &str) -> Result<()> {
-        bail!("contract scenario driver has not been implemented")
+    async fn exchange_link(&mut self, initiator: &str, responder: &str) -> Result<()> {
+        ensure!(initiator != responder, "exchange requires distinct actors");
+        let alice = self
+            .actors
+            .get_mut(initiator)
+            .context("unknown initiator")?;
+        alice.activate("Exchange")?;
+        alice.activate("Link")?;
+        alice.activate("Share")?;
+        let url = alice.shared_url()?;
+        let bob = self
+            .actors
+            .get_mut(responder)
+            .context("unknown responder")?;
+        bob.dispatch(Event::DeepLinkOpened { uri: url })?;
+        bob.activate("Accept Exchange")?;
+        for _ in 0..64 {
+            for name in [initiator, responder] {
+                let actor = self
+                    .actors
+                    .get_mut(name)
+                    .context("unknown exchange actor")?;
+                if actor.celebrations() == 0 {
+                    actor.wake()?;
+                }
+            }
+            if [initiator, responder]
+                .into_iter()
+                .all(|name| self.actors[name].celebrations() == 1)
+            {
+                ensure!(
+                    self.relay.requests() > 0,
+                    "exchange bypassed the controlled transport"
+                );
+                return Ok(());
+            }
+        }
+        bail!("both actors did not present validated exchange success within 64 scheduled wakeups")
     }
-    async fn contact_names(&mut self, _owner: &str) -> Result<Vec<String>> {
-        bail!("contract scenario driver has not been implemented")
+    async fn contact_names(&mut self, owner: &str) -> Result<Vec<String>> {
+        let actor = self
+            .actors
+            .get_mut(owner)
+            .context("unknown scenario actor")?;
+        actor.activate("Contacts")?;
+        Ok(actor.contact_names())
     }
     async fn stop(&mut self) -> Result<()> {
         Ok(())
     }
+}
+
+// @internal
+#[tokio::test]
+async fn integration_shared_driver_without_delivery_never_adds_contacts() {
+    let mut driver = ContractDriver::start().expect("controlled driver");
+    driver.add_user("Alice").await.expect("Alice");
+    driver.add_user("Bob").await.expect("Bob");
+    driver.relay.block_delivery();
+    let error = driver
+        .exchange_link("Alice", "Bob")
+        .await
+        .expect_err("delivery is required");
+    assert_eq!(
+        error.to_string(),
+        "both actors did not present validated exchange success within 64 scheduled wakeups"
+    );
+    assert!(
+        driver.relay.requests() > 0,
+        "failure must reach the transport boundary"
+    );
+    assert_eq!(
+        driver.contact_names("Alice").await.expect("Alice contacts"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        driver.contact_names("Bob").await.expect("Bob contacts"),
+        Vec::<String>::new()
+    );
 }
