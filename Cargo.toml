@@ -19,9 +19,8 @@ junit = []
 # rendered to SVG via `inferno-flamegraph`. See `just flame-e2e <test>`.
 flame = ["dep:tracing-flame"]
 
-# TUI device automation via expectrl (PTY stack). Off by default to keep the
-# default build graph free of nix 0.26 / bitflags 1.x / regex duplicates.
-tui = ["dep:expectrl", "dep:vt100"]
+# Keep terminal automation dependencies out of device-free builds.
+tui = ["dep:portable-pty", "dep:regex", "dep:vt100"]
 
 # Build the seed-contacts helper bin. Off by default to keep fake/rand and the
 # darling 0.20 subtree out of the default integration-test build.
@@ -71,7 +70,8 @@ ctor = "0.2"
 tracing-flame = { version = "0.2", optional = true }
 
 # PTY automation for TUI testing (optional — enable the `tui` feature)
-expectrl = { version = "0.7", optional = true }
+portable-pty = { version = "0.9", optional = true }
+regex = { version = "1", optional = true }
 vt100 = { version = "0.16", optional = true }
 
 # HTTP client for Desktop test server (rustls to avoid native-tls/OpenSSL)

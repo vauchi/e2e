@@ -69,9 +69,103 @@ fn screen_snapshot_rejects_a_terminated_terminal() {
     let mut terminal =
         PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
     terminal.expect("Synced").unwrap();
-    terminal.session.expect(expectrl::Eof).unwrap();
+    let error = terminal.expect("unreachable marker").unwrap_err();
+    assert!(error.to_string().contains("not found"));
     assert!(
         terminal.read_screen_snapshot().is_err(),
         "a dead child cannot supply a successful retained screen"
+    );
+}
+
+// @internal
+#[test]
+fn terminal_environment_values_are_literal() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("literal environment.sh");
+    std::fs::write(
+        &program,
+        "#!/bin/bash\nstty -echo\nprintf '%s\\n' \"$MARKER\"\nread -r command\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let marker = r#"value "$LITERAL_UNDEFINED" $(printf expanded) 'quote' END"#;
+    let mut terminal = PtySession::new(
+        &program,
+        directory.path(),
+        "unused",
+        &HashMap::from([("MARKER".into(), marker.into())]),
+    )
+    .unwrap();
+    assert_eq!(terminal.expect("value .* END").unwrap(), marker);
+}
+
+// @internal
+#[test]
+fn terminal_matches_across_read_chunks_and_retains_the_unmatched_suffix() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("chunked-terminal.sh");
+    std::fs::write(
+        &program,
+        "#!/bin/bash\nstty -echo\nprintf 'START%5000sEND tail\\n' ''\nread -r command\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+    assert_eq!(
+        terminal.expect("START {5000}END").unwrap(),
+        format!("START{}END", " ".repeat(5000))
+    );
+    assert_eq!(terminal.expect("tail").unwrap(), "tail");
+    let error = terminal
+        .expect_with_timeout("missing", std::time::Duration::ZERO)
+        .unwrap_err();
+    assert!(error.to_string().contains("not found"));
+    terminal.send_text("complete\n").unwrap();
+}
+
+// @internal
+#[test]
+fn dropping_a_terminal_terminates_and_reaps_its_child() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("child-lifetime.sh");
+    std::fs::write(
+        &program,
+        "#!/bin/bash\nstty -echo\nprintf 'PID=%s\\n' \"$$\"\nread -r command\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+    let pid = terminal.expect("PID=[0-9]+").unwrap();
+    let pid = pid.strip_prefix("PID=").unwrap();
+    drop(terminal);
+    let status = std::process::Command::new("kill")
+        .args(["-0", pid])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert_eq!(status.code(), Some(1), "terminal child must be reaped");
+}
+
+// @internal
+#[test]
+fn terminal_rejects_excessive_unmatched_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("excessive-output.sh");
+    std::fs::write(
+        &program,
+        "#!/bin/bash\nstty -echo\nprintf '%1048577s' ''\nread -r command\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+    let error = terminal.expect("never emitted").unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("unmatched output exceeded 1 MiB"),
+        "{error}"
     );
 }

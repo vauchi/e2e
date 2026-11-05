@@ -2,25 +2,27 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Raw PTY plumbing under the TUI device driver: spawning the wrapper
-//! script inside an `expectrl` session, reading and matching its stream,
+//! Raw PTY plumbing under the TUI device driver: spawning the TUI
+//! process inside a PTY, reading and matching its stream,
 //! and retaining rendered terminal state across incremental redraws.
 
-use std::io::Write as IoWrite;
 use std::time::Duration;
 
-use expectrl::{Regex, Session};
+use regex::bytes::Regex;
 
 use crate::error::{E2eError, E2eResult};
+
+mod process;
+use process::TerminalProcess;
 
 /// Default timeout for expect operations.
 pub(super) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Simple wrapper around expectrl Session for PTY control.
-/// This is stored separately to avoid complex generics.
 pub(super) struct PtySession {
-    session: Session,
+    process: TerminalProcess,
     screen: vt100::Parser,
+    pending: Vec<u8>,
+    closed: bool,
 }
 
 impl PtySession {
@@ -30,71 +32,26 @@ impl PtySession {
         relay_url: &str,
         extra_env: &std::collections::HashMap<String, String>,
     ) -> E2eResult<Self> {
-        // Create a wrapper script to handle all the terminal setup
-        // This avoids complex shell quoting issues
-        let script_path = data_dir.join("run_tui.sh");
-        // Forward caller-supplied env (e.g. the e2e OHTTP key/route overrides)
-        // into the TUI process so it can reach a locally-spawned relay — the
-        // CLI gets these via its subprocess env; the TUI needs them too.
-        let extra_exports: String = extra_env
-            .iter()
-            .map(|(k, v)| format!("export {k}=\"{v}\"\n"))
-            .collect();
-        let script_content = format!(
-            r#"#!/bin/bash
-export TERM=xterm-256color
-export VAUCHI_DATA_DIR="{}"
-export VAUCHI_RELAY_URL="{}"
-{}stty rows 40 cols 160 2>/dev/null || true
-exec "{}"
-"#,
-            data_dir.display(),
-            relay_url,
-            extra_exports,
-            tui_binary.display()
-        );
-
-        std::fs::write(&script_path, &script_content)
-            .map_err(|e| E2eError::device(format!("Failed to write wrapper script: {}", e)))?;
-
-        // Make the script executable
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&script_path)
-                .map_err(|e| E2eError::device(format!("Failed to get script metadata: {}", e)))?
-                .permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&script_path, perms).map_err(|e| {
-                E2eError::device(format!("Failed to set script permissions: {}", e))
-            })?;
-        }
-
-        // Spawn the wrapper script directly inside an expectrl PTY. This is
-        // portable across Linux and macOS; the older `script -c` invocation
-        // works on Linux but is rejected by macOS `script`.
-        let script_cmd = script_path.to_string_lossy().to_string();
-        let mut session = expectrl::spawn(&script_cmd)
+        let process = TerminalProcess::new(tui_binary, data_dir, relay_url, extra_env)
             .map_err(|e| E2eError::device(format!("Failed to spawn TUI: {}", e)))?;
 
-        // Set default timeout
-        session.set_expect_timeout(Some(DEFAULT_TIMEOUT));
-
         Ok(Self {
-            session,
+            process,
             screen: vt100::Parser::new(40, 160, 0),
+            pending: Vec::new(),
+            closed: false,
         })
     }
 
     pub(super) fn send_key(&mut self, key: u8) -> E2eResult<()> {
-        self.session
+        self.process
             .write_all(&[key])
             .map_err(|e| E2eError::device(format!("Failed to send key: {}", e)))?;
         Ok(())
     }
 
     pub(super) fn send_text(&mut self, text: &str) -> E2eResult<()> {
-        self.session
+        self.process
             .write_all(text.as_bytes())
             .map_err(|e| E2eError::device(format!("Failed to send text: {}", e)))?;
         Ok(())
@@ -109,19 +66,37 @@ exec "{}"
         pattern: &str,
         timeout: Duration,
     ) -> E2eResult<String> {
-        self.session.set_expect_timeout(Some(timeout));
-
-        // expectrl's Regex takes the pattern directly
-        let regex = Regex(pattern);
-
-        let found = self
-            .session
-            .expect(regex)
-            .map_err(|e| E2eError::device(format!("Pattern '{}' not found: {}", pattern, e)))?;
-
-        self.screen.process(found.as_bytes());
-        let matched = found.get(0).unwrap_or_else(|| found.as_bytes());
-        Ok(String::from_utf8_lossy(matched).to_string())
+        let regex = Regex::new(pattern)
+            .map_err(|error| E2eError::device(format!("Invalid terminal pattern: {error}")))?;
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if let Some(found) = regex.find(&self.pending) {
+                let end = found.end();
+                let matched = String::from_utf8_lossy(found.as_bytes()).into_owned();
+                self.screen.process(&self.pending[..end]);
+                self.pending.drain(..end);
+                return Ok(matched);
+            }
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                return Err(E2eError::device(format!(
+                    "Pattern '{pattern}' not found: timeout"
+                )));
+            }
+            match self.receive(remaining) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(E2eError::device(format!(
+                        "Pattern '{pattern}' not found: timeout"
+                    )));
+                }
+                Err(error) => {
+                    return Err(E2eError::device(format!(
+                        "Pattern '{pattern}' not found: {error}"
+                    )));
+                }
+            }
+        }
     }
 
     /// Read the visible screen without relying on a new full redraw.
@@ -136,23 +111,42 @@ exec "{}"
     }
 
     pub(super) fn read_available(&mut self) -> E2eResult<String> {
-        let mut buffer = vec![0u8; 4096];
-        match self.session.try_read(&mut buffer) {
-            Ok(0) => Err(E2eError::device("TUI output closed unexpectedly")),
-            Ok(n) => {
-                self.screen.process(&buffer[..n]);
-                let content = String::from_utf8_lossy(&buffer[..n]).to_string();
-                Ok(content)
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(String::new()),
-            Err(error) => Err(E2eError::device(format!(
-                "Failed to read TUI output: {error}"
-            ))),
+        if self.closed {
+            return Err(E2eError::device("TUI output closed unexpectedly"));
         }
+        if self.pending.is_empty() {
+            self.receive(Duration::ZERO)?;
+        }
+        self.screen.process(&self.pending);
+        let content = String::from_utf8_lossy(&self.pending).into_owned();
+        self.pending.clear();
+        Ok(content)
+    }
+
+    fn receive(&mut self, timeout: Duration) -> E2eResult<bool> {
+        if self.closed {
+            return Err(E2eError::device("TUI output closed unexpectedly"));
+        }
+        let chunk = self
+            .process
+            .read(timeout)
+            .map_err(|error| E2eError::device(format!("Failed to read TUI output: {error}")))?;
+        let Some(chunk) = chunk else {
+            return Ok(false);
+        };
+        if chunk.is_empty() {
+            self.closed = true;
+            return Err(E2eError::device("TUI output closed unexpectedly"));
+        }
+        if self.pending.len() + chunk.len() > 1024 * 1024 {
+            return Err(E2eError::device("TUI unmatched output exceeded 1 MiB"));
+        }
+        self.pending.extend(chunk);
+        Ok(true)
     }
 
     pub(super) fn quit(&mut self) -> E2eResult<()> {
-        let _ = self.session.write_all(b"q");
+        let _ = self.process.write_all(b"q");
         Ok(())
     }
 }

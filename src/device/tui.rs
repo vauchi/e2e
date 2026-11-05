@@ -4,11 +4,11 @@
 
 //! TUI-based device implementation.
 //!
-//! Controls the Vauchi TUI using pseudo-terminal automation via expectrl.
+//! Controls the Vauchi TUI using pseudo-terminal automation.
 //!
 //! ## Implementation
 //!
-//! Uses the `expectrl` crate for PTY management to:
+//! Uses the `portable-pty` crate for PTY management to:
 //! - Spawn the TUI process in a terminal emulator
 //! - Send keyboard inputs (navigation keys, text)
 //! - Parse the terminal screen buffer for feedback
