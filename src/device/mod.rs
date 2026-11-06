@@ -22,6 +22,13 @@ pub use maestro::{MaestroDevice, MaestroPlatform};
 #[cfg(feature = "tui")]
 pub use tui::TuiDevice;
 
+/// Feedback observed through a device's real link-entry interface.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ExchangeLinkFeedback {
+    InvalidLink,
+    Other(String),
+}
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -243,6 +250,13 @@ pub trait Device: Send + Sync {
     /// Accept another user's Link-mode exchange URL as the responder.
     async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
         self.complete_exchange(url).await
+    }
+
+    /// Submit a link; setup, transport and automation failures remain errors.
+    async fn open_exchange_link_feedback(&self, _url: &str) -> E2eResult<ExchangeLinkFeedback> {
+        Err(crate::error::E2eError::DeviceNotSupported(
+            "exchange link feedback".into(),
+        ))
     }
 
     /// Wait for an in-flight Link-mode exchange to complete on the *initiator*

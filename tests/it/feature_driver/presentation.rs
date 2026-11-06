@@ -59,6 +59,7 @@ impl Actor {
                         | Command::SetContextBar { .. }
                         | Command::PresentOverlay { .. }
                         | Command::DismissOverlay { .. }
+                        | Command::PresentAlert { .. }
                 )
             });
         }

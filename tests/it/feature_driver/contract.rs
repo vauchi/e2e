@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use vauchi_app::ui::AppEngine;
 use vauchi_core::clock::FakeClock;
 use vauchi_core::rng::OsSecureRng;
-use vauchi_core::{Event, Vauchi, VauchiConfig};
+use vauchi_core::{Command, Event, Vauchi, VauchiConfig};
 
 pub(super) struct ContractDriver {
     relay: EscrowAdapter,
@@ -94,9 +94,50 @@ impl FeatureDriver for ContractDriver {
         actor.activate("Contacts")?;
         Ok(actor.contact_names())
     }
+
+    async fn open_link(&mut self, owner: &str, url: &str) -> Result<super::ExchangeLinkFeedback> {
+        let actor = self
+            .actors
+            .get_mut(owner)
+            .context("unknown scenario actor")?;
+        let start = actor.emitted.len();
+        actor.dispatch(Event::DeepLinkOpened { uri: url.into() })?;
+        let alert = actor.emitted[start..]
+            .iter()
+            .find_map(|command| match command {
+                Command::PresentAlert { alert } => Some(alert),
+                _ => None,
+            })
+            .context("Core did not present link feedback")?;
+        if alert.title == "Invalid Link" && alert.message == "This link cannot be opened in Vauchi."
+        {
+            return Ok(super::ExchangeLinkFeedback::InvalidLink);
+        }
+        Ok(super::ExchangeLinkFeedback::Other(format!(
+            "{}: {}",
+            alert.title, alert.message
+        )))
+    }
     async fn stop(&mut self) -> Result<()> {
         Ok(())
     }
+}
+
+// @internal
+#[tokio::test]
+async fn integration_shared_driver_missing_alert_cannot_report_rejection() {
+    let mut driver = ContractDriver::start().expect("controlled driver");
+    driver.add_user("Bob").await.expect("Bob");
+    driver
+        .actors
+        .get_mut("Bob")
+        .expect("Bob actor")
+        .drop_presentation_updates = true;
+    let error = driver
+        .open_link("Bob", "https://vauchi.app/x#pk=invalid&n=invalid")
+        .await
+        .expect_err("missing alert cannot report an invalid-link observation");
+    assert_eq!(error.to_string(), "Core did not present link feedback");
 }
 
 // @internal

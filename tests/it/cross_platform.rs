@@ -694,6 +694,7 @@ async fn integration_cli_to_ios_exchange() {
 /// Tags: integration, exchange, cross-platform, tui
 /// Feature: link_exchange.feature
 // @scenario: link_exchange :: Two users exchange contact cards using a link
+// @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
 #[tokio::test]
 #[cfg(feature = "tui")]
 async fn integration_tui_to_tui_link_exchange() {

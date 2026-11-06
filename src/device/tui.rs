@@ -531,6 +531,41 @@ impl Device for TuiDevice {
         Ok(())
     }
 
+    async fn open_exchange_link_feedback(
+        &self,
+        url: &str,
+    ) -> E2eResult<super::ExchangeLinkFeedback> {
+        self.session.ensure_started().await?;
+        self.session.navigate_to("Exchange").await?;
+        self.session
+            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
+            .await?;
+        self.session.send_char('1').await?;
+        self.session
+            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
+            .await?;
+        self.session.send_text(url).await?;
+        self.session
+            .wait_for_frame(url, Duration::from_secs(10))
+            .await?;
+        self.session.send_enter().await?;
+        let feedback = self
+            .session
+            .wait_for_frame("Invalid Link|Exchange Request", Duration::from_secs(10))
+            .await?;
+        if feedback != "Invalid Link" {
+            return Ok(super::ExchangeLinkFeedback::Other(feedback));
+        }
+        self.session
+            .wait_for_frame(
+                "This link cannot be opened in Vauchi.",
+                Duration::from_secs(10),
+            )
+            .await?;
+        self.session.send_escape().await?;
+        Ok(super::ExchangeLinkFeedback::InvalidLink)
+    }
+
     async fn await_exchange_complete(&self) -> E2eResult<()> {
         // The initiator never leaves its Link share screen; its live session
         // keeps polling the relay, so once the responder deposits its epk and

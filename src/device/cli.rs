@@ -508,6 +508,25 @@ impl Device for CliDevice {
         Ok(())
     }
 
+    async fn open_exchange_link_feedback(
+        &self,
+        url: &str,
+    ) -> E2eResult<super::ExchangeLinkFeedback> {
+        let output = self
+            .run_command(&["exchange", "link", url, "--yes"])
+            .await?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !output.status.success() && stderr.contains("not a Vauchi exchange link:") {
+            return Ok(super::ExchangeLinkFeedback::InvalidLink);
+        }
+        Ok(super::ExchangeLinkFeedback::Other(format!(
+            "{}: {}{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            stderr
+        )))
+    }
+
     async fn await_exchange_complete(&self) -> E2eResult<()> {
         self.wait_link_share().await
     }

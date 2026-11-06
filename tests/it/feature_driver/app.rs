@@ -53,6 +53,16 @@ impl FeatureDriver for AppDriver {
         Ok(contacts.into_iter().map(|contact| contact.name).collect())
     }
 
+    async fn open_link(&mut self, owner: &str, url: &str) -> Result<super::ExchangeLinkFeedback> {
+        let user = self
+            .orchestrator
+            .user(owner)
+            .context("unknown scenario actor")?;
+        let user = user.read().await;
+        let device = user.primary_device().context("missing primary device")?;
+        Ok(device.read().await.open_exchange_link_feedback(url).await?)
+    }
+
     async fn stop(&mut self) -> Result<()> {
         self.orchestrator.stop().await?;
         Ok(())

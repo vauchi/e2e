@@ -4,6 +4,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use cucumber::{World, given, then, when, writer::Stats as _};
+use vauchi_e2e_tests::device::ExchangeLinkFeedback;
 
 mod app;
 mod contract;
@@ -16,6 +17,7 @@ mod presentation;
 trait FeatureDriver: Send {
     async fn add_user(&mut self, name: &str) -> Result<()>;
     async fn exchange_link(&mut self, initiator: &str, responder: &str) -> Result<()>;
+    async fn open_link(&mut self, owner: &str, url: &str) -> Result<ExchangeLinkFeedback>;
     async fn contact_names(&mut self, owner: &str) -> Result<Vec<String>>;
     async fn stop(&mut self) -> Result<()>;
 }
@@ -31,6 +33,7 @@ pub(super) enum Backend {
 #[derive(Default, World)]
 struct FeatureWorld {
     driver: Option<Box<dyn FeatureDriver>>,
+    link_feedback: Option<(String, ExchangeLinkFeedback)>,
 }
 
 impl std::fmt::Debug for FeatureWorld {
@@ -72,6 +75,36 @@ async fn has_contact(world: &mut FeatureWorld, owner: String, peer: String) {
             .await
             .expect("observe contacts"),
         vec![peer]
+    );
+}
+
+#[when(expr = "{string} opens a malformed exchange link")]
+async fn open_malformed_link(world: &mut FeatureWorld, owner: String) {
+    let feedback = world
+        .driver()
+        .open_link(&owner, "https://vauchi.app/x#pk=invalid&n=invalid")
+        .await
+        .expect("observe link feedback through the real interface");
+    world.link_feedback = Some((owner, feedback));
+}
+
+#[then(expr = "{string} is told the exchange link is invalid")]
+async fn invalid_link_feedback(world: &mut FeatureWorld, owner: String) {
+    assert_eq!(
+        world.link_feedback,
+        Some((owner, ExchangeLinkFeedback::InvalidLink))
+    );
+}
+
+#[then(expr = "{string} has no contacts")]
+async fn has_no_contacts(world: &mut FeatureWorld, owner: String) {
+    assert_eq!(
+        world
+            .driver()
+            .contact_names(&owner)
+            .await
+            .expect("observe contacts"),
+        Vec::<String>::new()
     );
 }
 
@@ -118,15 +151,20 @@ pub(super) async fn run(backend: Backend) {
             })
         })
         .filter_run(feature, |_, _, scenario| {
-            scenario.name == "Two users exchange contact cards using a link"
+            matches!(
+                scenario.name.as_str(),
+                "Two users exchange contact cards using a link"
+                    | "A malformed exchange link is rejected without adding contacts"
+            )
         })
         .await;
     let stats = writer.scenarios_stats();
     assert!(!writer.execution_has_failed(), "feature execution failed");
-    assert_eq!((stats.passed, stats.failed, stats.skipped), (1, 0, 0));
+    assert_eq!((stats.passed, stats.failed, stats.skipped), (2, 0, 0));
 }
 
 // @scenario: link_exchange :: Two users exchange contact cards using a link
+// @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
 #[tokio::test]
 async fn integration_shared_driver_contract_link_exchange() {
     run(Backend::Contract).await;
