@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
+    response::IntoResponse,
     routing::post,
 };
 use std::sync::{
@@ -14,7 +15,6 @@ use std::sync::{
 };
 use std::time::Instant;
 use tokio::sync::oneshot;
-use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse};
 use vauchi_relay::escrow::EscrowStore;
 
 struct Store {
@@ -94,7 +94,7 @@ impl Drop for EscrowAdapter {
 async fn exchange(
     State(store): State<Arc<Store>>,
     Json(mut value): Json<serde_json::Value>,
-) -> Result<Json<EscrowResponse>, StatusCode> {
+) -> Result<impl IntoResponse, StatusCode> {
     store.requests.fetch_add(1, Ordering::Relaxed);
     if !store.delivery.load(Ordering::Relaxed) {
         return Err(StatusCode::SERVICE_UNAVAILABLE);
@@ -104,7 +104,6 @@ async fn exchange(
         .remove("escrow_action")
         .ok_or(StatusCode::BAD_REQUEST)?;
     object.insert("action".into(), action);
-    let message: EscrowMessage =
-        serde_json::from_value(value).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let message = serde_json::from_value(value).map_err(|_| StatusCode::BAD_REQUEST)?;
     Ok(Json(store.escrow.handle_at(message, store.instant)))
 }
