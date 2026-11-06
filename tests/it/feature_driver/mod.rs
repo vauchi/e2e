@@ -155,16 +155,18 @@ pub(super) async fn run(backend: Backend) {
                 scenario.name.as_str(),
                 "Two users exchange contact cards using a link"
                     | "A malformed exchange link is rejected without adding contacts"
+                    | "Users exchange contact cards after a malformed link is rejected"
             )
         })
         .await;
     let stats = writer.scenarios_stats();
     assert!(!writer.execution_has_failed(), "feature execution failed");
-    assert_eq!((stats.passed, stats.failed, stats.skipped), (2, 0, 0));
+    assert_eq!((stats.passed, stats.failed, stats.skipped), (3, 0, 0));
 }
 
 // @scenario: link_exchange :: Two users exchange contact cards using a link
 // @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
+// @scenario: link_exchange :: Users exchange contact cards after a malformed link is rejected
 #[tokio::test]
 async fn integration_shared_driver_contract_link_exchange() {
     run(Backend::Contract).await;

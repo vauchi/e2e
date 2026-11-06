@@ -36,6 +36,9 @@ impl TuiDevice {
             )
             .await?;
         self.session.send_escape().await?;
+        self.session
+            .send_text(&"\u{7f}".repeat(url.chars().count()))
+            .await?;
         Ok(ExchangeLinkFeedback::InvalidLink)
     }
 }

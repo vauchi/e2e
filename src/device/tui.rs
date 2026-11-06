@@ -482,14 +482,14 @@ impl Device for TuiDevice {
         self.session.ensure_started().await?;
         self.session.navigate_to("Exchange").await?;
         self.session
-            .expect_timeout("Exchange Mode|Pick a way", Duration::from_secs(10))
+            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
             .await?;
         self.session.send_char('1').await?;
         self.session
-            .expect_timeout("Share Link|Send this link", Duration::from_secs(10))
+            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
             .await?;
         tokio::time::sleep(Duration::from_millis(300)).await;
-        let screen = self.session.read_screen().await?;
+        let screen = self.session.read_screen_snapshot().await?;
         share_link_in(&strip_ansi(&screen))
             .ok_or_else(|| E2eError::device("Could not extract the share link from the TUI"))
     }
@@ -501,21 +501,19 @@ impl Device for TuiDevice {
         self.session.ensure_started().await?;
         self.session.navigate_to("Exchange").await?;
         self.session
-            .expect_timeout("Exchange Mode|Pick a way", Duration::from_secs(10))
+            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
             .await?;
         self.session.send_char('1').await?;
         self.session
-            .expect_timeout("Share Link|Send this link", Duration::from_secs(10))
+            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
             .await?;
         // Typing lands in the first input (the peer-link field), and Return
         // submits it — core routes the pasted link like an opened deep link
         // and raises the consent screen.
         self.session.send_text(qr_data).await?;
-        // Let every pasted character be read and applied before Return:
-        // sending Return too soon makes the app process it while the input
-        // is still filling, and it activates the primary "Share" action
-        // instead of submitting the link.
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        self.session
+            .wait_for_frame(qr_data, Duration::from_secs(10))
+            .await?;
         self.session.send_enter().await?;
         self.session
             .wait_for_visible("Exchange Request|Accept Exchange", Duration::from_secs(20))
