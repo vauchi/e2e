@@ -23,6 +23,14 @@ users. CLI feedback requires a nonzero exit and its validation diagnostic;
 TUI feedback comes from the visible alert title and message. Timeouts,
 process failures and missing feedback fail the scenario.
 
+The recovery scenario rejects a malformed link, checks both contact lists
+are empty, then completes a valid exchange with the same users and live
+driver. The TUI dismisses the alert and removes the rejected text with
+ordinary backspaces; it observes retained terminal frames on reentry.
+Each backend must pass all three scenarios with no failed or skipped
+scenarios. Core fixes for cached Contacts and picker reentry must be
+available in the consumer's dependency set before this selection can pass.
+
 A separate test blocks all escrow requests and
 requires an exchange error and empty contact lists on both sides.
 Another drops presentation updates after boot and requires failure before
