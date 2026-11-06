@@ -31,8 +31,8 @@ seed-contacts = ["dep:fake", "dep:rand"]
 # Equals CORE_TAG in ci/pins.env: the relay and CLI e2e builds sit at
 # commits that pin this same tag, so the set runs one Core
 # (vauchi/private#1032; ci/tests/pins.test.sh holds them equal).
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.99.1", version = "=0.99.1" }
-vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.99.1", version = "=0.99.1", features = ["network-native-tls"] }
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.100.0", version = "=0.100.0" }
+vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.100.0", version = "=0.100.0", features = ["network-native-tls"] }
 # Force vauchi-relay's transitive protocol dependency to the same Core tag
 # so the relay and CLI agree on the wire format.
 
@@ -93,7 +93,7 @@ fake = { version = "3", features = ["derive"], optional = true }
 
 [dev-dependencies]
 cucumber = "0.21"
-vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.99.1", version = "=0.99.1", features = ["testing"] }
+vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.100.0", version = "=0.100.0", features = ["testing"] }
 base64 = "0.22"
 toml = "0.9"
 
@@ -103,7 +103,7 @@ vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "d303a772485
 
 # Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
 # pinned to the Core tag above like vauchi-core.
-vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.99.1", version = "=0.99.1" }
+vauchi-protocol = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.100.0", version = "=0.100.0" }
 
 # OHTTP key generation for stale-key error tests
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"] }
