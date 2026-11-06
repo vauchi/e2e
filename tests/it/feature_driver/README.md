@@ -78,6 +78,11 @@ and sharing. Link escrow I/O currently runs inside Core, so it is observed
 at the HTTP adapter instead of being presented as a shell-side operation.
 Its direct loopback transport is test-only. The CLI path retains OHTTP.
 
+The HTTP adapter uses the relay store's own request and response types.
+Core smoke jobs can replace Core with another version while the relay
+library still pins its protocol crate; the JSON boundary remains usable
+across those distinct Rust types.
+
 This pilot verifies Link exchange, not QR proximity, physical hardware,
 GTK rendering or device input. Renderer fixtures and message-shape
 compatibility tests remain separate. Extend the interface when another
