@@ -99,7 +99,7 @@ toml = "0.9"
 
 # Relay for integration tests - git dependency for CI, patched to local path via .cargo/config.toml
 # At RELAY_SHA in ci/pins.env, the commit the relay binary is built from.
-vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "d303a77248568bd56dd8580c805fa5cb8086b922" }
+vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "20ba918f9de1752cacc653509ce0357c74042844" }
 
 # Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
 # pinned to the Core tag above like vauchi-core.
