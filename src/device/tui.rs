@@ -46,6 +46,7 @@ use super::tui_pty::{PtySession, strip_ansi};
 use super::{Contact, ContactCard, Device, DeviceType, NetworkConfig};
 use crate::error::{E2eError, E2eResult};
 
+mod link;
 #[path = "tui_screen_text.rs"]
 mod screen_text;
 use screen_text::{
@@ -535,35 +536,7 @@ impl Device for TuiDevice {
         &self,
         url: &str,
     ) -> E2eResult<super::ExchangeLinkFeedback> {
-        self.session.ensure_started().await?;
-        self.session.navigate_to("Exchange").await?;
-        self.session
-            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
-            .await?;
-        self.session.send_char('1').await?;
-        self.session
-            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
-            .await?;
-        self.session.send_text(url).await?;
-        self.session
-            .wait_for_frame(url, Duration::from_secs(10))
-            .await?;
-        self.session.send_enter().await?;
-        let feedback = self
-            .session
-            .wait_for_frame("Invalid Link|Exchange Request", Duration::from_secs(10))
-            .await?;
-        if feedback != "Invalid Link" {
-            return Ok(super::ExchangeLinkFeedback::Other(feedback));
-        }
-        self.session
-            .wait_for_frame(
-                "This link cannot be opened in Vauchi.",
-                Duration::from_secs(10),
-            )
-            .await?;
-        self.session.send_escape().await?;
-        Ok(super::ExchangeLinkFeedback::InvalidLink)
+        self.link_feedback(url).await
     }
 
     async fn await_exchange_complete(&self) -> E2eResult<()> {
