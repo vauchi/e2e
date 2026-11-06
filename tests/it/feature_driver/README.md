@@ -3,8 +3,8 @@
 
 # Shared feature-driver pilot
 
-The Link scenario in the features repository's `link_exchange.feature`
-runs through the same Cucumber step definitions with three drivers:
+The Link scenarios in the features repository's `link_exchange.feature`
+run through the same Cucumber step definitions with three drivers:
 
 - Contract: AppEngine receives generic events with ids resolved from its
   emitted presentation. Only boot requests a snapshot; subsequent state
@@ -16,12 +16,20 @@ runs through the same Cucumber step definitions with three drivers:
   their interfaces. It uses the same relay/OHTTP orchestrator and domain
   assertions as CLI.
 
-Every path requires Alice to observe only Bob and Bob to observe only Alice
-in their contact lists. A separate test blocks all escrow requests and
+The successful exchange requires Alice to observe only Bob and Bob to
+observe only Alice in their contact lists. The malformed-link scenario
+requires explicit invalid-link feedback and empty contact lists for both
+users. CLI feedback requires a nonzero exit and its validation diagnostic;
+TUI feedback comes from the visible alert title and message. Timeouts,
+process failures and missing feedback fail the scenario.
+
+A separate test blocks all escrow requests and
 requires an exchange error and empty contact lists on both sides.
 Another drops presentation updates after boot and requires failure before
 any escrow request. This prevents an extra snapshot from hiding missing
-renderer commands. Scheduled wakeups are consumed once and rearmed only
+renderer commands. Another drops the native alert command and requires
+failure instead of inferring rejection from empty contact lists.
+Scheduled wakeups are consumed once and rearmed only
 when Core emits a new scheduling command.
 Missing specifications, unbound steps, parser failures and hook failures
 fail the pilot instead of producing skipped coverage.
