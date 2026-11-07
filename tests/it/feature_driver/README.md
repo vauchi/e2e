@@ -27,9 +27,16 @@ The recovery scenario rejects a malformed link, checks both contact lists
 are empty, then completes a valid exchange with the same users and live
 driver. The TUI dismisses the alert and removes the rejected text with
 ordinary backspaces; it observes retained terminal frames on reentry.
-Each backend must pass all three scenarios with no failed or skipped
+Each backend must pass all four scenarios with no failed or skipped
 scenarios. Core fixes for cached Contacts and picker reentry must be
 available in the consumer's dependency set before this selection can pass.
+
+The successive-exchange scenario keeps Alice alive for exchanges with Bob
+and Carol. It checks the first connection before the second exchange,
+then requires exactly Bob and Carol in Alice's list and only Alice in
+each peer's list. The contract driver requires one new completion per
+actor per exchange. Starting another Link attempt must present a fresh
+share screen instead of the earlier terminal screen.
 
 A separate test blocks all escrow requests and
 requires an exchange error and empty contact lists on both sides.
