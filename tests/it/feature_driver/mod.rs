@@ -129,6 +129,19 @@ async fn open_malformed_link(world: &mut FeatureWorld, owner: String) {
     world.link_feedback = Some((owner, feedback));
 }
 
+#[then(expr = "{string} has {string} and {string} as contacts")]
+async fn has_two_contacts(world: &mut FeatureWorld, owner: String, first: String, second: String) {
+    let mut actual = world
+        .driver()
+        .contact_names(&owner)
+        .await
+        .expect("observe contacts");
+    let mut expected = vec![first, second];
+    actual.sort();
+    expected.sort();
+    assert_eq!(actual, expected);
+}
+
 #[then(expr = "{string} is told the exchange link is invalid")]
 async fn invalid_link_feedback(world: &mut FeatureWorld, owner: String) {
     assert_eq!(
@@ -197,6 +210,7 @@ pub(super) async fn run(backend: Backend) {
                 "Two users exchange contact cards using a link"
                     | "A malformed exchange link is rejected without adding contacts"
                     | "Users exchange contact cards after a malformed link is rejected"
+                    | "A user exchanges contact cards with two people in succession"
             ) || (matches!(backend, Backend::Contract)
                 && scenario.name == "A wrong code makes no contact")
         })
@@ -204,9 +218,9 @@ pub(super) async fn run(backend: Backend) {
     let stats = writer.scenarios_stats();
     assert!(!writer.execution_has_failed(), "feature execution failed");
     let expected = if matches!(backend, Backend::Contract) {
-        4
+        5
     } else {
-        3
+        4
     };
     assert_eq!(
         (stats.passed, stats.failed, stats.skipped),
@@ -217,6 +231,7 @@ pub(super) async fn run(backend: Backend) {
 // @scenario: link_exchange :: Two users exchange contact cards using a link
 // @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
 // @scenario: link_exchange :: Users exchange contact cards after a malformed link is rejected
+// @scenario: link_exchange :: A user exchanges contact cards with two people in succession
 #[tokio::test]
 async fn integration_shared_driver_contract_link_exchange() {
     run(Backend::Contract).await;

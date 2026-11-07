@@ -696,6 +696,7 @@ async fn integration_cli_to_ios_exchange() {
 // @scenario: link_exchange :: Two users exchange contact cards using a link
 // @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
 // @scenario: link_exchange :: Users exchange contact cards after a malformed link is rejected
+// @scenario: link_exchange :: A user exchanges contact cards with two people in succession
 #[tokio::test]
 #[cfg(feature = "tui")]
 async fn integration_tui_to_tui_link_exchange() {

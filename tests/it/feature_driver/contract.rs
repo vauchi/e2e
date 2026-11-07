@@ -98,21 +98,27 @@ impl FeatureDriver for ContractDriver {
     }
     async fn exchange_link(&mut self, initiator: &str, responder: &str) -> Result<()> {
         ensure!(initiator != responder, "exchange requires distinct actors");
+        let completed = [initiator, responder]
+            .map(|name| self.actors.get(name).map(Actor::celebrations))
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .context("unknown exchange actor")?;
         let link = self.share(initiator)?;
         self.open_with_code(responder, &link.url, &link.code)?;
         for _ in 0..64 {
-            for name in [initiator, responder] {
+            for (name, completed) in [initiator, responder].into_iter().zip(&completed) {
                 let actor = self
                     .actors
                     .get_mut(name)
                     .context("unknown exchange actor")?;
-                if actor.celebrations() == 0 {
+                if actor.celebrations() == *completed {
                     actor.wake()?;
                 }
             }
             if [initiator, responder]
                 .into_iter()
-                .all(|name| self.actors[name].celebrations() == 1)
+                .zip(&completed)
+                .all(|(name, completed)| self.actors[name].celebrations() == completed + 1)
             {
                 ensure!(
                     self.relay.requests() > 0,
