@@ -7,7 +7,7 @@
 # at the commits ci/pins.env names (vauchi/private#1032, decision D5), or
 # at each repository's main with E2E_PIN_MODE=heads (the nightly heads
 # lane). A cached binary is reused only when its commit marker and its
-# build profile match; the profiles select the e2e test clock and fault
+# build profile and Core tag match; the profiles select the e2e test clock and fault
 # routes these binaries are built with. With E2E_CORE_DIR, the relay and
 # the CLI are built against that Core checkout instead of their pinned
 # tag, and nothing is cached: a Core merge request testing its own commit
@@ -84,6 +84,11 @@ cached() { # name commit profile binary...
     shift 3
     [ -f "$bin_dir/$c_name.sha" ] && [ "$(cat "$bin_dir/$c_name.sha")" = "$c_commit" ] || return 1
     [ -f "$bin_dir/$c_name.build-profile" ] && [ "$(cat "$bin_dir/$c_name.build-profile")" = "$c_profile" ] || return 1
+    case "$mode:$c_name" in
+        pinned:relay|pinned:cli)
+            [ -f "$bin_dir/$c_name.core-tag" ] && [ "$(cat "$bin_dir/$c_name.core-tag")" = "$CORE_TAG" ] || return 1
+            ;;
+    esac
     for c_bin in "$@"; do
         [ -x "$bin_dir/$c_bin" ] || return 1
     done
@@ -92,6 +97,15 @@ cached() { # name commit profile binary...
 mark() { # name commit profile
     echo "$2" > "$bin_dir/$1.sha"
     echo "$3" > "$bin_dir/$1.build-profile"
+    case "$1" in
+        relay|cli)
+            if [ "$mode" = pinned ]; then
+                echo "$CORE_TAG" > "$bin_dir/$1.core-tag"
+            else
+                echo heads > "$bin_dir/$1.core-tag"
+            fi
+            ;;
+    esac
 }
 
 # The relay has no --version: started bare it refuses to serve without

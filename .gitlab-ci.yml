@@ -110,6 +110,7 @@ check:ci-contracts:
     - apk add --no-cache git python3 > /dev/null
   script:
     - sh ci/tests/pins.test.sh
+    - sh ci/tests/pinned-cache.test.sh
     - sh ci/tests/fetch-features.test.sh
     - sh ci/tests/audit-order.test.sh
     - sh ci/tests/lane-paths.test.sh
