@@ -99,7 +99,9 @@ mark() { # name commit profile
     echo "$3" > "$bin_dir/$1.build-profile"
     case "$1" in
         relay|cli)
-            if [ "$mode" = pinned ]; then
+            if [ -n "${E2E_CORE_DIR:-}" ]; then
+                echo candidate > "$bin_dir/$1.core-tag"
+            elif [ "$mode" = pinned ]; then
                 echo "$CORE_TAG" > "$bin_dir/$1.core-tag"
             else
                 echo heads > "$bin_dir/$1.core-tag"

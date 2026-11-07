@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -eu
+unset E2E_CORE_DIR E2E_PIN_MODE CI_JOB_TOKEN
 here=$(cd "$(dirname "$0")/../.." && pwd)
 t=$(mktemp -d)
 trap 'rm -rf "$t"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 mkdir -p "$t/ci" "$t/bin" "$t/cache"
-cp "$here/ci/build-pinned-binaries.sh" "$here/ci/check-core-pin.sh" "$t/ci/"
+cp "$here/ci/build-pinned-binaries.sh" "$here/ci/check-core-pin.sh" "$here/ci/point-core-at.sh" "$t/ci/"
 sha=1111111111111111111111111111111111111111
 cat > "$t/ci/pins.env" <<EOF
 CORE_TAG=v2.0.0
@@ -69,3 +70,35 @@ echo v2.0.0 > "$t/cache/cli.core-tag"
 PATH="$t/bin:$PATH" sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>&1 || fail "matching Core cache markers must remain usable"
 grep -qx 'core=v2.0.0' "$t/cache/set.txt" || fail "matching cohort must have an accurate receipt"
 echo "PASS: matching Core cache markers retain cached binaries"
+
+mkdir -p "$t/core/vauchi-core"
+cat > "$t/bin/cargo" <<'EOF'
+#!/bin/sh
+set -eu
+manifest=
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = --manifest-path ]; then manifest=$2; shift; fi
+    shift
+done
+[ -n "$manifest" ] || exit 2
+dest=${manifest%/*}
+for profile in debug release; do
+    mkdir -p "$dest/target/$profile"
+    for binary in vauchi-relay vauchi-ohttp-anchor vauchi vauchi-ohttp-relay; do
+        cat > "$dest/target/$profile/$binary" <<'BIN'
+#!/bin/sh
+# __e2e/reorder-next-forward
+exit 0
+BIN
+        chmod +x "$dest/target/$profile/$binary"
+    done
+done
+EOF
+chmod +x "$t/bin/cargo"
+PATH="$t/bin:$PATH" E2E_CORE_DIR="$t/core" sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>&1 || fail "candidate Core fixture must build"
+status=0
+PATH="$t/bin:$PATH" sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>&1 || status=$?
+[ "$status" = 1 ] || fail "candidate Core binaries must not qualify as a release (exit $status)"
+grep -q "pins Core crates at another tag" "$t/out" || fail "must validate source after a candidate build"
+grep -qx "core=$t/core" "$t/cache/set.txt" || fail "must preserve the candidate receipt when release validation fails"
+echo "PASS: candidate Core binaries cannot qualify as a released cohort"
