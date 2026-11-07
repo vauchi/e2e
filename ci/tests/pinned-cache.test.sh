@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -eu
-unset E2E_CORE_DIR E2E_PIN_MODE CI_JOB_TOKEN
+unset E2E_CORE_DIR E2E_PIN_MODE CI_JOB_TOKEN E2E_DEVICE_BACKEND
 here=$(cd "$(dirname "$0")/../.." && pwd)
 t=$(mktemp -d)
 trap 'rm -rf "$t"' EXIT
@@ -81,6 +81,7 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 [ -n "$manifest" ] || exit 2
+echo "$manifest" >> "${CARGO_BUILD_LOG:-/dev/null}"
 dest=${manifest%/*}
 for profile in debug release; do
     mkdir -p "$dest/target/$profile"
@@ -102,3 +103,11 @@ PATH="$t/bin:$PATH" sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>
 grep -q "pins Core crates at another tag" "$t/out" || fail "must validate source after a candidate build"
 grep -qx "core=$t/core" "$t/cache/set.txt" || fail "must preserve the candidate receipt when release validation fails"
 echo "PASS: candidate Core binaries cannot qualify as a released cohort"
+
+: > "$t/builds"
+PATH="$t/bin:$PATH" CARGO_BUILD_LOG="$t/builds" E2E_CORE_DIR="$t/core" E2E_DEVICE_BACKEND=core \
+    sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>&1 || fail "the Core device's set must build"
+grep -q '/relay/Cargo.toml$' "$t/builds" || fail "the Core device's set must still build the relay"
+! grep -q '/cli/Cargo.toml$' "$t/builds" || fail "the Core device's set must not build the CLI"
+grep -qx 'cli=not built (Core device)' "$t/cache/set.txt" || fail "the receipt must say the CLI was not built"
+echo "PASS: the Core device's set builds no CLI"

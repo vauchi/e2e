@@ -16,6 +16,8 @@
 # Usage: ci/build-pinned-binaries.sh <bin-dir>
 # Env:   E2E_PIN_MODE    pinned (default) or heads
 #        E2E_CORE_DIR    a Core checkout to build the relay and CLI against
+#        E2E_DEVICE_BACKEND  core skips the CLI, which the Core device does
+#                        not run
 #        CI_JOB_TOKEN    clones from gitlab.com/vauchi in CI
 
 set -eu
@@ -123,7 +125,11 @@ else
     mark relay "$RELAY_SHA" "$RELAY_BUILD_PROFILE"
 fi
 
-if cached cli "$CLI_SHA" "$CLI_BUILD_PROFILE" vauchi &&
+if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
+    # The Core device calls Core in-process, so no test needs the CLI, and
+    # a Core change the CLI has yet to follow must not fail here (#1118).
+    echo "CLI not built: E2E_DEVICE_BACKEND=core"
+elif cached cli "$CLI_SHA" "$CLI_BUILD_PROFILE" vauchi &&
     "$bin_dir/vauchi" --version > /dev/null 2>&1; then
     echo "CLI cached at $CLI_SHA"
 else
@@ -161,7 +167,11 @@ fi
     fi
     echo "relay=$RELAY_SHA"
     echo "ohttp_relay=$OHTTP_RELAY_SHA"
-    echo "cli=$CLI_SHA"
+    if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
+        echo "cli=not built (Core device)"
+    else
+        echo "cli=$CLI_SHA"
+    fi
 } > "$bin_dir/set.txt"
 echo "Set under test ($mode):"
 sed 's/^/  /' "$bin_dir/set.txt"
