@@ -18,6 +18,8 @@
 #        E2E_CORE_DIR    a Core checkout to build the relay and CLI against
 #        E2E_DEVICE_BACKEND  core skips the CLI, which the Core device does
 #                        not run
+#        E2E_CLI_DIR     a CLI checkout to build the CLI from, with the Core
+#                        it pins, instead of CLI_SHA; never cached
 #        CI_JOB_TOKEN    clones from gitlab.com/vauchi in CI
 
 set -eu
@@ -129,6 +131,13 @@ if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
     # The Core device calls Core in-process, so no test needs the CLI, and
     # a Core change the CLI has yet to follow must not fail here (#1118).
     echo "CLI not built: E2E_DEVICE_BACKEND=core"
+elif [ -n "${E2E_CLI_DIR:-}" ]; then
+    # A CLI merge request tests its own checkout against the Core it pins,
+    # not e2e's: at a Core pin bump the two differ on purpose (#1118).
+    echo "Building the e2e CLI from $E2E_CLI_DIR..."
+    cargo build --features e2e-test-clock --manifest-path "$E2E_CLI_DIR/Cargo.toml"
+    cp "$E2E_CLI_DIR/target/debug/vauchi" "$bin_dir/"
+    mark cli checkout "$CLI_BUILD_PROFILE"
 elif cached cli "$CLI_SHA" "$CLI_BUILD_PROFILE" vauchi &&
     "$bin_dir/vauchi" --version > /dev/null 2>&1; then
     echo "CLI cached at $CLI_SHA"
@@ -169,6 +178,8 @@ fi
     echo "ohttp_relay=$OHTTP_RELAY_SHA"
     if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
         echo "cli=not built (Core device)"
+    elif [ -n "${E2E_CLI_DIR:-}" ]; then
+        echo "cli=$E2E_CLI_DIR"
     else
         echo "cli=$CLI_SHA"
     fi

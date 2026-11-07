@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -eu
-unset E2E_CORE_DIR E2E_PIN_MODE CI_JOB_TOKEN E2E_DEVICE_BACKEND
+unset E2E_CORE_DIR E2E_PIN_MODE CI_JOB_TOKEN E2E_DEVICE_BACKEND E2E_CLI_DIR
 here=$(cd "$(dirname "$0")/../.." && pwd)
 t=$(mktemp -d)
 trap 'rm -rf "$t"' EXIT
@@ -111,3 +111,13 @@ grep -q '/relay/Cargo.toml$' "$t/builds" || fail "the Core device's set must sti
 ! grep -q '/cli/Cargo.toml$' "$t/builds" || fail "the Core device's set must not build the CLI"
 grep -qx 'cli=not built (Core device)' "$t/cache/set.txt" || fail "the receipt must say the CLI was not built"
 echo "PASS: the Core device's set builds no CLI"
+
+mkdir -p "$t/cli-checkout"
+: > "$t/builds"
+PATH="$t/bin:$PATH" CARGO_BUILD_LOG="$t/builds" E2E_CORE_DIR="$t/core" E2E_CLI_DIR="$t/cli-checkout" \
+    sh "$t/ci/build-pinned-binaries.sh" "$t/cache" > "$t/out" 2>&1 || fail "a CLI checkout must build"
+grep -qx "$t/cli-checkout/Cargo.toml" "$t/builds" || fail "the CLI must be built from E2E_CLI_DIR"
+! grep -q '/cli/Cargo.toml$' "$t/builds" || fail "the pinned CLI must not be fetched and built as well"
+grep -qx "cli=$t/cli-checkout" "$t/cache/set.txt" || fail "the receipt must name the CLI checkout"
+grep -qx checkout "$t/cache/cli.sha" || fail "a checkout build must not pass as the pinned CLI"
+echo "PASS: E2E_CLI_DIR builds the CLI from that checkout"
