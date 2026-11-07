@@ -718,10 +718,7 @@ impl Orchestrator {
             let user = initiator.read().await;
             user.await_exchange_complete().await
         };
-        let (responder_result, initiator_result) =
-            tokio::join!(responder_complete, initiator_complete);
-        responder_result?;
-        initiator_result?;
+        tokio::try_join!(responder_complete, initiator_complete)?;
 
         // Establish the first ratchet direction both ways so callers can
         // immediately publish cards or visibility changes.
