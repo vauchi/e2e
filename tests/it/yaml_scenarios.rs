@@ -39,6 +39,14 @@ async fn yaml_smoke_scenarios() {
             ScenarioExecutor::print_manual_instructions(scenario);
             continue;
         }
+        if names_the_cli_off_its_backend(scenario) {
+            println!(
+                "Skipped '{}': it names the CLI, which the Core device does not run; \
+                 the CLI's pipeline runs it (vauchi/private#1118)",
+                scenario.name
+            );
+            continue;
+        }
         let result = executor.execute(scenario).await.expect("Executor failed");
         assert!(
             result.passed,
@@ -127,4 +135,17 @@ async fn yaml_scenarios_parse_successfully() {
             scenario.name
         );
     }
+}
+
+/// A scenario with a participant on `platform: cli` needs the CLI binary,
+/// which a run on the Core device does not build.
+fn names_the_cli_off_its_backend(scenario: &vauchi_e2e_tests::yaml::Scenario) -> bool {
+    use vauchi_e2e_tests::device::{DeviceType, default_device_type};
+    use vauchi_e2e_tests::yaml::Platform;
+
+    default_device_type().expect("E2E_DEVICE_BACKEND") == DeviceType::Core
+        && scenario
+            .participants
+            .values()
+            .any(|participant| participant.platform == Platform::Cli)
 }

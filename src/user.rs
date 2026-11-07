@@ -14,7 +14,10 @@ use tracing::{debug, info};
 
 #[cfg(feature = "tui")]
 use crate::device::TuiDevice;
-use crate::device::{CliDevice, Contact, ContactCard, Device, DeviceType, MaestroDevice};
+use crate::device::{
+    CliDevice, Contact, ContactCard, CoreDevice, Device, DeviceType, MaestroDevice,
+    default_device_type,
+};
 use crate::error::{E2eError, E2eResult};
 
 /// A Vauchi user with one or more devices.
@@ -116,10 +119,45 @@ impl User {
         Ok(self.devices.len() - 1)
     }
 
+    /// Add a device that calls Core in-process, routed like a CLI device
+    /// given the same `extra_env`.
+    pub fn add_core_device_with_env(
+        &mut self,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+    ) -> E2eResult<usize> {
+        let full_name = format!("{}_device_{}", self.name, self.devices.len());
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
+        info!("Adding Core device '{full_name}' (relay: {url})");
+        let device: Box<dyn Device> = Box::new(CoreDevice::new(&full_name, url, extra_env)?);
+        self.devices.push(Arc::new(RwLock::new(device)));
+        Ok(self.devices.len() - 1)
+    }
+
+    /// Add `count` devices of the backend `E2E_DEVICE_BACKEND` selects.
+    pub fn add_default_devices_with_env(
+        &mut self,
+        count: usize,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+    ) -> E2eResult<Vec<usize>> {
+        match default_device_type()? {
+            DeviceType::Core => (0..count)
+                .map(|_| self.add_core_device_with_env(relay_url, extra_env))
+                .collect(),
+            _ => self.add_cli_devices_with_env(count, relay_url, extra_env),
+        }
+    }
+
     /// Add a device with a specific type (for future expansion).
     pub fn add_device(&mut self, relay_url: &str, device_type: DeviceType) -> E2eResult<usize> {
         match device_type {
             DeviceType::Cli => self.add_cli_device(relay_url),
+            DeviceType::Core => self.add_core_device_with_env(relay_url, &HashMap::new()),
             _ => Err(E2eError::device(format!(
                 "Device type {:?} requires device-specific parameters; use add_maestro_ios_device, add_maestro_android_device, or add_tui_device",
                 device_type
@@ -606,10 +644,11 @@ impl UserBuilder {
         }
     }
 
-    /// Set the number of CLI devices.
+    /// Set the number of devices, of the backend `E2E_DEVICE_BACKEND`
+    /// selects; [`Self::with_device_types`] names the types instead.
     pub fn with_devices(mut self, count: usize) -> Self {
         self.device_count = count;
-        self.device_types = vec![DeviceType::Cli; count];
+        self.device_types = Vec::new();
         self
     }
 
@@ -633,8 +672,7 @@ impl UserBuilder {
         let mut user = User::with_relay(&self.name, &self.relay_url);
 
         if self.device_types.is_empty() {
-            // Default to CLI devices
-            user.add_cli_devices_with_env(self.device_count, &self.relay_url, &self.extra_env)?;
+            user.add_default_devices_with_env(self.device_count, &self.relay_url, &self.extra_env)?;
         } else {
             for device_type in self.device_types.into_iter() {
                 match device_type {

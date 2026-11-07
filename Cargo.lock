@@ -3890,6 +3890,7 @@ dependencies = [
  "vauchi-protocol",
  "vauchi-relay",
  "vt100",
+ "zeroize",
 ]
 
 [[package]]

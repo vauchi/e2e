@@ -10,6 +10,7 @@
 //! - Maestro: Mobile app control through the Maestro CLI
 
 mod cli;
+mod core_device;
 mod maestro;
 mod maestro_artifacts;
 #[cfg(feature = "tui")]
@@ -18,6 +19,7 @@ mod tui;
 mod tui_pty;
 
 pub use cli::CliDevice;
+pub use core_device::CoreDevice;
 pub use maestro::{MaestroDevice, MaestroPlatform};
 #[cfg(feature = "tui")]
 pub use tui::TuiDevice;
@@ -94,6 +96,29 @@ pub enum DeviceType {
     AndroidEmulator,
     /// Terminal UI.
     Tui,
+    /// Core's API called in-process, with no client binary.
+    Core,
+}
+
+/// Selects the backend for devices a test adds without naming one.
+pub const DEVICE_BACKEND_ENV: &str = "E2E_DEVICE_BACKEND";
+
+/// The device type [`DEVICE_BACKEND_ENV`] selects: unset, empty or `cli`
+/// keeps the CLI, `core` selects [`CoreDevice`]. Any other value is an
+/// error, so a misspelt backend cannot run the suite on the wrong one.
+pub fn default_device_type_from(value: Option<&str>) -> crate::error::E2eResult<DeviceType> {
+    match value.map(str::trim) {
+        None | Some("") | Some("cli") => Ok(DeviceType::Cli),
+        Some("core") => Ok(DeviceType::Core),
+        Some(other) => Err(crate::error::E2eError::device(format!(
+            "{DEVICE_BACKEND_ENV}={other}: expected `cli` or `core`"
+        ))),
+    }
+}
+
+/// [`default_device_type_from`] for the current environment.
+pub fn default_device_type() -> crate::error::E2eResult<DeviceType> {
+    default_device_type_from(std::env::var(DEVICE_BACKEND_ENV).ok().as_deref())
 }
 
 impl std::fmt::Display for DeviceType {
@@ -103,6 +128,7 @@ impl std::fmt::Display for DeviceType {
             DeviceType::IosSimulator => write!(f, "iOS"),
             DeviceType::AndroidEmulator => write!(f, "Android"),
             DeviceType::Tui => write!(f, "TUI"),
+            DeviceType::Core => write!(f, "Core"),
         }
     }
 }

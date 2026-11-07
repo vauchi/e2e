@@ -178,7 +178,8 @@ impl ScenarioExecutor {
 
             // Add devices based on platform
             let device_type = match participant.platform {
-                Platform::Any | Platform::Cli => DeviceType::Cli,
+                Platform::Any => crate::device::default_device_type()?,
+                Platform::Cli => DeviceType::Cli,
                 Platform::Ios => DeviceType::IosSimulator,
                 Platform::Android => DeviceType::AndroidEmulator,
                 Platform::Tui => DeviceType::Tui,
@@ -188,6 +189,9 @@ impl ScenarioExecutor {
                 match device_type {
                     DeviceType::Cli => {
                         user.add_cli_device(&relay_url)?;
+                    }
+                    DeviceType::Core => {
+                        user.add_core_device_with_env(&relay_url, &HashMap::new())?;
                     }
                     _ => {
                         // TODO: Add other device types when implemented

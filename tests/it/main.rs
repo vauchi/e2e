@@ -34,6 +34,7 @@ mod cli_signed_ohttp_key;
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;
+mod device_backend;
 mod device_opt_out;
 mod exchange_error_paths;
 mod feature_driver;
