@@ -498,14 +498,12 @@ impl Device for CliDevice {
         Ok(())
     }
 
-    async fn share_exchange_link(&self) -> E2eResult<String> {
+    async fn share_exchange_link(&self) -> E2eResult<super::ExchangeLink> {
         self.spawn_link_share().await
     }
 
-    async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
-        self.run_command_success(&["exchange", "link", url, "--yes"])
-            .await?;
-        Ok(())
+    async fn accept_exchange_link(&self, link: &super::ExchangeLink) -> E2eResult<()> {
+        self.accept_link(link).await
     }
 
     async fn open_exchange_link_feedback(

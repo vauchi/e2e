@@ -100,6 +100,14 @@ pub enum DeviceType {
     Core,
 }
 
+/// A shared Link-mode exchange: the URL and, since Core 0.101.0, the
+/// six-digit code the sharer sends another way (private#727).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExchangeLink {
+    pub url: String,
+    pub code: Option<String>,
+}
+
 /// Selects the backend for devices a test adds without naming one.
 pub const DEVICE_BACKEND_ENV: &str = "E2E_DEVICE_BACKEND";
 
@@ -267,15 +275,19 @@ pub trait Device: Send + Sync {
     /// Complete an exchange using a QR code from another user.
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()>;
 
-    /// Share this device's Link-mode exchange URL as the initiator. A device
+    /// Share this device's Link-mode exchange link as the initiator. A device
     /// whose QR step already shares a link (the TUI) keeps `generate_qr`.
-    async fn share_exchange_link(&self) -> E2eResult<String> {
-        self.generate_qr().await
+    async fn share_exchange_link(&self) -> E2eResult<ExchangeLink> {
+        Ok(ExchangeLink {
+            url: self.generate_qr().await?,
+            code: None,
+        })
     }
 
-    /// Accept another user's Link-mode exchange URL as the responder.
-    async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
-        self.complete_exchange(url).await
+    /// Accept another user's Link-mode exchange link as the responder,
+    /// typing its code when the sharer showed one.
+    async fn accept_exchange_link(&self, link: &ExchangeLink) -> E2eResult<()> {
+        self.complete_exchange(&link.url).await
     }
 
     /// Submit a link; setup, transport and automation failures remain errors.
