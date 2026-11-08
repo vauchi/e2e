@@ -109,6 +109,7 @@ check:ci-contracts:
   before_script:
     - apk add --no-cache git python3 > /dev/null
   script:
+    - python3 ci/tests/check-core-pin.test.py
     - sh ci/tests/pins.test.sh
     - sh ci/tests/pinned-cache.test.sh
     - sh ci/tests/fetch-features.test.sh

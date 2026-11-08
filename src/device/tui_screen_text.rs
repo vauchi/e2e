@@ -7,6 +7,26 @@
 
 pub(super) const DEVICE_LINK_PREFIX: &str = "vauchi://device-link?";
 
+pub(super) fn exchange_code_in(screen: &str) -> Option<String> {
+    let mut codes = screen.lines().filter_map(|line| {
+        let mut words = line
+            .trim_matches(|c: char| c.is_whitespace() || "│║".contains(c))
+            .split_whitespace();
+        let first = words.next()?;
+        let second = words.next()?;
+        if words.next().is_some()
+            || [first, second]
+                .iter()
+                .any(|word| word.len() != 3 || !word.bytes().all(|b| b.is_ascii_digit()))
+        {
+            return None;
+        }
+        Some(format!("{first}{second}"))
+    });
+    let code = codes.next()?;
+    codes.next().is_none().then_some(code)
+}
+
 /// The device-link invitation URL the terminal prints under its QR label.
 ///
 /// The URL is longer than a terminal row, so the renderer hard-wraps it
@@ -49,21 +69,6 @@ pub(super) fn confirmation_code_in(screen: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The six-digit code a Link share screen shows after its link as
-/// `ddd ddd` since Core 0.101.0 (vauchi/private#727).
-pub(super) fn link_code_in(screen: &str) -> Option<String> {
-    let after_link = &screen[screen.find("https://vauchi.app/x#")?..];
-    let tokens: Vec<&str> = after_link
-        .split(|c: char| c.is_whitespace() || c == '│')
-        .filter(|token| !token.is_empty())
-        .collect();
-    let is_group = |token: &str| token.len() == 3 && token.bytes().all(|b| b.is_ascii_digit());
-    tokens
-        .windows(2)
-        .find(|pair| is_group(pair[0]) && is_group(pair[1]))
-        .map(|pair| format!("{}{}", pair[0], pair[1]))
-}
-
 /// The exchange link on a Link share screen: Core's
 /// `https://vauchi.app/x#…` form since 0.81.0 (vauchi/private#277), or the
 /// `vauchi://exchange?…` form older builds print.
@@ -87,6 +92,31 @@ mod tests {
     use super::*;
 
     // @internal
+    #[test]
+    fn exchange_confirmation_code_is_read_separately_from_the_link() {
+        let screen = "│Send this link: https://vauchi.app/x#pk=AAAA&n=BBBB│\n│  042 917   │\n│Send the code another way than the link.│";
+        assert_eq!(exchange_code_in(screen).as_deref(), Some("042917"));
+        assert_eq!(
+            share_link_in(screen).as_deref(),
+            Some("https://vauchi.app/x#pk=AAAA&n=BBBB")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn exchange_confirmation_code_rejects_missing_or_ambiguous_codes() {
+        for screen in [
+            "No code yet",
+            "│Expires at 1792731197│",
+            "│042-917│",
+            "│042 917 123│",
+            "│042 917│\n│123 456│",
+        ] {
+            assert_eq!(exchange_code_in(screen), None, "{screen}");
+        }
+    }
+
+    // @internal
     /// Core 0.101.0's share screen shows the code as `123 456` on the line
     /// after the link (the TUI prints no label); the other side types the
     /// six digits (vauchi/private#727).
@@ -94,17 +124,17 @@ mod tests {
     fn the_share_screen_code_is_read_as_six_digits() {
         let screen = "┌Share Link──┐\n│Send this link only to the person you mean. They also need the code below.│\n│  ⚭ Link   │\n│https://vauchi.app/x#pk=Q9i0&n=Ftra&v=2&nm=QWxpY2U   │\n│798 069         │\n│Send this code another way than the link.│";
 
-        assert_eq!(link_code_in(screen).as_deref(), Some("798069"));
+        assert_eq!(exchange_code_in(screen).as_deref(), Some("798069"));
         assert_eq!(
-            link_code_in("Share Link 2 contacts 404 512\nhttps://vauchi.app/x#pk=A&n=B"),
+            exchange_code_in("Share Link 2 contacts 404 512\nhttps://vauchi.app/x#pk=A&n=B"),
             None,
             "digits before the link are not its code"
         );
         assert_eq!(
-            link_code_in("https://vauchi.app/x#pk=A&n=B\n│48 2913│"),
+            exchange_code_in("https://vauchi.app/x#pk=A&n=B\n│48 2913│"),
             None
         );
-        assert_eq!(link_code_in("no link here 123 456"), None);
+        assert_eq!(exchange_code_in("no link here 123 456"), None);
     }
 
     // @internal

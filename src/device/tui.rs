@@ -50,7 +50,7 @@ mod link;
 #[path = "tui_screen_text.rs"]
 mod screen_text;
 use screen_text::{
-    DEVICE_LINK_PREFIX, confirmation_code_in, device_link_invitation_in, link_code_in,
+    DEVICE_LINK_PREFIX, confirmation_code_in, device_link_invitation_in, exchange_code_in,
     share_link_in,
 };
 
@@ -495,25 +495,28 @@ impl Device for TuiDevice {
             .ok_or_else(|| E2eError::device("Could not extract the share link from the TUI"))
     }
 
-    /// Paste the peer's link on the Link share screen and accept the
-    /// exchange request core raises for it (camera-less route,
-    /// `problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload`).
-    async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
-        self.open_link(qr_data, None).await
+    async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
+        Err(E2eError::DeviceNotSupported(
+            "TUI exchange needs the separately shared confirmation code".into(),
+        ))
     }
 
-    /// The share screen's link and, since Core 0.101.0, its code.
     async fn share_exchange_link(&self) -> E2eResult<super::ExchangeLink> {
         let url = self.generate_qr().await?;
-        let screen = strip_ansi(&self.session.read_screen_snapshot().await?);
+        let frame = self.session.read_screen_snapshot().await?;
+        let code = exchange_code_in(&frame)
+            .ok_or_else(|| E2eError::device("TUI share screen has no unique exchange code"))?;
         Ok(super::ExchangeLink {
             url,
-            code: link_code_in(&screen),
+            code: Some(code),
         })
     }
 
-    async fn accept_exchange_link(&self, link: &super::ExchangeLink) -> E2eResult<()> {
-        self.open_link(&link.url, link.code.as_deref()).await
+    async fn accept_exchange_link(&self, invitation: &super::ExchangeLink) -> E2eResult<()> {
+        let code = invitation.code.as_deref().ok_or_else(|| {
+            E2eError::device("TUI exchange needs a separately shared confirmation code")
+        })?;
+        self.complete_link_exchange(&invitation.url, code).await
     }
 
     async fn open_exchange_link_feedback(

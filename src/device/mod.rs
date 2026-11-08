@@ -287,6 +287,11 @@ pub trait Device: Send + Sync {
     /// Accept another user's Link-mode exchange link as the responder,
     /// typing its code when the sharer showed one.
     async fn accept_exchange_link(&self, link: &ExchangeLink) -> E2eResult<()> {
+        if link.code.is_some() {
+            return Err(crate::error::E2eError::DeviceNotSupported(
+                "exchange confirmation code".into(),
+            ));
+        }
         self.complete_exchange(&link.url).await
     }
 
