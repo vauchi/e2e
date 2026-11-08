@@ -248,12 +248,15 @@ test:smoke:
       sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
       export VAUCHI_FEATURES_DIR="$PWD/.feature-specs"
 
-      echo "Running smoke tests and the shared-driver pilot..."
+      # previous_release_interop runs the previous store release's CLI
+      # against the current one (vauchi/private#1111) on every MR, so a
+      # Core bump MR shows a wire break before it merges.
+      echo "Running smoke tests, the shared-driver pilot and release interop..."
       # Relay-backed tests are capped at four workers by
       # .config/nextest.toml; match that tested capacity instead of
       # serializing every smoke scenario.
       cargo nextest run --profile ci --run-ignored default -j 4 \
-        -E 'test(smoke_) | test(feature_driver::) | test(cli_link_exchange::)' 2>&1 | tee smoke-results.txt
+        -E 'test(smoke_) | test(feature_driver::) | test(cli_link_exchange::) | test(previous_release_interop::)' 2>&1 | tee smoke-results.txt
 
       echo "Smoke suite complete"
   artifacts:
@@ -296,6 +299,7 @@ test:backup-restore:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/backup_restore.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -351,6 +355,7 @@ test:release-rg3:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/orchestrator_default_ohttp.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -402,6 +407,7 @@ test:release-rg4-rg5:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/multi_device_sync.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -453,6 +459,7 @@ test:release-rg6-observability:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/ohttp_integration.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -502,6 +509,7 @@ test:release-rg7:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/ohttp_source_address.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -553,6 +561,7 @@ test:release-rg8:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/ohttp_fail_closed_matrix.rs"
           - "tests/it/action_family_oracles.rs"
@@ -608,6 +617,7 @@ test:release-rg10:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/multi_device_sync.rs"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -661,6 +671,7 @@ test:release-rg15:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/longitudinal_continuity.rs"
           - "tests/it/multi_device_sync.rs"
@@ -717,6 +728,7 @@ test:tui-journey:
           - "ci/build-pinned-binaries.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
+          - "ci/check-previous-core-pin.sh"
           - ".gitlab-ci.yml"
           - "tests/it/cross_platform.rs"
   allow_failure: false

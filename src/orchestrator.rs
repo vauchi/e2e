@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{debug, info};
 
+use crate::device::CliDevice;
 use crate::error::{E2eError, E2eResult};
 use crate::ohttp_relay_manager::{OhttpRelayConfig, OhttpRelayManager};
 use crate::relay_manager::{RelayConfig, RelayManager};
@@ -333,6 +334,41 @@ impl Orchestrator {
 
         info!("Adding user '{}' with {} device(s)", name, device_count);
 
+        let user = UserBuilder::new(&name, relay_url)
+            .with_devices(device_count)
+            .with_extra_env(self.cli_extra_env()?)
+            .build()?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+
+        Ok(user)
+    }
+
+    /// Add a user with one CLI device running the previous store
+    /// release's CLI, routed like [`add_user`](Self::add_user) (private#1111).
+    pub fn add_user_on_previous_release(
+        &mut self,
+        name: impl Into<String>,
+    ) -> E2eResult<Arc<RwLock<User>>> {
+        let name = name.into();
+        let relay_url = self.primary_cli_relay_url()?;
+        let cli_path = CliDevice::find_previous_release_cli()?;
+        info!("Adding user '{name}' on the previous release's CLI");
+
+        let mut user = UserBuilder::new(&name, relay_url.clone())
+            .with_devices(0)
+            .build()?;
+        user.add_cli_device_running(&relay_url, &self.cli_extra_env()?, cli_path)?;
+
+        let user = Arc::new(RwLock::new(user));
+        self.users.insert(name, user.clone());
+        Ok(user)
+    }
+
+    /// The environment every CLI device gets: the OHTTP route and, when the
+    /// relay has one, its anchor.
+    fn cli_extra_env(&self) -> E2eResult<HashMap<String, String>> {
         let mut extra_env = HashMap::new();
         extra_env.insert(
             CLI_OHTTP_RELAY_URL_ENV.to_string(),
@@ -341,16 +377,7 @@ impl Orchestrator {
         if let Some(hex) = self.relay_anchor_hex.as_ref() {
             extra_env.insert(CLI_RELAY_ANCHOR_ENV.to_string(), hex.clone());
         }
-
-        let user = UserBuilder::new(&name, relay_url)
-            .with_devices(device_count)
-            .with_extra_env(extra_env)
-            .build()?;
-
-        let user = Arc::new(RwLock::new(user));
-        self.users.insert(name, user.clone());
-
-        Ok(user)
+        Ok(extra_env)
     }
 
     /// Add a user configured **production-shaped**: `--relay` points at the

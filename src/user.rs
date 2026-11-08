@@ -119,6 +119,31 @@ impl User {
         Ok(self.devices.len() - 1)
     }
 
+    /// Add a CLI device that runs `cli_path`, such as the previous
+    /// release's CLI in the interop tests (private#1111).
+    pub fn add_cli_device_running(
+        &mut self,
+        relay_url: &str,
+        extra_env: &HashMap<String, String>,
+        cli_path: std::path::PathBuf,
+    ) -> E2eResult<usize> {
+        let full_name = format!("{}_device_{}", self.name, self.devices.len());
+        let url = if relay_url.is_empty() {
+            &self.relay_url
+        } else {
+            relay_url
+        };
+        info!(
+            "Adding CLI device '{full_name}' running {} (relay: {url})",
+            cli_path.display()
+        );
+        let device =
+            CliDevice::with_cli(&full_name, url, cli_path)?.with_extra_env(extra_env.clone());
+        let device: Box<dyn Device> = Box::new(device);
+        self.devices.push(Arc::new(RwLock::new(device)));
+        Ok(self.devices.len() - 1)
+    }
+
     /// Add a device that calls Core in-process, routed like a CLI device
     /// given the same `extra_env`.
     pub fn add_core_device_with_env(
