@@ -637,6 +637,27 @@ fn the_previous_release_cli_is_looked_up_beside_the_current_one() {
     );
 }
 
+/// Until the first store release `ci/pins.env` says `PREVIOUS_CLI_SHA=none`
+/// and the current CLI stands in, locally as in CI (private#1111); a pinned
+/// commit must be built.
+// @internal
+#[test]
+fn the_pins_say_whether_a_previous_release_exists() {
+    assert_eq!(
+        CliDevice::previous_release_pin("CLI_SHA=abc\nPREVIOUS_CLI_SHA=none\n"),
+        None
+    );
+    assert_eq!(
+        CliDevice::previous_release_pin("PREVIOUS_CLI_SHA=0123abcd\n"),
+        Some("0123abcd".to_string())
+    );
+    assert_eq!(
+        CliDevice::previous_release_pin("# PREVIOUS_CLI_SHA=none\nCLI_SHA=abc\n"),
+        Some(String::new()),
+        "a missing pin is not `none`"
+    );
+}
+
 /// A device given its own binary runs that binary, not the one the search
 /// finds: the interop lane puts two releases side by side (private#1111).
 // @internal
