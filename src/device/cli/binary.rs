@@ -49,20 +49,39 @@ impl CliDevice {
         candidates
     }
 
+    /// `PREVIOUS_CLI_SHA` from `ci/pins.env`: `None` when it is `none` (no
+    /// store release yet), the commit otherwise, empty when the line is
+    /// missing so a broken pins file is never read as `none`.
+    pub fn previous_release_pin(pins_env: &str) -> Option<String> {
+        let value = pins_env
+            .lines()
+            .find_map(|line| line.strip_prefix("PREVIOUS_CLI_SHA="))
+            .unwrap_or_default()
+            .trim();
+        (value != "none").then(|| value.to_string())
+    }
+
     /// The previous release's CLI, which the interop tests run beside the
-    /// current one.
+    /// current one. Before the first store release (`PREVIOUS_CLI_SHA=none`)
+    /// the current CLI stands in, as `ci/build-pinned-binaries.sh` does.
     pub fn find_previous_release_cli() -> E2eResult<PathBuf> {
         let env_bin_dir = std::env::var("E2E_BIN_DIR").ok();
-        Self::previous_release_cli_candidates(env_bin_dir.as_deref())
+        if let Some(path) = Self::previous_release_cli_candidates(env_bin_dir.as_deref())
             .into_iter()
             .find(|path| path.exists())
-            .ok_or_else(|| {
-                E2eError::cli_execution(
-                    "Previous-release CLI not found. `sh ci/build-pinned-binaries.sh <dir>` \
-                     builds it into <dir>/previous/ at PREVIOUS_CLI_SHA; then set \
-                     E2E_BIN_DIR=<dir>.",
-                )
-            })
+        {
+            return Ok(path);
+        }
+        let pins_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ci/pins.env");
+        let pins = std::fs::read_to_string(&pins_path)
+            .map_err(|e| E2eError::cli_execution(format!("read {}: {e}", pins_path.display())))?;
+        match Self::previous_release_pin(&pins) {
+            None => Self::find_cli_binary(),
+            Some(sha) => Err(E2eError::cli_execution(format!(
+                "Previous-release CLI ({sha}) not found. `sh ci/build-pinned-binaries.sh <dir>` \
+                 builds it into <dir>/previous/; then set E2E_BIN_DIR=<dir>."
+            ))),
+        }
     }
 
     /// Whether `cli` is an `e2e-test-clock` build. Such a build panics on a
