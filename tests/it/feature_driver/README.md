@@ -27,8 +27,9 @@ The recovery scenario rejects a malformed link, checks both contact lists
 are empty, then completes a valid exchange with the same users and live
 driver. The TUI dismisses the alert and removes the rejected text with
 ordinary backspaces; it observes retained terminal frames on reentry.
-Each backend must pass all four scenarios with no failed or skipped
-scenarios. Core fixes for cached Contacts and picker reentry must be
+Each backend must pass the four shared scenarios with no failed or
+skipped scenarios. The contract backend also runs the wrong-code case.
+Core fixes for cached Contacts and picker reentry must be
 available in the consumer's dependency set before this selection can pass.
 
 The successive-exchange scenario keeps Alice alive for exchanges with Bob
@@ -37,6 +38,13 @@ then requires exactly Bob and Carol in Alice's list and only Alice in
 each peer's list. The contract driver requires one new completion per
 actor per exchange. Starting another Link attempt must present a fresh
 share screen instead of the earlier terminal screen.
+
+The drivers observe the confirmation code separately from the URL. The
+contract driver enters the shown digits through the presented input's
+opaque binding; CLI uses stdin and TUI uses its real terminal input.
+An external `VAUCHI_LOCALES_DIR` must contain the code labels and hints
+required by the pinned SDK. A stale locale checkout can hide those
+observations; use compatible locale assets or the SDK's bundled fallback.
 
 A separate test blocks all escrow requests and
 requires an exchange error and empty contact lists on both sides.
