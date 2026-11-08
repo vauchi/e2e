@@ -20,6 +20,17 @@ trait FeatureDriver: Send {
     async fn open_link(&mut self, owner: &str, url: &str) -> Result<ExchangeLinkFeedback>;
     async fn contact_names(&mut self, owner: &str) -> Result<Vec<String>>;
     async fn stop(&mut self) -> Result<()>;
+    // The CLI and TUI cannot enter a link code until their Core bump
+    // (vauchi/private#727), so only the contract driver answers these.
+    async fn share_link(&mut self, _initiator: &str) -> Result<()> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
+    async fn open_shared_link_with_wrong_code(&mut self, _responder: &str) -> Result<()> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
+    async fn waiting_for_exchange(&mut self, _owner: &str) -> Result<bool> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -64,6 +75,36 @@ async fn share_link(world: &mut FeatureWorld, initiator: String, responder: Stri
         .exchange_link(&initiator, &responder)
         .await
         .expect("exchange through driver");
+}
+
+#[when(expr = "{string} shares an exchange link")]
+async fn share_link_alone(world: &mut FeatureWorld, initiator: String) {
+    world
+        .driver()
+        .share_link(&initiator)
+        .await
+        .expect("share a link through the driver");
+}
+
+#[when(expr = "{string} opens the exchange link with a wrong code")]
+async fn open_link_with_wrong_code(world: &mut FeatureWorld, responder: String) {
+    world
+        .driver()
+        .open_shared_link_with_wrong_code(&responder)
+        .await
+        .expect("open the shared link with a wrong code");
+}
+
+#[then(expr = "{string} is still waiting for the exchange")]
+async fn still_waiting(world: &mut FeatureWorld, owner: String) {
+    assert!(
+        world
+            .driver()
+            .waiting_for_exchange(&owner)
+            .await
+            .expect("observe the exchange screen"),
+        "{owner} should still be waiting, not told the exchange failed"
+    );
 }
 
 #[then(expr = "{string} has {string} as a contact")]
@@ -150,18 +191,27 @@ pub(super) async fn run(backend: Backend) {
                 }
             })
         })
-        .filter_run(feature, |_, _, scenario| {
+        .filter_run(feature, move |_, _, scenario| {
             matches!(
                 scenario.name.as_str(),
                 "Two users exchange contact cards using a link"
                     | "A malformed exchange link is rejected without adding contacts"
                     | "Users exchange contact cards after a malformed link is rejected"
-            )
+            ) || (matches!(backend, Backend::Contract)
+                && scenario.name == "A wrong code makes no contact")
         })
         .await;
     let stats = writer.scenarios_stats();
     assert!(!writer.execution_has_failed(), "feature execution failed");
-    assert_eq!((stats.passed, stats.failed, stats.skipped), (3, 0, 0));
+    let expected = if matches!(backend, Backend::Contract) {
+        4
+    } else {
+        3
+    };
+    assert_eq!(
+        (stats.passed, stats.failed, stats.skipped),
+        (expected, 0, 0)
+    );
 }
 
 // @scenario: link_exchange :: Two users exchange contact cards using a link

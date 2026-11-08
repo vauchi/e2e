@@ -99,6 +99,65 @@ impl PresentationModel {
         })
     }
 
+    pub(super) fn title(&self) -> Option<String> {
+        self.current.iter().find_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some(surface.title.clone()),
+            _ => None,
+        })
+    }
+
+    pub(super) fn texts(&self) -> Vec<String> {
+        fn collect(nodes: &[PresentationNode], texts: &mut Vec<String>) {
+            for node in nodes {
+                match node {
+                    PresentationNode::Text { content, .. } => texts.push(content.clone()),
+                    PresentationNode::Group { children, .. } => collect(children, texts),
+                    PresentationNode::List { rows, .. } => {
+                        rows.iter().for_each(|row| collect(&row.controls, texts))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut texts = Vec::new();
+        for command in &self.current {
+            if let Command::ReplaceSurface { surface } = command {
+                collect(&surface.nodes, &mut texts);
+            }
+        }
+        texts
+    }
+
+    pub(super) fn input(&self, label: &str, value: &str) -> Option<Event> {
+        fn find(
+            surface: &SurfaceId,
+            nodes: &[PresentationNode],
+            label: &str,
+            value: &str,
+        ) -> Option<Event> {
+            nodes.iter().find_map(|node| match node {
+                PresentationNode::Input {
+                    binding_id,
+                    label: input_label,
+                    enabled: true,
+                    ..
+                } if input_label == label => Some(Event::ValueChanged {
+                    surface_id: surface.clone(),
+                    binding_id: binding_id.clone(),
+                    value: InputValue::Text(value.into()),
+                }),
+                PresentationNode::Group { children, .. } => find(surface, children, label, value),
+                _ => None,
+            })
+        }
+        self.current.iter().find_map(|command| match command {
+            Command::ReplaceSurface { surface } => {
+                find(&surface.surface_id, &surface.nodes, label, value)
+            }
+            _ => None,
+        })
+    }
+
     pub(super) fn contact_names(&self) -> Vec<String> {
         fn rows(nodes: &[PresentationNode], names: &mut Vec<String>) {
             for node in nodes {
