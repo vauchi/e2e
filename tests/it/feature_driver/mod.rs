@@ -20,8 +20,6 @@ trait FeatureDriver: Send {
     async fn open_link(&mut self, owner: &str, url: &str) -> Result<ExchangeLinkFeedback>;
     async fn contact_names(&mut self, owner: &str) -> Result<Vec<String>>;
     async fn stop(&mut self) -> Result<()>;
-    // The CLI and TUI cannot enter a link code until their Core bump
-    // (vauchi/private#727), so only the contract driver answers these.
     async fn share_link(&mut self, _initiator: &str) -> Result<()> {
         anyhow::bail!("this driver cannot enter a link code")
     }

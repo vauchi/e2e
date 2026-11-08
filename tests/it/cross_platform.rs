@@ -684,8 +684,7 @@ async fn integration_cli_to_ios_exchange() {
     orch.stop().await.expect("Failed to stop orchestrator");
 }
 
-// @scenario: contact_exchange:Two users exchange contact cards via QR code
-/// Integration test: CLI user shares their card with a TUI user.
+/// Integration test: two TUI users exchange contact cards using a link.
 ///
 /// Requirements:
 /// - TUI binary built (`just build tui`)
