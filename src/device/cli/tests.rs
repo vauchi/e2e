@@ -617,6 +617,44 @@ fn env_bin_dir_is_tried_first() {
     assert_eq!(&with_env[1..], &without[..]);
 }
 
+/// The previous release's CLI sits in `previous/` beside the current one
+/// (private#1111), so one `E2E_BIN_DIR` hands over both.
+// @internal
+#[test]
+fn the_previous_release_cli_is_looked_up_beside_the_current_one() {
+    let with_env = CliDevice::previous_release_cli_candidates(Some("/opt/prebuilt"));
+    let without = CliDevice::previous_release_cli_candidates(None);
+
+    assert_eq!(
+        with_env.first(),
+        Some(&PathBuf::from("/opt/prebuilt/previous/vauchi"))
+    );
+    assert_eq!(&with_env[1..], &without[..]);
+    assert_eq!(without.len(), 1, "got {without:?}");
+    assert!(
+        without[0].ends_with("target/e2e-bin/previous/vauchi"),
+        "got {without:?}"
+    );
+}
+
+/// A device given its own binary runs that binary, not the one the search
+/// finds: the interop lane puts two releases side by side (private#1111).
+// @internal
+#[test]
+fn a_device_given_a_cli_runs_that_cli() {
+    let device = CliDevice::with_cli(
+        "Old",
+        "https://relay.invalid",
+        PathBuf::from("/opt/prebuilt/previous/vauchi"),
+    )
+    .expect("device");
+
+    assert_eq!(
+        device.cli_path(),
+        std::path::Path::new("/opt/prebuilt/previous/vauchi")
+    );
+}
+
 /// A stand-in CLI: with `honors_clock` it rejects a malformed test-clock
 /// epoch on a timestamping command, as the `e2e-test-clock` build does.
 fn stand_in_cli(dir: &tempfile::TempDir, honors_clock: bool) -> PathBuf {

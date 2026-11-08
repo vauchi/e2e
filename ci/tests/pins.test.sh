@@ -43,6 +43,17 @@ for pair in "RELAY_SHA=${RELAY_SHA:-}" "OHTTP_RELAY_SHA=${OHTTP_RELAY_SHA:-}" "C
     fi
 done
 
+case "${PREVIOUS_CLI_SHA:-}" in
+    none) pass "PREVIOUS_CLI_SHA is none: no store release yet" ;;
+    *)
+        if printf '%s' "$PREVIOUS_CLI_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            pass "PREVIOUS_CLI_SHA is a full commit"
+        else
+            fail "PREVIOUS_CLI_SHA '${PREVIOUS_CLI_SHA:-}' is neither none nor a 40-character commit"
+        fi
+        ;;
+esac
+
 if sh ci/check-core-pin.sh Cargo.toml "$CORE_TAG" > /dev/null; then
     pass "Cargo.toml pins Core at $CORE_TAG"
 else
@@ -126,6 +137,38 @@ if sh ci/check-core-pin.sh "$fixtures/no-git.toml" v1.2.3 > /dev/null 2>&1; then
     fail "check-core-pin must fail a manifest that takes no Core from git"
 else
     pass "check-core-pin fails a manifest with no Core from git"
+fi
+
+# check-previous-core-pin.sh (private#1111): the previous release's CLI
+# runs Core of the set's minor or the one below it, on one tag.
+for case in "v1.2.0:v1.2.3:pass" "v1.1.9:v1.2.3:pass" "v1.0.4:v1.2.3:fail" \
+    "v1.3.0:v1.2.3:fail" "v0.9.1:v1.0.0:fail" "v1.2.3:v1.2.3:pass"; do
+    previous=${case%%:*}
+    rest=${case#*:}
+    set_tag=${rest%%:*}
+    want=${rest#*:}
+    printf 'vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "%s", version = "=%s" }\n' \
+        "$previous" "${previous#v}" > "$fixtures/previous.toml"
+    if sh ci/check-previous-core-pin.sh "$fixtures/previous.toml" "$set_tag" > /dev/null 2>&1; then
+        got=pass
+    else
+        got=fail
+    fi
+    if [ "$got" = "$want" ]; then
+        pass "check-previous-core-pin: $previous against $set_tag must $want"
+    else
+        fail "check-previous-core-pin: $previous against $set_tag must $want, did $got"
+    fi
+done
+if sh ci/check-previous-core-pin.sh "$fixtures/other-tag.toml" v1.2.4 > /dev/null 2>&1; then
+    fail "check-previous-core-pin must fail a manifest on two Core tags"
+else
+    pass "check-previous-core-pin fails a manifest on two Core tags"
+fi
+if sh ci/check-previous-core-pin.sh "$fixtures/no-git.toml" v1.2.3 > /dev/null 2>&1; then
+    fail "check-previous-core-pin must fail a manifest that takes no Core from git"
+else
+    pass "check-previous-core-pin fails a manifest with no Core from git"
 fi
 
 # point-core-at.sh (decision D8): a Core MR's job points the pinned
