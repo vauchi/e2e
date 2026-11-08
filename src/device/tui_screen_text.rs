@@ -117,6 +117,27 @@ mod tests {
     }
 
     // @internal
+    /// Core 0.101.0's share screen shows the code as `123 456` on the line
+    /// after the link (the TUI prints no label); the other side types the
+    /// six digits (vauchi/private#727).
+    #[test]
+    fn the_share_screen_code_is_read_as_six_digits() {
+        let screen = "┌Share Link──┐\n│Send this link only to the person you mean. They also need the code below.│\n│  ⚭ Link   │\n│https://vauchi.app/x#pk=Q9i0&n=Ftra&v=2&nm=QWxpY2U   │\n│798 069         │\n│Send this code another way than the link.│";
+
+        assert_eq!(exchange_code_in(screen).as_deref(), Some("798069"));
+        assert_eq!(
+            exchange_code_in("Share Link 2 contacts 404 512\nhttps://vauchi.app/x#pk=A&n=B"),
+            None,
+            "digits before the link are not its code"
+        );
+        assert_eq!(
+            exchange_code_in("https://vauchi.app/x#pk=A&n=B\n│48 2913│"),
+            None
+        );
+        assert_eq!(exchange_code_in("no link here 123 456"), None);
+    }
+
+    // @internal
     /// Core 0.81.0 shares `https://vauchi.app/x#pk=…&n=…&nm=…`
     /// (vauchi/private#277); the harness must read that off the share
     /// screen as it read the old `vauchi://exchange?…` form.
