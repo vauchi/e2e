@@ -52,6 +52,7 @@ mod ohttp_signed_key;
 mod ohttp_source_address;
 mod onboarding_flow;
 mod orchestrator_default_ohttp;
+mod previous_release_interop;
 mod recovery_flow;
 mod recovery_wire;
 mod relay_failover;
