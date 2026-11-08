@@ -3115,13 +3115,13 @@ dependencies = [
 [[package]]
 name = "spake2"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5482afe85a0b6ce956c945401598dbc527593c77ba51d0a87a586938b1b893a"
+source = "git+https://gitlab.com/vauchi/utils/spake2.git?tag=v0.4.0%2Bvauchi.1#e4a91c40930ecd645427094ce99f8238e01a78da"
 dependencies = [
  "curve25519-dalek",
  "hkdf",
  "rand_core 0.6.4",
  "sha2",
+ "zeroize",
 ]
 
 [[package]]
@@ -3777,8 +3777,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.100.2"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.100.2#be91cd195e694be62c9170ee23c44e5e43664902"
+version = "0.102.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.102.0#c85dbbba59191320b005e0645ea3da22d541a734"
 dependencies = [
  "base64",
  "flate2",
@@ -3808,8 +3808,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.100.2"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.100.2#be91cd195e694be62c9170ee23c44e5e43664902"
+version = "0.102.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.102.0#c85dbbba59191320b005e0645ea3da22d541a734"
 dependencies = [
  "argon2",
  "base64",
@@ -3844,7 +3844,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol",
+ "vauchi-protocol 0.102.0",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -3887,7 +3887,7 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol",
+ "vauchi-protocol 0.102.0",
  "vauchi-relay",
  "vt100",
  "zeroize",
@@ -3897,6 +3897,16 @@ dependencies = [
 name = "vauchi-protocol"
 version = "0.100.2"
 source = "git+https://gitlab.com/vauchi/core.git?tag=v0.100.2#be91cd195e694be62c9170ee23c44e5e43664902"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "vauchi-protocol"
+version = "0.102.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.102.0#c85dbbba59191320b005e0645ea3da22d541a734"
 dependencies = [
  "serde",
  "serde_json",
@@ -3934,7 +3944,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol",
+ "vauchi-protocol 0.100.2",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
