@@ -115,6 +115,7 @@ check:ci-contracts:
     - sh ci/tests/fetch-features.test.sh
     - sh ci/tests/audit-order.test.sh
     - sh ci/tests/lane-paths.test.sh
+    - sh ci/tests/lane-groups.test.sh
     - sh ci/tests/update-pins.test.sh
     - sh ci/tests/pins-bot.test.sh
   rules:
@@ -274,8 +275,17 @@ test:smoke:
   timeout: 1 hour
 
 # Full integration runs after merge; this restore regression must block MRs.
+# Release lanes compile in under a second and then test for up to half an
+# hour (rg4-rg5: 0.42 s build, 28.5 min of latency-bound six-device tests).
+# They keep cold-rebuild-tree's two-hour ceiling but not its one-job slot:
+# each sets resource_group e2e-lane-a or e2e-lane-b, two lanes at a time
+# (vauchi/private#1179; ci/tests/lane-groups.test.sh).
+.release-lane:
+  timeout: 2 hours
+
 test:backup-restore:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -331,7 +341,8 @@ test:backup-restore:
 # evidence can point to one stable, blocking contract on merge requests, main,
 # and schedules.
 test:release-rg3:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -383,7 +394,8 @@ test:release-rg3:
 # named lane mirroring test:release-rg3 so release evidence points to one
 # stable contract on merge requests, main, and schedules.
 test:release-rg4-rg5:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-a
   stage: test
   needs:
     - job: test:smoke
@@ -435,7 +447,8 @@ test:release-rg4-rg5:
 # process output or Prometheus metrics. Other service-boundary surfaces remain
 # required before RG-6 itself can close.
 test:release-rg6-observability:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -485,7 +498,8 @@ test:release-rg6-observability:
 # relay's address, never the end user's (ADR-037). The client connects from
 # 127.0.0.2, so the test needs a Linux runner (all of 127/8 is loopback).
 test:release-rg7:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -537,7 +551,8 @@ test:release-rg7:
 # test clock; the shipping CLI does not. Blocking named lane mirroring
 # test:release-rg4-rg5.
 test:release-rg8:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -593,7 +608,8 @@ test:release-rg8:
 # by test:smoke, so a scenario driving new cli grammar lands only after the
 # cli MR that adds it has merged.
 test:release-rg10:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
@@ -647,7 +663,8 @@ test:release-rg10:
 # revoked device. Like RG-10, new cli grammar (contacts ignore) reaches this
 # lane only after the cli MR that adds it has merged.
 test:release-rg15:
-  extends: [.linux-runner, .timeout-cold-rebuild]
+  extends: [.linux-runner, .release-lane]
+  resource_group: e2e-lane-b
   stage: test
   needs:
     - job: test:smoke
