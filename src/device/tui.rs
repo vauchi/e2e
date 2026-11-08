@@ -508,12 +508,12 @@ impl Device for TuiDevice {
             .ok_or_else(|| E2eError::device("TUI share screen has no unique exchange code"))?;
         Ok(super::ExchangeLink {
             url,
-            confirmation_code: Some(code),
+            code: Some(code),
         })
     }
 
     async fn accept_exchange_link(&self, invitation: &super::ExchangeLink) -> E2eResult<()> {
-        let code = invitation.confirmation_code.as_deref().ok_or_else(|| {
+        let code = invitation.code.as_deref().ok_or_else(|| {
             E2eError::device("TUI exchange needs a separately shared confirmation code")
         })?;
         self.complete_link_exchange(&invitation.url, code).await
