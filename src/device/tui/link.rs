@@ -7,6 +7,42 @@ use crate::error::E2eResult;
 use std::time::Duration;
 
 impl TuiDevice {
+    pub(super) async fn complete_link_exchange(&self, url: &str, code: &str) -> E2eResult<()> {
+        self.session.ensure_started().await?;
+        self.session.navigate_to("Exchange").await?;
+        self.session
+            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
+            .await?;
+        self.session.send_char('1').await?;
+        self.session
+            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
+            .await?;
+        self.session.send_text(url).await?;
+        self.session
+            .wait_for_frame(url, Duration::from_secs(10))
+            .await?;
+        self.session.send_enter().await?;
+        self.session
+            .wait_for_visible("Exchange Request|Accept Exchange", Duration::from_secs(20))
+            .await?;
+        self.session.send_enter().await?;
+        self.session
+            .wait_for_frame("6-digit code", Duration::from_secs(10))
+            .await?;
+        self.session.send_text(code).await?;
+        self.session
+            .wait_for_frame(code, Duration::from_secs(10))
+            .await?;
+        self.session.send_enter().await?;
+        self.session
+            .wait_for_visible(
+                "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
+                Duration::from_secs(60),
+            )
+            .await?;
+        Ok(())
+    }
+
     pub(super) async fn link_feedback(&self, url: &str) -> E2eResult<ExchangeLinkFeedback> {
         self.session.ensure_started().await?;
         self.session.navigate_to("Exchange").await?;

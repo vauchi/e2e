@@ -403,7 +403,7 @@ impl User {
     }
 
     /// Share a Link-mode exchange URL from the primary device (initiator).
-    pub async fn share_exchange_link(&self) -> E2eResult<String> {
+    pub async fn share_exchange_link(&self) -> E2eResult<crate::device::ExchangeLink> {
         let primary = self
             .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
@@ -413,13 +413,16 @@ impl User {
     }
 
     /// Accept another user's Link-mode exchange URL on the primary device.
-    pub async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
+    pub async fn accept_exchange_link(
+        &self,
+        invitation: &crate::device::ExchangeLink,
+    ) -> E2eResult<()> {
         let primary = self
             .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
-        device.accept_exchange_link(url).await
+        device.accept_exchange_link(invitation).await
     }
 
     /// Wait for an in-flight Link-mode exchange to complete on the initiator's

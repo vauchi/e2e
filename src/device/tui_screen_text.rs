@@ -7,6 +7,26 @@
 
 pub(super) const DEVICE_LINK_PREFIX: &str = "vauchi://device-link?";
 
+pub(super) fn exchange_code_in(screen: &str) -> Option<String> {
+    let mut codes = screen.lines().filter_map(|line| {
+        let mut words = line
+            .trim_matches(|c: char| c.is_whitespace() || "│║".contains(c))
+            .split_whitespace();
+        let first = words.next()?;
+        let second = words.next()?;
+        if words.next().is_some()
+            || [first, second]
+                .iter()
+                .any(|word| word.len() != 3 || !word.bytes().all(|b| b.is_ascii_digit()))
+        {
+            return None;
+        }
+        Some(format!("{first}{second}"))
+    });
+    let code = codes.next()?;
+    codes.next().is_none().then_some(code)
+}
+
 /// The device-link invitation URL the terminal prints under its QR label.
 ///
 /// The URL is longer than a terminal row, so the renderer hard-wraps it
@@ -70,6 +90,31 @@ pub(super) fn share_link_in(screen: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // @internal
+    #[test]
+    fn exchange_confirmation_code_is_read_separately_from_the_link() {
+        let screen = "│Send this link: https://vauchi.app/x#pk=AAAA&n=BBBB│\n│  042 917   │\n│Send the code another way than the link.│";
+        assert_eq!(exchange_code_in(screen).as_deref(), Some("042917"));
+        assert_eq!(
+            share_link_in(screen).as_deref(),
+            Some("https://vauchi.app/x#pk=AAAA&n=BBBB")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn exchange_confirmation_code_rejects_missing_or_ambiguous_codes() {
+        for screen in [
+            "No code yet",
+            "│Expires at 1792731197│",
+            "│042-917│",
+            "│042 917 123│",
+            "│042 917│\n│123 456│",
+        ] {
+            assert_eq!(exchange_code_in(screen), None, "{screen}");
+        }
+    }
 
     // @internal
     /// Core 0.81.0 shares `https://vauchi.app/x#pk=…&n=…&nm=…`

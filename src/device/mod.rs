@@ -31,6 +31,12 @@ pub enum ExchangeLinkFeedback {
     Other(String),
 }
 
+/// The invitation and its optional code, delivered over separate channels.
+pub struct ExchangeLink {
+    pub url: String,
+    pub confirmation_code: Option<String>,
+}
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -269,13 +275,21 @@ pub trait Device: Send + Sync {
 
     /// Share this device's Link-mode exchange URL as the initiator. A device
     /// whose QR step already shares a link (the TUI) keeps `generate_qr`.
-    async fn share_exchange_link(&self) -> E2eResult<String> {
-        self.generate_qr().await
+    async fn share_exchange_link(&self) -> E2eResult<ExchangeLink> {
+        Ok(ExchangeLink {
+            url: self.generate_qr().await?,
+            confirmation_code: None,
+        })
     }
 
     /// Accept another user's Link-mode exchange URL as the responder.
-    async fn accept_exchange_link(&self, url: &str) -> E2eResult<()> {
-        self.complete_exchange(url).await
+    async fn accept_exchange_link(&self, invitation: &ExchangeLink) -> E2eResult<()> {
+        if invitation.confirmation_code.is_some() {
+            return Err(crate::error::E2eError::DeviceNotSupported(
+                "exchange confirmation code".into(),
+            ));
+        }
+        self.complete_exchange(&invitation.url).await
     }
 
     /// Submit a link; setup, transport and automation failures remain errors.

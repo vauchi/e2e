@@ -50,7 +50,8 @@ mod link;
 #[path = "tui_screen_text.rs"]
 mod screen_text;
 use screen_text::{
-    DEVICE_LINK_PREFIX, confirmation_code_in, device_link_invitation_in, share_link_in,
+    DEVICE_LINK_PREFIX, confirmation_code_in, device_link_invitation_in, exchange_code_in,
+    share_link_in,
 };
 
 /// Find the TUI binary in the workspace.
@@ -494,40 +495,28 @@ impl Device for TuiDevice {
             .ok_or_else(|| E2eError::device("Could not extract the share link from the TUI"))
     }
 
-    /// Paste the peer's link on the Link share screen and accept the
-    /// exchange request core raises for it (camera-less route,
-    /// `problems/2026-09-09-tui-cannot-ingest-peer-exchange-payload`).
-    async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()> {
-        self.session.ensure_started().await?;
-        self.session.navigate_to("Exchange").await?;
-        self.session
-            .wait_for_frame("Exchange Mode|Pick a way", Duration::from_secs(10))
-            .await?;
-        self.session.send_char('1').await?;
-        self.session
-            .wait_for_frame("Share Link|Send this link", Duration::from_secs(10))
-            .await?;
-        // Typing lands in the first input (the peer-link field), and Return
-        // submits it — core routes the pasted link like an opened deep link
-        // and raises the consent screen.
-        self.session.send_text(qr_data).await?;
-        self.session
-            .wait_for_frame(qr_data, Duration::from_secs(10))
-            .await?;
-        self.session.send_enter().await?;
-        self.session
-            .wait_for_visible("Exchange Request|Accept Exchange", Duration::from_secs(20))
-            .await?;
-        // Return with no focused input activates the context-bar primary
-        // ("Accept Exchange"), which retrieves the peer's card and completes.
-        self.session.send_enter().await?;
-        self.session
-            .wait_for_visible(
-                "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
-                Duration::from_secs(60),
-            )
-            .await?;
-        Ok(())
+    async fn complete_exchange(&self, _qr_data: &str) -> E2eResult<()> {
+        Err(E2eError::DeviceNotSupported(
+            "TUI exchange needs the separately shared confirmation code".into(),
+        ))
+    }
+
+    async fn share_exchange_link(&self) -> E2eResult<super::ExchangeLink> {
+        let url = self.generate_qr().await?;
+        let frame = self.session.read_screen_snapshot().await?;
+        let code = exchange_code_in(&frame)
+            .ok_or_else(|| E2eError::device("TUI share screen has no unique exchange code"))?;
+        Ok(super::ExchangeLink {
+            url,
+            confirmation_code: Some(code),
+        })
+    }
+
+    async fn accept_exchange_link(&self, invitation: &super::ExchangeLink) -> E2eResult<()> {
+        let code = invitation.confirmation_code.as_deref().ok_or_else(|| {
+            E2eError::device("TUI exchange needs a separately shared confirmation code")
+        })?;
+        self.complete_link_exchange(&invitation.url, code).await
     }
 
     async fn open_exchange_link_feedback(
