@@ -15,7 +15,7 @@ use tracing::{debug, info};
 #[cfg(feature = "tui")]
 use crate::device::TuiDevice;
 use crate::device::{
-    CliDevice, Contact, ContactCard, CoreDevice, Device, DeviceType, MaestroDevice,
+    CliDevice, Contact, ContactCard, CoreDevice, Device, DeviceType, ExchangeLink, MaestroDevice,
     default_device_type,
 };
 use crate::error::{E2eError, E2eResult};
@@ -428,7 +428,7 @@ impl User {
     }
 
     /// Share a Link-mode exchange URL from the primary device (initiator).
-    pub async fn share_exchange_link(&self) -> E2eResult<crate::device::ExchangeLink> {
+    pub async fn share_exchange_link(&self) -> E2eResult<ExchangeLink> {
         let primary = self
             .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
@@ -438,16 +438,13 @@ impl User {
     }
 
     /// Accept another user's Link-mode exchange URL on the primary device.
-    pub async fn accept_exchange_link(
-        &self,
-        invitation: &crate::device::ExchangeLink,
-    ) -> E2eResult<()> {
+    pub async fn accept_exchange_link(&self, link: &ExchangeLink) -> E2eResult<()> {
         let primary = self
             .primary_device()
             .ok_or_else(|| E2eError::user("No primary device"))?;
 
         let device = primary.read().await;
-        device.accept_exchange_link(invitation).await
+        device.accept_exchange_link(link).await
     }
 
     /// Wait for an in-flight Link-mode exchange to complete on the initiator's

@@ -20,6 +20,15 @@ trait FeatureDriver: Send {
     async fn open_link(&mut self, owner: &str, url: &str) -> Result<ExchangeLinkFeedback>;
     async fn contact_names(&mut self, owner: &str) -> Result<Vec<String>>;
     async fn stop(&mut self) -> Result<()>;
+    async fn share_link(&mut self, _initiator: &str) -> Result<()> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
+    async fn open_shared_link_with_wrong_code(&mut self, _responder: &str) -> Result<()> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
+    async fn waiting_for_exchange(&mut self, _owner: &str) -> Result<bool> {
+        anyhow::bail!("this driver cannot enter a link code")
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -66,6 +75,36 @@ async fn share_link(world: &mut FeatureWorld, initiator: String, responder: Stri
         .expect("exchange through driver");
 }
 
+#[when(expr = "{string} shares an exchange link")]
+async fn share_link_alone(world: &mut FeatureWorld, initiator: String) {
+    world
+        .driver()
+        .share_link(&initiator)
+        .await
+        .expect("share a link through the driver");
+}
+
+#[when(expr = "{string} opens the exchange link with a wrong code")]
+async fn open_link_with_wrong_code(world: &mut FeatureWorld, responder: String) {
+    world
+        .driver()
+        .open_shared_link_with_wrong_code(&responder)
+        .await
+        .expect("open the shared link with a wrong code");
+}
+
+#[then(expr = "{string} is still waiting for the exchange")]
+async fn still_waiting(world: &mut FeatureWorld, owner: String) {
+    assert!(
+        world
+            .driver()
+            .waiting_for_exchange(&owner)
+            .await
+            .expect("observe the exchange screen"),
+        "{owner} should still be waiting, not told the exchange failed"
+    );
+}
+
 #[then(expr = "{string} has {string} as a contact")]
 async fn has_contact(world: &mut FeatureWorld, owner: String, peer: String) {
     assert_eq!(
@@ -86,6 +125,19 @@ async fn open_malformed_link(world: &mut FeatureWorld, owner: String) {
         .await
         .expect("observe link feedback through the real interface");
     world.link_feedback = Some((owner, feedback));
+}
+
+#[then(expr = "{string} has {string} and {string} as contacts")]
+async fn has_two_contacts(world: &mut FeatureWorld, owner: String, first: String, second: String) {
+    let mut actual = world
+        .driver()
+        .contact_names(&owner)
+        .await
+        .expect("observe contacts");
+    let mut expected = vec![first, second];
+    actual.sort();
+    expected.sort();
+    assert_eq!(actual, expected);
 }
 
 #[then(expr = "{string} is told the exchange link is invalid")]
@@ -150,23 +202,34 @@ pub(super) async fn run(backend: Backend) {
                 }
             })
         })
-        .filter_run(feature, |_, _, scenario| {
+        .filter_run(feature, move |_, _, scenario| {
             matches!(
                 scenario.name.as_str(),
                 "Two users exchange contact cards using a link"
                     | "A malformed exchange link is rejected without adding contacts"
                     | "Users exchange contact cards after a malformed link is rejected"
-            )
+                    | "A user exchanges contact cards with two people in succession"
+            ) || (matches!(backend, Backend::Contract)
+                && scenario.name == "A wrong code makes no contact")
         })
         .await;
     let stats = writer.scenarios_stats();
     assert!(!writer.execution_has_failed(), "feature execution failed");
-    assert_eq!((stats.passed, stats.failed, stats.skipped), (3, 0, 0));
+    let expected = if matches!(backend, Backend::Contract) {
+        5
+    } else {
+        4
+    };
+    assert_eq!(
+        (stats.passed, stats.failed, stats.skipped),
+        (expected, 0, 0)
+    );
 }
 
 // @scenario: link_exchange :: Two users exchange contact cards using a link
 // @scenario: link_exchange :: A malformed exchange link is rejected without adding contacts
 // @scenario: link_exchange :: Users exchange contact cards after a malformed link is rejected
+// @scenario: link_exchange :: A user exchanges contact cards with two people in succession
 #[tokio::test]
 async fn integration_shared_driver_contract_link_exchange() {
     run(Backend::Contract).await;

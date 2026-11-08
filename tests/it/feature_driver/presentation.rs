@@ -90,6 +90,38 @@ impl Actor {
         self.dispatch(Event::WakeupFired)
     }
 
+    pub(super) fn wake_if_scheduled(&mut self) -> Result<()> {
+        if self.pending_wakeup.is_some() {
+            self.wake()?;
+        }
+        Ok(())
+    }
+
+    /// The six-digit code a sender's Share Link screen shows, without the
+    /// space Core groups it with.
+    pub(super) fn shown_code(&self) -> Result<String> {
+        self.model
+            .texts()
+            .into_iter()
+            .find_map(|text| {
+                let digits: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+                (digits.len() == 6 && digits.chars().all(|c| c.is_ascii_digit())).then_some(digits)
+            })
+            .ok_or_else(|| anyhow::anyhow!("Core did not show a link code"))
+    }
+
+    pub(super) fn type_into(&mut self, label: &str, value: &str) -> Result<()> {
+        let event = self
+            .model
+            .input(label, value)
+            .ok_or_else(|| anyhow::anyhow!("no presented enabled input named {label:?}"))?;
+        self.dispatch(event)
+    }
+
+    pub(super) fn title(&self) -> Option<String> {
+        self.model.title()
+    }
+
     pub(super) fn celebrations(&self) -> usize {
         self.emitted
             .iter()

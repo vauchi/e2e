@@ -727,7 +727,7 @@ impl Orchestrator {
 
         // Initiator shares its link and stays on the share screen; its live
         // session begins polling the relay for the responder's deposit.
-        let url = {
+        let link = {
             let user = initiator.read().await;
             user.share_exchange_link().await?
         };
@@ -739,16 +739,13 @@ impl Orchestrator {
         // initiator must keep polling to deposit its card for the responder.
         let responder_complete = async {
             let user = responder.read().await;
-            user.accept_exchange_link(&url).await
+            user.accept_exchange_link(&link).await
         };
         let initiator_complete = async {
             let user = initiator.read().await;
             user.await_exchange_complete().await
         };
-        let (responder_result, initiator_result) =
-            tokio::join!(responder_complete, initiator_complete);
-        responder_result?;
-        initiator_result?;
+        tokio::try_join!(responder_complete, initiator_complete)?;
 
         // Establish the first ratchet direction both ways so callers can
         // immediately publish cards or visibility changes.

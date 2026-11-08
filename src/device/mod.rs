@@ -31,12 +31,6 @@ pub enum ExchangeLinkFeedback {
     Other(String),
 }
 
-/// The invitation and its optional code, delivered over separate channels.
-pub struct ExchangeLink {
-    pub url: String,
-    pub confirmation_code: Option<String>,
-}
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -104,6 +98,14 @@ pub enum DeviceType {
     Tui,
     /// Core's API called in-process, with no client binary.
     Core,
+}
+
+/// A shared Link-mode exchange: the URL and, since Core 0.101.0, the
+/// six-digit code the sharer sends another way (private#727).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExchangeLink {
+    pub url: String,
+    pub code: Option<String>,
 }
 
 /// Selects the backend for devices a test adds without naming one.
@@ -273,23 +275,24 @@ pub trait Device: Send + Sync {
     /// Complete an exchange using a QR code from another user.
     async fn complete_exchange(&self, qr_data: &str) -> E2eResult<()>;
 
-    /// Share this device's Link-mode exchange URL as the initiator. A device
+    /// Share this device's Link-mode exchange link as the initiator. A device
     /// whose QR step already shares a link (the TUI) keeps `generate_qr`.
     async fn share_exchange_link(&self) -> E2eResult<ExchangeLink> {
         Ok(ExchangeLink {
             url: self.generate_qr().await?,
-            confirmation_code: None,
+            code: None,
         })
     }
 
-    /// Accept another user's Link-mode exchange URL as the responder.
-    async fn accept_exchange_link(&self, invitation: &ExchangeLink) -> E2eResult<()> {
-        if invitation.confirmation_code.is_some() {
+    /// Accept another user's Link-mode exchange link as the responder,
+    /// typing its code when the sharer showed one.
+    async fn accept_exchange_link(&self, link: &ExchangeLink) -> E2eResult<()> {
+        if link.code.is_some() {
             return Err(crate::error::E2eError::DeviceNotSupported(
                 "exchange confirmation code".into(),
             ));
         }
-        self.complete_exchange(&invitation.url).await
+        self.complete_exchange(&link.url).await
     }
 
     /// Submit a link; setup, transport and automation failures remain errors.

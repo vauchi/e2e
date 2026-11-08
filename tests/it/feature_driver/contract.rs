@@ -13,9 +13,22 @@ use vauchi_core::clock::FakeClock;
 use vauchi_core::rng::OsSecureRng;
 use vauchi_core::{Command, Event, Vauchi, VauchiConfig};
 
+const LINK_CODE_LABEL: &str = "6-digit code";
+const WAITING_TITLE: &str = "Waiting for Response";
+// Enough scheduled wakeups for both handshake deposits and the card deposits
+// to reach the relay, well inside the sender's 300 s window.
+const WRONG_CODE_WAKEUP_ROUNDS: usize = 16;
+
+struct SharedLink {
+    initiator: String,
+    url: String,
+    code: String,
+}
+
 pub(super) struct ContractDriver {
     relay: EscrowAdapter,
     actors: BTreeMap<String, Actor>,
+    shared: Option<SharedLink>,
 }
 
 impl ContractDriver {
@@ -23,8 +36,44 @@ impl ContractDriver {
         Ok(Self {
             relay: EscrowAdapter::start()?,
             actors: BTreeMap::new(),
+            shared: None,
         })
     }
+
+    fn actor(&mut self, name: &str) -> Result<&mut Actor> {
+        self.actors.get_mut(name).context("unknown scenario actor")
+    }
+
+    fn share(&mut self, initiator: &str) -> Result<SharedLink> {
+        let alice = self.actor(initiator)?;
+        alice.activate("Exchange")?;
+        alice.activate("Link")?;
+        let code = alice.shown_code()?;
+        alice.activate("Share")?;
+        Ok(SharedLink {
+            initiator: initiator.into(),
+            url: alice.shared_url()?,
+            code,
+        })
+    }
+
+    fn open_with_code(&mut self, responder: &str, url: &str, code: &str) -> Result<()> {
+        let bob = self.actor(responder)?;
+        bob.dispatch(Event::DeepLinkOpened { uri: url.into() })?;
+        bob.activate("Accept Exchange")?;
+        bob.type_into(LINK_CODE_LABEL, code)?;
+        bob.activate("Continue")
+    }
+}
+
+fn a_wrong_code(code: &str) -> String {
+    code.chars()
+        .enumerate()
+        .map(|(index, digit)| match (index, digit.to_digit(10)) {
+            (0, Some(value)) => char::from_digit((value + 1) % 10, 10).unwrap_or(digit),
+            _ => digit,
+        })
+        .collect()
 }
 
 #[async_trait]
@@ -49,33 +98,27 @@ impl FeatureDriver for ContractDriver {
     }
     async fn exchange_link(&mut self, initiator: &str, responder: &str) -> Result<()> {
         ensure!(initiator != responder, "exchange requires distinct actors");
-        let alice = self
-            .actors
-            .get_mut(initiator)
-            .context("unknown initiator")?;
-        alice.activate("Exchange")?;
-        alice.activate("Link")?;
-        alice.activate("Share")?;
-        let url = alice.shared_url()?;
-        let bob = self
-            .actors
-            .get_mut(responder)
-            .context("unknown responder")?;
-        bob.dispatch(Event::DeepLinkOpened { uri: url })?;
-        bob.activate("Accept Exchange")?;
+        let completed = [initiator, responder]
+            .map(|name| self.actors.get(name).map(Actor::celebrations))
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .context("unknown exchange actor")?;
+        let link = self.share(initiator)?;
+        self.open_with_code(responder, &link.url, &link.code)?;
         for _ in 0..64 {
-            for name in [initiator, responder] {
+            for (name, completed) in [initiator, responder].into_iter().zip(&completed) {
                 let actor = self
                     .actors
                     .get_mut(name)
                     .context("unknown exchange actor")?;
-                if actor.celebrations() == 0 {
+                if actor.celebrations() == *completed {
                     actor.wake()?;
                 }
             }
             if [initiator, responder]
                 .into_iter()
-                .all(|name| self.actors[name].celebrations() == 1)
+                .zip(&completed)
+                .all(|(name, completed)| self.actors[name].celebrations() == completed + 1)
             {
                 ensure!(
                     self.relay.requests() > 0,
@@ -120,6 +163,34 @@ impl FeatureDriver for ContractDriver {
     }
     async fn stop(&mut self) -> Result<()> {
         Ok(())
+    }
+
+    async fn share_link(&mut self, initiator: &str) -> Result<()> {
+        self.shared = Some(self.share(initiator)?);
+        Ok(())
+    }
+
+    async fn open_shared_link_with_wrong_code(&mut self, responder: &str) -> Result<()> {
+        let link = self.shared.take().context("no link was shared")?;
+        ensure!(
+            link.initiator != responder,
+            "exchange requires distinct actors"
+        );
+        self.open_with_code(responder, &link.url, &a_wrong_code(&link.code))?;
+        for _ in 0..WRONG_CODE_WAKEUP_ROUNDS {
+            for name in [link.initiator.as_str(), responder] {
+                self.actor(name)?.wake_if_scheduled()?;
+            }
+        }
+        ensure!(
+            self.relay.requests() > 0,
+            "exchange bypassed the controlled transport"
+        );
+        Ok(())
+    }
+
+    async fn waiting_for_exchange(&mut self, owner: &str) -> Result<bool> {
+        Ok(self.actor(owner)?.title().as_deref() == Some(WAITING_TITLE))
     }
 }
 

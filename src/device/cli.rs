@@ -513,21 +513,11 @@ impl Device for CliDevice {
     }
 
     async fn share_exchange_link(&self) -> E2eResult<super::ExchangeLink> {
-        Ok(super::ExchangeLink {
-            url: self.spawn_link_share().await?,
-            confirmation_code: None,
-        })
+        self.spawn_link_share().await
     }
 
-    async fn accept_exchange_link(&self, invitation: &super::ExchangeLink) -> E2eResult<()> {
-        if invitation.confirmation_code.is_some() {
-            return Err(E2eError::DeviceNotSupported(
-                "CLI exchange confirmation code".into(),
-            ));
-        }
-        self.run_command_success(&["exchange", "link", &invitation.url, "--yes"])
-            .await?;
-        Ok(())
+    async fn accept_exchange_link(&self, link: &super::ExchangeLink) -> E2eResult<()> {
+        self.accept_link(link).await
     }
 
     async fn open_exchange_link_feedback(
