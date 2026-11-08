@@ -36,6 +36,35 @@ impl CliDevice {
         candidates
     }
 
+    /// Where the previous release's CLI may be, most-trusted first:
+    /// `previous/` beside the current CLI, as `ci/build-pinned-binaries.sh`
+    /// lays it out (private#1111).
+    pub fn previous_release_cli_candidates(env_bin_dir: Option<&str>) -> Vec<PathBuf> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut candidates = Vec::new();
+        if let Some(dir) = env_bin_dir {
+            candidates.push(PathBuf::from(dir).join("previous/vauchi"));
+        }
+        candidates.push(workspace.join("target/e2e-bin/previous/vauchi"));
+        candidates
+    }
+
+    /// The previous release's CLI, which the interop tests run beside the
+    /// current one.
+    pub fn find_previous_release_cli() -> E2eResult<PathBuf> {
+        let env_bin_dir = std::env::var("E2E_BIN_DIR").ok();
+        Self::previous_release_cli_candidates(env_bin_dir.as_deref())
+            .into_iter()
+            .find(|path| path.exists())
+            .ok_or_else(|| {
+                E2eError::cli_execution(
+                    "Previous-release CLI not found. `sh ci/build-pinned-binaries.sh <dir>` \
+                     builds it into <dir>/previous/ at PREVIOUS_CLI_SHA; then set \
+                     E2E_BIN_DIR=<dir>.",
+                )
+            })
+    }
+
     /// Whether `cli` is an `e2e-test-clock` build. Such a build panics on a
     /// malformed `VAUCHI_TEST_CLOCK_EPOCH` the moment a command stamps time;
     /// any other build accepts it and keeps the real clock.

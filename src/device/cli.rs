@@ -105,10 +105,19 @@ pub struct CliDevice {
 impl CliDevice {
     /// Create a new CLI device with an isolated data directory.
     pub fn new(name: impl Into<String>, relay_url: impl Into<String>) -> E2eResult<Self> {
+        Self::with_cli(name, relay_url, Self::find_cli_binary()?)
+    }
+
+    /// Create a CLI device that runs `cli_path` instead of the binary the
+    /// search finds: the interop lane runs two releases side by side
+    /// (private#1111).
+    pub fn with_cli(
+        name: impl Into<String>,
+        relay_url: impl Into<String>,
+        cli_path: PathBuf,
+    ) -> E2eResult<Self> {
         let data_dir = TempDir::new()
             .map_err(|e| E2eError::device(format!("Failed to create temp directory: {}", e)))?;
-
-        let cli_path = Self::find_cli_binary()?;
 
         Ok(Self {
             name: name.into(),
@@ -120,6 +129,11 @@ impl CliDevice {
             command_timeout: Self::command_timeout_from_env(),
             link_initiator: tokio::sync::Mutex::new(None),
         })
+    }
+
+    /// The `vauchi` binary this device runs.
+    pub fn cli_path(&self) -> &std::path::Path {
+        &self.cli_path
     }
 
     /// Create a new CLI device with a specific data directory path.

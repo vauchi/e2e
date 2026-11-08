@@ -150,6 +150,31 @@ else
     mark cli "$CLI_SHA" "$CLI_BUILD_PROFILE"
 fi
 
+# The interop tests run the previous store release's CLI beside the
+# current one (vauchi/private#1111). It keeps the Core it shipped with,
+# whatever E2E_CORE_DIR or heads mode do to the current set; before the
+# first store release (PREVIOUS_CLI_SHA=none) the current CLI stands in.
+previous_dir="$bin_dir/previous"
+if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
+    echo "Previous CLI not built: E2E_DEVICE_BACKEND=core"
+elif [ "$PREVIOUS_CLI_SHA" = none ]; then
+    mkdir -p "$previous_dir"
+    cp "$bin_dir/vauchi" "$previous_dir/vauchi"
+    echo "Previous CLI: none released yet; the current CLI stands in"
+elif [ -f "$previous_dir/vauchi.sha" ] &&
+    [ "$(cat "$previous_dir/vauchi.sha")" = "$PREVIOUS_CLI_SHA:$CLI_BUILD_PROFILE" ] &&
+    "$previous_dir/vauchi" --version > /dev/null 2>&1; then
+    echo "Previous CLI cached at $PREVIOUS_CLI_SHA"
+else
+    echo "Building the previous CLI at $PREVIOUS_CLI_SHA..."
+    fetch_at cli "$PREVIOUS_CLI_SHA" "$work/previous-cli"
+    sh "$here/check-previous-core-pin.sh" "$work/previous-cli/Cargo.toml" "$CORE_TAG"
+    cargo build --features e2e-test-clock --manifest-path "$work/previous-cli/Cargo.toml"
+    mkdir -p "$previous_dir"
+    cp "$work/previous-cli/target/debug/vauchi" "$previous_dir/vauchi"
+    echo "$PREVIOUS_CLI_SHA:$CLI_BUILD_PROFILE" > "$previous_dir/vauchi.sha"
+fi
+
 if cached ohttp "$OHTTP_RELAY_SHA" "$OHTTP_BUILD_PROFILE" vauchi-ohttp-relay &&
     grep -qa "$OHTTP_FAULT_ROUTE" "$bin_dir/vauchi-ohttp-relay"; then
     echo "OHTTP relay cached at $OHTTP_RELAY_SHA"
@@ -182,6 +207,13 @@ fi
         echo "cli=$E2E_CLI_DIR"
     else
         echo "cli=$CLI_SHA"
+    fi
+    if [ "${E2E_DEVICE_BACKEND:-cli}" = core ]; then
+        echo "previous_cli=not built (Core device)"
+    elif [ "$PREVIOUS_CLI_SHA" = none ]; then
+        echo "previous_cli=none released; the current CLI stands in"
+    else
+        echo "previous_cli=$PREVIOUS_CLI_SHA"
     fi
 } > "$bin_dir/set.txt"
 echo "Set under test ($mode):"

@@ -35,6 +35,7 @@ test:release-rg10 test:release-rg15 test:tui-journey"
 SHARED="src/**/* tests/it/main.rs tests/it/ohttp_helpers.rs tests/it/six_device.rs
 tests/*.rs tests/fixtures/**/* Cargo.toml Cargo.lock rust-toolchain.toml .config/**/*
 ci/pins.env ci/build-pinned-binaries.sh ci/point-core-at.sh ci/check-core-pin.sh
+ci/check-previous-core-pin.sh
 .gitlab-ci.yml"
 
 job_block() {

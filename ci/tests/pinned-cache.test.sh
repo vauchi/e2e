@@ -9,13 +9,15 @@ t=$(mktemp -d)
 trap 'rm -rf "$t"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 mkdir -p "$t/ci" "$t/bin" "$t/cache"
-cp "$here/ci/build-pinned-binaries.sh" "$here/ci/check-core-pin.sh" "$here/ci/point-core-at.sh" "$t/ci/"
+cp "$here/ci/build-pinned-binaries.sh" "$here/ci/check-core-pin.sh" "$here/ci/point-core-at.sh" \
+    "$here/ci/check-previous-core-pin.sh" "$t/ci/"
 sha=1111111111111111111111111111111111111111
 cat > "$t/ci/pins.env" <<EOF
 CORE_TAG=v2.0.0
 RELAY_SHA=$sha
 CLI_SHA=$sha
 OHTTP_RELAY_SHA=$sha
+PREVIOUS_CLI_SHA=none
 EOF
 for binary in vauchi-relay vauchi-ohttp-anchor vauchi vauchi-ohttp-relay; do
     cat > "$t/cache/$binary" <<'EOF'
