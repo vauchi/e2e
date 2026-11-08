@@ -650,3 +650,26 @@ fn a_cli_that_ignores_the_test_clock_is_recognised() {
         &dir, false
     )));
 }
+
+/// A CLI on Core 0.101.0 prints the code it shares in two groups of three
+/// (`code.grouped()`); the other side types the six digits (private#727).
+// @internal
+#[test]
+fn the_shared_link_code_is_read_as_six_digits() {
+    assert_eq!(
+        CliDevice::shared_link_code("Confirmation code: 123 456"),
+        Some("123456".to_string())
+    );
+    for not_a_code in [
+        "Confirmation code: 12 345",
+        "Confirmation code: 123 45a",
+        "Send this code another way than the link.",
+        "https://vauchi.app/x#pk=abc",
+    ] {
+        assert_eq!(
+            CliDevice::shared_link_code(not_a_code),
+            None,
+            "{not_a_code}"
+        );
+    }
+}
