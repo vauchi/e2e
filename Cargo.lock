@@ -979,7 +979,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1527,7 +1527,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -2079,7 +2079,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2710,7 +2710,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3259,7 +3259,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3269,7 +3269,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3855,7 +3855,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol 0.103.0",
+ "vauchi-protocol",
  "webpki-roots",
  "winapi-util",
  "x25519-dalek",
@@ -3899,20 +3899,10 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.103.0",
+ "vauchi-protocol",
  "vauchi-relay",
  "vt100",
  "zeroize",
-]
-
-[[package]]
-name = "vauchi-protocol"
-version = "0.102.2"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.102.2#5511f861f2f850cc34291eb4c126fb761e4f4cc7"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3928,7 +3918,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
-source = "git+https://gitlab.com/vauchi/relay.git?rev=21ebc31df7f5a5116c6b9b98ea2035bf5437fd09#21ebc31df7f5a5116c6b9b98ea2035bf5437fd09"
+source = "git+https://gitlab.com/vauchi/relay.git?rev=57db9ac88fc3d3b635d06e7c9b64f680f431584e#57db9ac88fc3d3b635d06e7c9b64f680f431584e"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -3956,7 +3946,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol 0.102.2",
+ "vauchi-protocol",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
@@ -4168,7 +4158,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
