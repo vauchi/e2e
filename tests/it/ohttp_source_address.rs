@@ -59,7 +59,6 @@ fn end_user_client() -> reqwest::Client {
 }
 
 // @claim: S3
-// @scenario: release_privacy_multidevice_certification.feature:Application relay sees the gateway under a distinct operator
 // @internal
 #[tokio::test]
 async fn application_relay_observes_the_ohttp_relay_never_the_end_user() {
