@@ -54,10 +54,10 @@ case "${PREVIOUS_CLI_SHA:-}" in
         ;;
 esac
 
-if sh ci/check-core-pin.sh Cargo.toml "$CORE_TAG" > /dev/null; then
-    pass "Cargo.toml pins Core at $CORE_TAG"
+if sh ci/check-core-pin.sh Cargo.toml "$CORE_TAG" Cargo.lock > /dev/null; then
+    pass "Cargo.toml and Cargo.lock pin Core at $CORE_TAG"
 else
-    fail "Cargo.toml must pin every Core crate at CORE_TAG $CORE_TAG"
+    fail "Cargo.toml and Cargo.lock must pin every Core crate at CORE_TAG $CORE_TAG"
 fi
 if grep -qE "^vauchi-relay *=.*rev = \"$RELAY_SHA\"" Cargo.toml; then
     pass "Cargo.toml pins the relay at RELAY_SHA"
@@ -137,6 +137,22 @@ if sh ci/check-core-pin.sh "$fixtures/no-git.toml" v1.2.3 > /dev/null 2>&1; then
     fail "check-core-pin must fail a manifest that takes no Core from git"
 else
     pass "check-core-pin fails a manifest with no Core from git"
+fi
+cat > "$fixtures/mixed.lock" <<'EOF'
+[[package]]
+name = "vauchi-protocol"
+version = "1.2.2"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v1.2.2#0123456789abcdef"
+
+[[package]]
+name = "vauchi-protocol"
+version = "1.2.3"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v1.2.3#abcdef0123456789"
+EOF
+if sh ci/check-core-pin.sh "$fixtures/on-tag.toml" v1.2.3 "$fixtures/mixed.lock" > /dev/null 2>&1; then
+    fail "check-core-pin must fail a lockfile with a Core crate on another tag"
+else
+    pass "check-core-pin fails a lockfile with a Core crate on another tag"
 fi
 
 # check-previous-core-pin.sh (private#1111): the previous release's CLI
