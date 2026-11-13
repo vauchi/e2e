@@ -3788,8 +3788,8 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.103.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.103.0#adf0115cb7230aaca90d56ee6996d674abb2f01c"
+version = "0.106.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.106.0#994c62d62e30f48160579c3c811d9d44387332e7"
 dependencies = [
  "base64",
  "flate2",
@@ -3808,8 +3808,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-contract"
-version = "0.97.2"
-source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.97.2#cf84bd10115270d2853321d854cfecf7a15f37a2"
+version = "0.98.0"
+source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.98.0#1fbfc734dcadfb92bc667343f43249faaaf369ac"
 dependencies = [
  "serde",
  "serde_json",
@@ -3819,8 +3819,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.103.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.103.0#adf0115cb7230aaca90d56ee6996d674abb2f01c"
+version = "0.106.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.106.0#994c62d62e30f48160579c3c811d9d44387332e7"
 dependencies = [
  "argon2",
  "base64",
@@ -3855,7 +3855,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol",
+ "vauchi-protocol 0.106.0",
  "webpki-roots",
  "winapi-util",
  "x25519-dalek",
@@ -3899,7 +3899,7 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol",
+ "vauchi-protocol 0.106.0",
  "vauchi-relay",
  "vt100",
  "zeroize",
@@ -3909,6 +3909,16 @@ dependencies = [
 name = "vauchi-protocol"
 version = "0.103.0"
 source = "git+https://gitlab.com/vauchi/core.git?tag=v0.103.0#adf0115cb7230aaca90d56ee6996d674abb2f01c"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "vauchi-protocol"
+version = "0.106.0"
+source = "git+https://gitlab.com/vauchi/core.git?tag=v0.106.0#994c62d62e30f48160579c3c811d9d44387332e7"
 dependencies = [
  "serde",
  "serde_json",
@@ -3946,7 +3956,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol",
+ "vauchi-protocol 0.103.0",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
