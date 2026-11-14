@@ -3855,7 +3855,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-contract",
- "vauchi-protocol 0.106.0",
+ "vauchi-protocol",
  "webpki-roots",
  "winapi-util",
  "x25519-dalek",
@@ -3899,20 +3899,10 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
- "vauchi-protocol 0.106.0",
+ "vauchi-protocol",
  "vauchi-relay",
  "vt100",
  "zeroize",
-]
-
-[[package]]
-name = "vauchi-protocol"
-version = "0.103.0"
-source = "git+https://gitlab.com/vauchi/core.git?tag=v0.103.0#adf0115cb7230aaca90d56ee6996d674abb2f01c"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3928,7 +3918,7 @@ dependencies = [
 [[package]]
 name = "vauchi-relay"
 version = "0.3.3"
-source = "git+https://gitlab.com/vauchi/relay.git?rev=57db9ac88fc3d3b635d06e7c9b64f680f431584e#57db9ac88fc3d3b635d06e7c9b64f680f431584e"
+source = "git+https://gitlab.com/vauchi/relay.git?rev=0299f8188846a9f30b88ba105f3a0ecc7c13e27e#0299f8188846a9f30b88ba105f3a0ecc7c13e27e"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -3956,7 +3946,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "vauchi-protocol 0.103.0",
+ "vauchi-protocol",
  "webpki-roots",
  "x25519-dalek",
  "zeroize",
