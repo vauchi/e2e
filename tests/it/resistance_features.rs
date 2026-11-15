@@ -316,11 +316,11 @@ fn test_configure_emergency_broadcast() {
         .unwrap();
 
     // Verify configuration
-    let config = vauchi.load_emergency_config().unwrap();
-    assert!(config.is_some());
-
-    let config = config.unwrap();
-    assert_eq!(config.trusted_contact_ids.len(), 2);
+    let config = vauchi
+        .load_emergency_config()
+        .unwrap()
+        .expect("emergency configuration was saved");
+    assert_eq!(config.trusted_contact_ids, vec![bob_id, charlie_id]);
     assert_eq!(config.message, "Emergency - help needed");
     assert!(!config.include_location);
 }
