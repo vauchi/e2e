@@ -118,6 +118,7 @@ check:ci-contracts:
     - sh ci/tests/lane-groups.test.sh
     - sh ci/tests/update-pins.test.sh
     - sh ci/tests/pins-bot.test.sh
+    - sh ci/tests/pins-cohort.test.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -884,13 +885,17 @@ test:integration:
 # head's pipeline passed and, for the relay and the CLI, it pins the set's
 # Core tag, and opens one MR whose pipeline runs the set against them. A
 # Core release's bump MR moves CORE_TAG with Cargo.toml; this bot moves the
-# relay and CLI after their own bump MRs merge.
+# relay and CLI after their own bump MRs merge. pins-cohort.sh then runs
+# the same move inside the open bump MR's branch (private#1210): main's
+# CORE_TAG is the old release, so without that second pass the bump MR
+# could never turn green on its own.
 bump:pins:
   extends: [.linux-runner, .timeout-standard]
   stage: test
   needs: []
   script:
     - sh ci/pins-bot.sh
+    - sh ci/pins-cohort.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
