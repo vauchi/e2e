@@ -3,6 +3,9 @@
 
 # @internal — real Git and HTTP boundaries, synthetic credentials only.
 from pathlib import Path
+import importlib.util
+import py_compile
+import shutil
 import unittest
 
 from pins_cohort_fixture import BRANCH, FILES, NEW, OLD, CohortFixture
@@ -29,6 +32,26 @@ class CohortTests(unittest.TestCase):
         self.assertEqual(fixture.read("unrelated.rs"), "preserve branch Rust fixes")
         self.assertEqual(len(fixture.posts), 1)
         self.assertEqual({a["file_path"] for a in fixture.posts[0]["actions"]}, set(FILES))
+
+    def test_cached_python_bytecode_cannot_run_with_the_write_credential(self):
+        fixture = self.fixture()
+        entry = fixture.root / "entry"
+        entry.mkdir()
+        for name in ("pins-cohort.sh", "pins-cohort.py", "pins_cohort_data.py"):
+            shutil.copy(ENTRY.parent / name, entry / name)
+        payload = fixture.root / "cached-payload.py"
+        payload.write_text("import os\nfrom pathlib import Path\n"
+                           + f"Path({str(fixture.sentinel)!r}).write_text('write credential available' if os.environ.get('PROJECT_ACCESS_TOKEN') else 'no credential')\n"
+                           + "raise SystemExit(99)\n")
+        cache = Path(importlib.util.cache_from_source(str(entry / "pins_cohort_data.py")))
+        cache.parent.mkdir()
+        py_compile.compile(str(payload), cfile=str(cache),
+                           invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+        fixture.entry = entry / "pins-cohort.sh"
+        result = fixture.run()
+        self.assertFalse(fixture.sentinel.exists(), "untrusted cached code ran in the credential holder")
+        self.succeeds(result)
+        self.assertIn(f"RELAY_SHA={NEW}", fixture.read("ci/pins.env"))
 
     def test_no_open_cohort_does_not_run_cargo_or_publish(self):
         fixture = self.fixture()
