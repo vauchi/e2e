@@ -169,3 +169,72 @@ fn terminal_rejects_excessive_unmatched_output() {
         "{error}"
     );
 }
+
+// @internal
+#[test]
+fn frame_reassembles_diff_writes_that_leave_no_contiguous_stream_text() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("diff-fragmented-terminal.sh");
+    std::fs::write(
+        &program,
+        r#"#!/bin/bash
+stty -echo
+# Cell-diff output: the completion text is written in two parts with an
+# unrelated row in between, so the stream never holds "Contact Added"
+# contiguously while the rendered screen shows exactly that.
+printf '\033[1;1HCon\033[2;1HSyncing\033[1;4Htact Added\033[2;7H done'
+read -r command
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+
+    // expect() syncs on the final write without any real-time sleep; it
+    // also feeds the writes into the retained screen.
+    terminal.expect("done").unwrap();
+    let frame = terminal.read_screen_snapshot().unwrap();
+    assert!(
+        frame.contains("Contact Added"),
+        "the retained frame reassembles cell-diff writes: {frame:?}"
+    );
+    let visible =
+        super::strip_ansi("\x1b[1;1HCon\x1b[2;1HSyncing\x1b[1;4Htact Added\x1b[2;7H done");
+    assert!(
+        !visible.contains("Contact Added"),
+        "the fragmented stream cannot satisfy a literal wait: {visible:?}"
+    );
+    terminal.quit().unwrap();
+}
+
+// @internal
+#[test]
+fn exchange_completion_waits_use_the_frame_not_the_stream() {
+    // The completion screen arrives as cell-diff updates, so a wait on the
+    // incremental stream misses it (private#1261). Pin the two completion
+    // waits to the retained frame.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    for relative in ["src/device/tui/link.rs", "src/device/tui.rs"] {
+        let source = std::fs::read_to_string(root.join(relative)).unwrap();
+        let pattern = "Contact added|Contact Added|Exchange complete|Exchange Complete";
+        let at = source
+            .find(pattern)
+            .unwrap_or_else(|| panic!("{relative} must keep its completion patterns"));
+        let call = &source[..at];
+        assert!(
+            call.ends_with("wait_for_visible(\n")
+                || call.contains("wait_for_visible(")
+                || call.contains("wait_for_frame("),
+            "{relative}: unrecognised completion wait shape"
+        );
+        let call_start = call
+            .rfind("wait_for_")
+            .expect("a wait call precedes the completion patterns");
+        assert!(
+            call[call_start..].starts_with("wait_for_frame("),
+            "{relative}: the completion wait must use wait_for_frame, found {}",
+            &call[call_start..call_start + 40.min(call.len() - call_start)]
+        );
+    }
+}
