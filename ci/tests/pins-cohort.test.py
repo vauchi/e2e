@@ -47,6 +47,15 @@ class CohortTests(unittest.TestCase):
         self.assertFalse(fixture.cargo_log.exists())
         self.assertEqual(fixture.posts, [])
 
+    def test_non_green_component_does_not_advance_or_run_cargo(self):
+        fixture = self.fixture()
+        fixture.pipeline_status = "failed"
+        before = fixture.head()
+        self.succeeds(fixture.run())
+        self.assertEqual(fixture.head(), before)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
     def test_moved_cohort_preserves_main_and_branch_work(self):
         fixture = self.fixture()
         self.succeeds(fixture.run())
@@ -57,6 +66,114 @@ class CohortTests(unittest.TestCase):
         self.assertNotIn("start_branch", fixture.posts[0])
         self.assertNotIn("start_sha", fixture.posts[0])
         self.assertEqual({a["action"] for a in fixture.posts[0]["actions"]}, {"update"})
+        self.assertTrue(fixture.pipeline_authentication)
+        self.assertEqual(set(fixture.pipeline_authentication), {True})
+
+    def bump_core(self, fixture):
+        fixture.change({name: fixture.read(name).replace("0.106.1", "0.106.2") + "\n"
+                        for name in ("ci/pins.env", "Cargo.toml")})
+
+    def test_incomplete_core_bump_waits_for_compatible_components(self):
+        fixture = self.fixture()
+        self.bump_core(fixture)
+        before = fixture.head()
+        self.succeeds(fixture.run())
+        self.assertEqual(fixture.head(), before)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_cli_ready_alone_waits_for_the_relay_core_bump(self):
+        fixture = self.fixture(cli_only=True)
+        self.bump_core(fixture)
+        fixture.component_tags["cli"] = "v0.106.2"
+        before = fixture.head()
+        self.succeeds(fixture.run())
+        self.assertEqual(fixture.head(), before)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_compatible_component_mains_complete_the_core_bump(self):
+        fixture = self.fixture()
+        self.bump_core(fixture)
+        fixture.heads["cli"] = NEW
+        fixture.component_tags.update(relay="v0.106.2", cli="v0.106.2")
+        self.succeeds(fixture.run())
+        self.assertIn("CORE_TAG=v0.106.2", fixture.read("ci/pins.env"))
+        self.assertIn("tag=v0.106.2", fixture.read("Cargo.lock"))
+        self.assertNotIn("tag=v0.106.1", fixture.read("Cargo.lock"))
+
+    def test_unprotected_core_tag_is_not_release_authority(self):
+        fixture = self.fixture()
+        fixture.core_protected = False
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_core_tag_cannot_move_during_resolution(self):
+        fixture = self.fixture()
+        fixture.core_tag_commits = ["c" * 40, "d" * 40]
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Core release tag moved", result.stderr)
+        self.assertEqual(fixture.posts, [])
+
+    def test_component_api_authorization_failure_is_not_reported_as_waiting(self):
+        fixture = self.fixture()
+        fixture.pipeline_http_status = 403
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("HTTP 403", result.stderr)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_missing_or_malformed_file_revision_blocks_publication(self):
+        for value in (None, "not-a-commit"):
+            with self.subTest(revision=value):
+                fixture = self.fixture()
+                fixture.file_metadata_override = {"last_commit_id": value}
+                result = fixture.run()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(fixture.cargo_log.exists())
+                self.assertEqual(fixture.posts, [])
+
+    def test_unprotected_component_main_is_not_admitted(self):
+        fixture = self.fixture()
+        fixture.component_main_protected = False
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_closed_mr_is_not_updated(self):
+        fixture = self.fixture()
+        fixture.on_recheck = lambda: setattr(fixture, "open", False)
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(fixture.posts, [])
+
+    def test_metadata_formatting_is_preserved(self):
+        fixture = self.fixture()
+        fixture.change({"ci/pins.env": fixture.read("ci/pins.env") + "\n\n# retained branch comment\n\n"})
+        self.succeeds(fixture.run())
+        self.assertTrue(fixture.read_bytes("ci/pins.env").endswith(b"\n\n# retained branch comment\n\n"))
+
+    def test_path_core_dependency_is_not_a_matching_release(self):
+        fixture = self.fixture()
+        fixture.component_extra["relay"] = '\nvauchi-app={path="branch-local-engine"}\n'
+        before = fixture.head()
+        self.succeeds(fixture.run())
+        self.assertEqual(fixture.head(), before)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_successful_resolver_with_missing_core_cannot_publish(self):
+        fixture = self.fixture()
+        cargo = fixture.root / "bin/cargo"
+        cargo.write_text("#!/bin/sh\nprintf 'version=4\\n[[package]]\\nname=\"vauchi-e2e-tests\"\\nversion=\"0.1.0\"\\n' > Cargo.lock\n")
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(fixture.posts, [])
 
     def test_fork_metadata_is_not_executed_or_published(self):
         fixture = self.fixture()
@@ -75,6 +192,7 @@ class CohortTests(unittest.TestCase):
             "manifest build hook": ("Cargo.toml", '[package]\nname="vauchi-e2e-tests"\nversion="0.1.0"\nbuild="payload.rs"\n'),
             "foreign lock source": ("Cargo.lock", 'version=4\n[[package]]\nname="evil"\nversion="1.0.0"\nsource="git+https://attacker.invalid/repo#' + OLD + '"\n'),
             "foreign local package": ("Cargo.lock", 'version=4\n[[package]]\nname="foreign"\nversion="1.0.0"\n'),
+            "foreign dependency identity": ("Cargo.lock", 'version=4\n[[package]]\nname="vauchi-e2e-tests"\nversion="0.1.0"\ndependencies=["evil 1.0.0 (git+https://attacker.invalid/repo#' + OLD + ')"]\n'),
         }
         for label, (name, value) in mutations.items():
             with self.subTest(label=label):
@@ -107,6 +225,23 @@ class CohortTests(unittest.TestCase):
         self.assertEqual(fixture.read("unrelated.rs"), "newer source work")
         self.assertIn(f"RELAY_SHA={NEW}", fixture.read("ci/pins.env"))
 
+    def test_retargeted_mr_is_rejected_before_publication(self):
+        fixture = self.fixture()
+        fixture.on_recheck = lambda: setattr(fixture, "target_branch", "release")
+        before = fixture.head()
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(fixture.head(), before)
+        self.assertEqual(fixture.posts, [])
+
+    def test_cli_only_move_guards_the_unchanged_manifest(self):
+        fixture = self.fixture(cli_only=True)
+        fixture.on_post = lambda: fixture.change({"Cargo.toml": fixture.read("Cargo.toml") + "\n# concurrent manifest edit\n"})
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("concurrent manifest edit", fixture.read("Cargo.toml"))
+        self.assertIn(f"CLI_SHA={OLD}", fixture.read("ci/pins.env"))
+
     def test_stale_file_rejects_the_entire_update(self):
         fixture = self.fixture()
         original_lock = fixture.read("Cargo.lock")
@@ -133,4 +268,3 @@ class CohortTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
