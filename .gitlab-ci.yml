@@ -23,7 +23,7 @@
 # Shared templates + GitLab Ultimate Templates
 include:
   - project: 'vauchi/scripts'
-    ref: ea3bfb1d139b56a6e2708f7f4757d48552aebd1d
+    ref: e6016f258e8d5cef52107bcd5ebba6a0aaf224b1
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -81,7 +81,7 @@ stages:
 
 variables:
   # Runtime helpers and structural templates must use the same commit.
-  VAUCHI_SCRIPTS_REF: "ea3bfb1d139b56a6e2708f7f4757d48552aebd1d"
+  VAUCHI_SCRIPTS_REF: "e6016f258e8d5cef52107bcd5ebba6a0aaf224b1"
   # cargo audit runs with --deny warnings; the one entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   AUDIT_IGNORES: ""
