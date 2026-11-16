@@ -8,6 +8,7 @@ import http.client
 import json
 import os
 import re
+import runpy
 from pathlib import Path
 import subprocess
 import sys
@@ -17,7 +18,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from pins_cohort_data import FILES, SHA, component_matches_core, pins, require, validate
+# Cached runner bytecode is not trusted with the write token (#1210).
+metadata = runpy.run_path(str(Path(__file__).with_name("pins_cohort_data.py")))
+FILES, SHA = metadata["FILES"], metadata["SHA"]
+component_matches_core = metadata["component_matches_core"]
+pins, require, validate = metadata["pins"], metadata["require"], metadata["validate"]
 
 PROJECT = "/projects/vauchi%2Fe2e"
 LIMIT = 4 * 1024 * 1024

@@ -3,4 +3,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 set -eu
-exec python3 "$(dirname "$0")/pins-cohort.py"
+exec python3 -I -B "$(dirname "$0")/pins-cohort.py"

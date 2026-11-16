@@ -5,10 +5,13 @@
 from pathlib import Path
 import importlib.util
 import py_compile
+import runpy
 import shutil
 import unittest
 
-from pins_cohort_fixture import BRANCH, FILES, NEW, OLD, CohortFixture
+fixture_code = runpy.run_path(str(Path(__file__).with_name("pins_cohort_fixture.py")))
+BRANCH, FILES = fixture_code["BRANCH"], fixture_code["FILES"]
+NEW, OLD, CohortFixture = fixture_code["NEW"], fixture_code["OLD"], fixture_code["CohortFixture"]
 
 ENTRY = Path(__file__).resolve().parents[1] / "pins-cohort.sh"
 
