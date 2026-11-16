@@ -37,3 +37,5 @@ data/
 *.pem
 credentials.json
 service-account*.json
+
+__pycache__/
