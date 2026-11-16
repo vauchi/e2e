@@ -100,7 +100,7 @@ async fn screen_snapshot_sync_rejects_the_previous_success() {
 
 // @internal — incremental redraws can reuse letters already on screen; a stream fragment is not the frame.
 #[tokio::test]
-async fn exchange_completion_retains_letters_from_an_earlier_frame() {
+async fn screen_snapshot_exchange_completion_retains_letters_from_an_earlier_frame() {
     let data_dir = TempDir::new().unwrap();
     let program = data_dir.path().join("incremental-exchange.sh");
     std::fs::write(
