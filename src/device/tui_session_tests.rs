@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
+use std::future::{Future, poll_fn};
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
+use std::task::Poll;
 
 use super::*;
 
@@ -147,4 +149,18 @@ done
         .expect("the completed retained frame was not recognized")
         .unwrap();
     assert_eq!(frame, "Exchange Complete\nREADY");
+}
+
+// @internal — an unrelated retained Contacts page cannot prove an exchange completed.
+#[tokio::test]
+async fn screen_snapshot_existing_contacts_are_not_exchange_completion() {
+    let device = terminal_fixture(false).await;
+    let mut completion = Box::pin(device.await_exchange_complete());
+    let outcome = poll_fn(|context| Poll::Ready(completion.as_mut().poll(context))).await;
+    drop(completion);
+    device.session.stop().await.unwrap();
+    assert_eq!(
+        outcome.map(|result| result.map_err(|error| error.to_string())),
+        Poll::Pending
+    );
 }

@@ -538,7 +538,7 @@ impl Device for TuiDevice {
         // expect can fill the unread terminal's PTS buffer and stall polling.
         self.session
             .wait_for_frame(
-                "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
+                "Contact added|Contact Added|Exchange complete|Exchange Complete",
                 Duration::from_secs(60),
             )
             .await?;
