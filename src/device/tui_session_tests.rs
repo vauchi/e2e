@@ -97,3 +97,54 @@ async fn screen_snapshot_sync_rejects_the_previous_success() {
     );
     device.session.stop().await.unwrap();
 }
+
+// @internal — incremental redraws can reuse letters already on screen; a stream fragment is not the frame.
+#[tokio::test]
+async fn exchange_completion_retains_letters_from_an_earlier_frame() {
+    let data_dir = TempDir::new().unwrap();
+    let program = data_dir.path().join("incremental-exchange.sh");
+    std::fs::write(
+        &program,
+        r#"#!/bin/bash
+stty -echo -icanon
+printf '\033[2J\033[HExchange _omplete\033[2;1HREADY'
+while IFS= read -rsn1 key; do
+    case "$key" in
+    '!') printf '\033[1;10HC' ;;
+    q) exit 0 ;;
+    esac
+done
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let session = TuiSession::new(
+        program.clone(),
+        data_dir.path().to_path_buf(),
+        "unused".into(),
+        HashMap::new(),
+    );
+    *session.pty.lock().await =
+        Some(PtySession::new(&program, data_dir.path(), "unused", &HashMap::new()).unwrap());
+    *session.is_running.lock().await = true;
+    session.expect("READY").await.unwrap();
+    assert_eq!(
+        session.read_screen_snapshot().await.unwrap(),
+        "Exchange _omplete\nREADY"
+    );
+    let device = TuiDevice {
+        name: "Fixture".into(),
+        data_dir,
+        relay_url: "unused".into(),
+        session,
+    };
+    device.session.send_char('!').await.unwrap();
+    let result =
+        tokio::time::timeout(Duration::from_secs(2), device.await_exchange_complete()).await;
+    let frame = device.session.read_screen_snapshot().await.unwrap();
+    device.session.stop().await.unwrap();
+    result
+        .expect("the completed retained frame was not recognized")
+        .unwrap();
+    assert_eq!(frame, "Exchange Complete\nREADY");
+}

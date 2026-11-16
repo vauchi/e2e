@@ -35,7 +35,7 @@ impl TuiDevice {
             .await?;
         self.session.send_enter().await?;
         self.session
-            .wait_for_visible(
+            .wait_for_frame(
                 "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
                 Duration::from_secs(60),
             )

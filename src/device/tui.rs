@@ -532,13 +532,12 @@ impl Device for TuiDevice {
         // card the initiator retrieves them and Core raises the completion
         // screen. Read it here — re-navigating would tear down the very
         // session the responder is converging with.
-        // `wait_for_visible` (not `expect_timeout`): it polls by draining the
-        // PTY on a 200 ms async tick, so running this concurrently with the
-        // responder's wait keeps *both* terminals drained. A blocking expect
-        // would let the unread terminal fill its PTS buffer and stall its
-        // poll loop — the initiator would then never deposit its card.
+        // Incremental redraws change only some cells, so the completion marker may
+        // reuse letters from an earlier frame. The async frame wait also
+        // keeps both PTYs drained while the responder converges; a blocking
+        // expect can fill the unread terminal's PTS buffer and stall polling.
         self.session
-            .wait_for_visible(
+            .wait_for_frame(
                 "Contact added|Contact Added|Exchange complete|Exchange Complete|Contacts",
                 Duration::from_secs(60),
             )
