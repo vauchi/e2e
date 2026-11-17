@@ -32,6 +32,17 @@ ignore = [
     # rustls-webpki CRL matching logic — limited impact (requires compromised CA).
     # Fix: cargo update -p rustls-webpki when patched version is released.
     "RUSTSEC-2026-0049",
+    # chrono and chrono-tz are unmaintained (advisories, not vulnerabilities)
+    # — reached only through rxing, vauchi-core's QR decoder, which needs
+    # them for calendar-result parsing and Aztec; our QR-only decode calls
+    # neither.
+    # Remove together with core's entries (private#1274).
+    "RUSTSEC-2026-0543",
+    "RUSTSEC-2026-0555",
+    # humantime is unmaintained (advisory, not a vulnerability) — reached
+    # through cucumber and humantime-serde in this test harness, which ships
+    # no binary. Remove together with core's entry (private#1274).
+    "RUSTSEC-2026-0542",
 ]
 
 [licenses]

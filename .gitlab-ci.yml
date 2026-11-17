@@ -82,9 +82,13 @@ stages:
 variables:
   # Runtime helpers and structural templates must use the same commit.
   VAUCHI_SCRIPTS_REF: "e6016f258e8d5cef52107bcd5ebba6a0aaf224b1"
-  # cargo audit runs with --deny warnings; the one entry here is an
+  # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
-  AUDIT_IGNORES: ""
+  #   RUSTSEC-2026-0543  chrono and chrono-tz unmaintained, only via
+  #   RUSTSEC-2026-0555  rxing (QR decode); mirrors deny.toml (private#1274).
+  #   RUSTSEC-2026-0542  humantime unmaintained, test harness only;
+  #                      mirrors deny.toml (private#1274).
+  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0555 --ignore RUSTSEC-2026-0542"
   # GitLab Ultimate Security Configuration
   SAST_EXCLUDED_PATHS: "target/, scenarios/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/, scenarios/"
