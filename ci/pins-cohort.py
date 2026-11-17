@@ -202,8 +202,12 @@ def main():
             response = client.request(PROJECT + "/repository/commits", body)
             require(isinstance(response.get("id"), str) and SHA.fullmatch(response["id"]), "invalid published commit response")
         except UnknownCommitOutcome:
+            reconciled = client.request(branch_path)
+            reconciled_sha = reconciled.get("commit", {}).get("id")
+            require(reconciled.get("name") == branch and isinstance(reconciled_sha, str)
+                    and SHA.fullmatch(reconciled_sha), "commit outcome unknown; invalid reconciliation snapshot")
             for action in actions:
-                response = client.request(PROJECT + "/repository/files/" + quote(action["file_path"], safe="") + "?" + urlencode({"ref": branch}))
+                response = client.request(PROJECT + "/repository/files/" + quote(action["file_path"], safe="") + "?" + urlencode({"ref": reconciled_sha}))
                 require(response.get("encoding") == "base64" and base64.b64decode(response["content"], validate=True) == generated[action["file_path"]],
                         "commit outcome unknown; inspect the branch before retrying")
             print("cohort: desired files confirmed after lost response; no duplicate write")

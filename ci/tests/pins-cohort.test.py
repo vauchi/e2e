@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # @internal — real Git and HTTP boundaries, synthetic credentials only.
+import base64
 from pathlib import Path
 import importlib.util
 import py_compile
@@ -290,6 +291,37 @@ class CohortTests(unittest.TestCase):
         self.succeeds(fixture.run())
         self.assertEqual(len(fixture.posts), 1)
         self.assertIn(f"RELAY_SHA={NEW}", fixture.read("ci/pins.env"))
+
+    def test_lost_response_cannot_confirm_files_from_mixed_branch_snapshots(self):
+        fixture = self.fixture()
+        original = {name: fixture.read_bytes(name) for name in FILES}
+        desired = {}
+        real_get = fixture.get
+        fixture.drop_reply = True
+
+        def lost_write(body):
+            desired.update({action["file_path"]: base64.b64decode(action["content"])
+                            for action in body["actions"]})
+            fixture.change({FILES[0]: desired[FILES[0]].decode()})
+            # Simulate a disconnected request whose write never applied.
+            return 201, {}
+
+        def rotating_snapshot(url):
+            result = real_get(url)
+            if desired and "/repository/files/" in url:
+                for index, name in enumerate(FILES[:-1]):
+                    if name.replace("/", "%2F") in url:
+                        fixture.change({name: original[name].decode(),
+                                        FILES[index + 1]: desired[FILES[index + 1]].decode()})
+                        break
+            return result
+
+        fixture.post, fixture.get = lost_write, rotating_snapshot
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("commit outcome unknown", result.stderr)
+        self.assertEqual(len(fixture.posts), 1)
+        self.assertFalse(all(fixture.read_bytes(name) == desired[name] for name in FILES))
 
 
 if __name__ == "__main__":
