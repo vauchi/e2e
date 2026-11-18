@@ -8,7 +8,9 @@ name: Sync with Relay (Android)
 # Trigger a sync with the relay server
 # This pulls any pending updates from contacts
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 
 # Wait for app to be ready
 - waitForAnimationToEnd

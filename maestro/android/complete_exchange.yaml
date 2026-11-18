@@ -22,7 +22,9 @@ name: Complete Exchange (Android)
     condition: ${typeof QR_DATA !== 'undefined' && String(QR_DATA) !== 'undefined' && String(QR_DATA).length > 0}
     label: "QR_DATA must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 
 # Delivered as a deep link rather than typed into a form. The manifest

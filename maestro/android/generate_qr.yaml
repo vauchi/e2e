@@ -12,7 +12,9 @@ name: Generate QR Code (Android)
 # The flow navigates to the exchange screen and captures QR data
 # either via screenshot or by reading the displayed code.
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 
 # Wait for app to be ready
 - waitForAnimationToEnd

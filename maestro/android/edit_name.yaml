@@ -14,7 +14,9 @@ name: edit_name
     condition: ${typeof NAME !== 'undefined' && String(NAME) !== 'undefined' && String(NAME).length > 0}
     label: "NAME must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 - tapOn:
     text: "More"

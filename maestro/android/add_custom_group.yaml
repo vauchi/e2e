@@ -24,6 +24,8 @@ name: Add Custom Group During Onboarding (Android)
 
 - launchApp:
     clearState: true
+    arguments:
+      test_locale: "en"
 
 - waitForAnimationToEnd
 

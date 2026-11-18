@@ -389,7 +389,8 @@ async fn test_android_device_exchange() {
 ///
 /// Runs only on the rig: set `VAUCHI_E2E_ANDROID_HOST` to the adb serial of
 /// a phone that holds an identity and `VAUCHI_E2E_ANDROID_JOINER` to one
-/// with a fresh install, both with the app in English.
+/// with a fresh install. The flows select English inside the debug app;
+/// the phones' system languages need not change.
 // @internal
 #[tokio::test]
 async fn test_android_phone_joins_another_phones_identity() {

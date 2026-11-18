@@ -12,7 +12,9 @@ appId: app.vauchi
 # variable still fails before the app is touched. Flows end with back
 # presses that can exit to the launcher, so a flow that assumed the
 # previous one left it foregrounded failed on its first tap.
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 
 # Devices is a top-level destination behind the nav overlay, not a row

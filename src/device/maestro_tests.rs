@@ -530,32 +530,36 @@ async fn test_maestro_ios_card_edits_are_unsupported_until_their_flows_exist() {
 
 // @internal
 #[test]
-fn test_maestro_an_english_phone_runs_the_flows() {
-    for locale in ["en-US", "en-GB", "en"] {
-        assert_eq!(locale_blocks_flows("034AY1UQS9", locale), None, "{locale}");
+fn test_maestro_every_android_launch_uses_an_app_scoped_english_locale() {
+    let flows_dir = MaestroDevice::find_flows_dir(MaestroPlatform::Android).expect("flows dir");
+    let mut launch_count = 0;
+    for flow in std::fs::read_dir(flows_dir).expect("read flows") {
+        let flow = flow.expect("flow entry").path();
+        if flow.extension().is_none_or(|extension| extension != "yaml") {
+            continue;
+        }
+        let yaml = std::fs::read_to_string(&flow).expect("read flow");
+        let lines: Vec<&str> = yaml.lines().collect();
+        let launches: Vec<usize> = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(index, line)| line.trim().starts_with("- launchApp").then_some(index))
+            .collect();
+        launch_count += launches.len();
+        for launch in launches {
+            let block = lines[launch + 1..]
+                .iter()
+                .take_while(|line| !line.starts_with("- "))
+                .copied()
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                block.contains("arguments:") && block.contains("test_locale: \"en\""),
+                "{} launch on line {} must select English inside the app under test",
+                flow.display(),
+                launch + 1
+            );
+        }
     }
-}
-
-// @internal
-#[test]
-fn test_maestro_a_phone_in_another_language_is_refused_with_its_locale() {
-    assert_eq!(
-        locale_blocks_flows("9886784a544a484938", "fr-CH"),
-        Some(
-            "Maestro device: 9886784a544a484938 is set to fr-CH, but the flows match English labels; switch its language to English"
-                .to_string()
-        )
-    );
-}
-
-// @internal
-#[test]
-fn test_maestro_an_unreadable_locale_does_not_block_the_flows() {
-    for locale in ["", "  ", "\r\n"] {
-        assert_eq!(
-            locale_blocks_flows("034AY1UQS9", locale),
-            None,
-            "{locale:?}"
-        );
-    }
+    assert_eq!(launch_count, 26, "every Android launch was inspected");
 }

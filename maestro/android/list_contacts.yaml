@@ -19,7 +19,9 @@ name: List Contacts (Android)
     condition: ${typeof MAESTRO_OUTPUT_PATH !== 'undefined' && String(MAESTRO_OUTPUT_PATH) !== 'undefined' && String(MAESTRO_OUTPUT_PATH).length > 0}
     label: "MAESTRO_OUTPUT_PATH must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 
 # Wait for app to be ready
 - waitForAnimationToEnd

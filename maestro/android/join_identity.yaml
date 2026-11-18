@@ -23,7 +23,9 @@ name: join_identity
     condition: ${typeof DEVICE_NAME !== 'undefined' && String(DEVICE_NAME) !== 'undefined' && String(DEVICE_NAME).length > 0}
     label: "DEVICE_NAME must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 
 # The invitation opens as the deep link a phone camera would open from

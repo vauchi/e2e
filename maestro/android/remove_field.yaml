@@ -14,7 +14,9 @@ name: remove_field
     condition: ${typeof FIELD_LABEL !== 'undefined' && String(FIELD_LABEL) !== 'undefined' && String(FIELD_LABEL).length > 0}
     label: "FIELD_LABEL must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 - tapOn:
     text: "More"

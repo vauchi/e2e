@@ -18,10 +18,11 @@ This directory contains Maestro YAML flows for automated mobile testing.
   the shell owned its screens; on 2026-08-12 none of the twelve still
   existed in the app, whose only test tags are `error.retry`,
   `recovery.restore_backup` and `recovery.start_fresh`.
-  Caveat: this couples flows to copy, so it holds only while the app is
-  unlocalized. Localizing the shell requires Core to supply stable
-  revision-independent identifiers first — a protocol addition, not a
-  flow change.
+  The Android flows pass the debug-only `test_locale: "en"` argument on
+  every `launchApp`, so their English labels work regardless of the
+  phone's system language and without changing the saved app preference.
+  Flows that continue a device-link ceremony deliberately do not relaunch
+  the app. Release builds ignore this argument.
 - **Navigation (Android, ADR-066)**: the app opens on the card surface and
   destinations live behind the context bar's navigation role button —
   `tapOn: "More"` then the destination (`My Card`, `Contacts`,

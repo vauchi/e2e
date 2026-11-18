@@ -25,6 +25,8 @@ name: Create Identity (Android)
 
 - launchApp:
     clearState: true
+    arguments:
+      test_locale: "en"
 
 - waitForAnimationToEnd
 
@@ -61,7 +63,9 @@ name: Create Identity (Android)
 
 # Verify the name came from Core persistence, not only optimistic UI state.
 - stopApp
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd:
     timeout: 15000
 - assertVisible: ${NAME}

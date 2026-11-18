@@ -28,7 +28,9 @@ name: Duress PIN rejects an invalid value (Android)
 # variable still fails before the app is touched. Flows end with back
 # presses that can exit to the launcher, so a flow that assumed the
 # previous one left it foregrounded failed on its first tap.
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 
 # ADR-066 navigation, addressed by label — see maestro/README.md.

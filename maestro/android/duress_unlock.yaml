@@ -30,7 +30,9 @@ appId: app.vauchi
     label: "REAL_CONTACT_NAME must be set (unset becomes the literal string \"undefined\")"
 
 # Relaunch app to trigger lock screen
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 
 # Wait for app password / PIN screen
 - waitForAnimationToEnd:

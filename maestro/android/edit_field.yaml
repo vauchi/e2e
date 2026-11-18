@@ -17,7 +17,9 @@ name: edit_field
     condition: ${typeof FIELD_VALUE !== 'undefined' && String(FIELD_VALUE) !== 'undefined' && String(FIELD_VALUE).length > 0}
     label: "FIELD_VALUE must be set (unset becomes the literal string \"undefined\")"
 
-- launchApp
+- launchApp:
+    arguments:
+      test_locale: "en"
 - waitForAnimationToEnd
 - tapOn:
     text: "More"
