@@ -755,8 +755,19 @@ test:tui-journey:
           - ".gitlab-ci.yml"
           - "tests/it/cross_platform.rs"
   allow_failure: false
+  # The smoke job's slot, read only: it holds both relays at the pinned
+  # commits, and the build script's markers decide whether they are used.
+  cache:
+    key:
+      files: [ci/pins.env, ci/build-pinned-binaries.sh]
+      prefix: e2e-bin
+    paths:
+      - .smoke-bin/
+    policy: pull
+  variables:
+    E2E_BIN_DIR: ${CI_PROJECT_DIR}/.smoke-bin
   script:
-    # The script builds the TUI and both relays in a job-private directory
+    # The script builds the TUI in a job-private directory, takes both relays
     # and runs the journeys; Core's merge requests run the same script
     # against their own Core (ci/tui-journey.sh, vauchi/private#1297).
     - >-

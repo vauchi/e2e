@@ -7,10 +7,11 @@
 # engine, against real relays. It is the one lane that failed when the sync
 # call was removed from the engine (vauchi/private#1297, ADR-082 item 3).
 #
-# Everything is built in a job-private directory. On a shell runner the tui
+# The TUI is built in a job-private directory. On a shell runner the tui
 # project's own job workspace is `../tui` of this checkout, so a sibling
 # clone there deleted a concurrent tui job's build tree and vice versa
-# (allyson, 2026-09-12); the relays are job-private for the same reason.
+# (allyson, 2026-09-12). The relays are never taken from a sibling checkout
+# for the same reason.
 #
 # With E2E_CORE_DIR the TUI is built against that Core checkout instead of
 # the tag tui pins: Core's merge requests run the engine under review, not
@@ -18,6 +19,8 @@
 #
 # Usage: ci/tui-journey.sh <job-dir> -E <nextest filter>
 # Env:   E2E_CORE_DIR   a Core checkout to build the TUI against
+#        E2E_BIN_DIR    where the relay binaries are kept and reused; the
+#                       job directory when unset
 #        CI_JOB_TOKEN   clones from gitlab.com/vauchi in CI
 # Run from the e2e checkout's root.
 set -eu
@@ -41,7 +44,7 @@ VAUCHI_FEATURES_DIR="$(pwd)/.feature-specs"
 export VAUCHI_FEATURES_DIR
 
 rm -rf "$job_dir"
-mkdir -p "$job_dir/bin"
+mkdir -p "$job_dir"
 
 # The TUI stays at its main until its journey moves to its app.
 git clone --depth=20 --branch main "$origin/tui.git" "$job_dir/tui"
@@ -60,26 +63,20 @@ VAUCHI_TUI_BIN="$job_dir/tui/target/release/vauchi-tui"
 export VAUCHI_TUI_BIN
 test -x "$VAUCHI_TUI_BIN"
 
-# Both relays at the commits ci/pins.env names (vauchi/private#1032), the
-# relay with its test clock and the anchor ceremony CLI e2e provisions each
-# relay's test anchor with (#288). The orchestrator routes through an OHTTP
-# relay by default (private#755).
-# shellcheck source=pins.env
-. ci/pins.env
-fetch_at() { # repository sha
-    git init -q "$job_dir/$1"
-    git -C "$job_dir/$1" fetch --depth=1 "$origin/$1.git" "$2"
-    git -C "$job_dir/$1" checkout -q FETCH_HEAD
-    git -C "$job_dir/$1" log --oneline -1
-}
-fetch_at relay "$RELAY_SHA"
-cargo build --release --features e2e-test-clock --manifest-path "$job_dir/relay/Cargo.toml"
-cp "$job_dir/relay/target/release/vauchi-relay" "$job_dir/relay/target/release/vauchi-ohttp-anchor" "$job_dir/bin/"
-fetch_at ohttp-relay "$OHTTP_RELAY_SHA"
-cargo build --release --manifest-path "$job_dir/ohttp-relay/Cargo.toml"
-cp "$job_dir/ohttp-relay/target/release/vauchi-ohttp-relay" "$job_dir/bin/"
-E2E_BIN_DIR="$job_dir/bin"
+# Both relays at the commits ci/pins.env names (vauchi/private#1032), built
+# by the script the smoke job uses, so a bin directory that already holds
+# them at those commits is reused: building them cold was most of this
+# lane's ten minutes. They stay on their own pins whatever Core the TUI is
+# built on, and the CLI is not built: no journey runs it.
+bin_dir=${E2E_BIN_DIR:-$job_dir/bin}
+(
+    unset E2E_CORE_DIR
+    E2E_DEVICE_BACKEND=core sh ci/build-pinned-binaries.sh "$bin_dir"
+)
+E2E_BIN_DIR=$bin_dir
 export E2E_BIN_DIR
+test -x "$E2E_BIN_DIR/vauchi-relay"
+test -x "$E2E_BIN_DIR/vauchi-ohttp-anchor"
 test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
 
 cargo nextest run --profile ci --run-ignored default -j 1 --features tui -E "$filter"
