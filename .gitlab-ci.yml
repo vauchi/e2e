@@ -748,6 +748,7 @@ test:tui-journey:
           - ".config/**/*"
           - "ci/pins.env"
           - "ci/build-pinned-binaries.sh"
+          - "ci/tui-journey.sh"
           - "ci/point-core-at.sh"
           - "ci/check-core-pin.sh"
           - "ci/check-previous-core-pin.sh"
@@ -755,65 +756,13 @@ test:tui-journey:
           - "tests/it/cross_platform.rs"
   allow_failure: false
   script:
-    - |
-      # Build the TUI in a job-private directory and hand the harness the
-      # binary path. On a shell runner the tui project's own job workspace
-      # is `../tui` of this checkout, so a sibling clone there deleted a
-      # concurrent tui job's build tree and vice versa (allyson,
-      # 2026-09-12: tui build:release lost its rlib, this job lost an
-      # object file, minutes apart). `find_tui_binary()` honours
-      # VAUCHI_TUI_BIN before any sibling guess.
-      sh ci/fetch-features.sh "${VAUCHI_FEATURES_REF:-main}" .feature-specs
-      export VAUCHI_FEATURES_DIR="$(pwd)/.feature-specs"
-      JOB_DIR="${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
-      TUI_DIR="$JOB_DIR/tui"
-      rm -rf "$JOB_DIR"
-      git clone --depth=20 --branch main \
-        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/tui.git" "$TUI_DIR"
-      git -C "$TUI_DIR" log --oneline -1
-      # tui embeds themes/generated/tokens_ansi.json from a sibling checkout
-      # (tui/src/theme.rs), so the sibling has to exist beside the clone.
-      git clone --depth=1 --branch main \
-        "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/themes.git" "$JOB_DIR/themes"
-      # themes/generated/ is not committed: the generator writes it beside
-      # itself (same step as the shared .clone-themes recipe), and a missing
-      # file must fail here, not as a rustc include error later.
-      python3 "$JOB_DIR/themes/scripts/generate.py"
-      test -f "$JOB_DIR/themes/generated/tokens_ansi.json"
-      cargo build --release --manifest-path "$TUI_DIR/Cargo.toml"
-      export VAUCHI_TUI_BIN="$TUI_DIR/target/release/vauchi-tui"
-      test -x "$VAUCHI_TUI_BIN"
-
-      # The relay too, job-private for the same reason, with its test clock
-      # and the anchor ceremony CLI e2e provisions each relay's test anchor
-      # with (#288). Without this the harness fell back to the sibling
-      # ../relay workspace, another job's tree, which lacked the CLI.
-      # Both relays at the commits ci/pins.env names (vauchi/private#1032);
-      # the TUI stays at its main until its journey moves to its app.
-      . ci/pins.env
-      git init -q "$JOB_DIR/relay"
-      git -C "$JOB_DIR/relay" fetch --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/relay.git" "$RELAY_SHA"
-      git -C "$JOB_DIR/relay" checkout -q FETCH_HEAD
-      git -C "$JOB_DIR/relay" log --oneline -1
-      cargo build --release --features e2e-test-clock --manifest-path "$JOB_DIR/relay/Cargo.toml"
-      mkdir -p "$JOB_DIR/bin"
-      cp "$JOB_DIR/relay/target/release/vauchi-relay" "$JOB_DIR/relay/target/release/vauchi-ohttp-anchor" "$JOB_DIR/bin/"
-
-      # The orchestrator routes through an OHTTP relay by default; without
-      # this binary it fell back to the sibling ../ohttp-relay tree and
-      # failed once that tree was gone (private#755).
-      git init -q "$JOB_DIR/ohttp-relay"
-      git -C "$JOB_DIR/ohttp-relay" fetch --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/ohttp-relay.git" "$OHTTP_RELAY_SHA"
-      git -C "$JOB_DIR/ohttp-relay" checkout -q FETCH_HEAD
-      git -C "$JOB_DIR/ohttp-relay" log --oneline -1
-      cargo build --release --manifest-path "$JOB_DIR/ohttp-relay/Cargo.toml"
-      cp "$JOB_DIR/ohttp-relay/target/release/vauchi-ohttp-relay" "$JOB_DIR/bin/"
-      export E2E_BIN_DIR="$JOB_DIR/bin"
-      test -x "$E2E_BIN_DIR/vauchi-ohttp-relay"
-
-      cargo nextest run --profile ci --run-ignored default -j 1 --features tui \
-        -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/cross_platform::integration_tui_to_tui_device_link/) + test(/screen_snapshot/) + test(/device::tui_pty::tests::/)' \
-        2>&1 | tee tui-journey-results.txt
+    # The script builds the TUI and both relays in a job-private directory
+    # and runs the journeys; Core's merge requests run the same script
+    # against their own Core (ci/tui-journey.sh, vauchi/private#1297).
+    - >-
+      sh ci/tui-journey.sh "${TMPDIR:-/tmp}/tui-journey-${CI_JOB_ID}"
+      -E 'test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/cross_platform::integration_tui_to_tui_device_link/) + test(/screen_snapshot/) + test(/device::tui_pty::tests::/)'
+      2>&1 | tee tui-journey-results.txt
   after_script:
     # Persistent shell runners keep the workspace between jobs; the
     # job-private clone would otherwise accumulate one tree per job id.
