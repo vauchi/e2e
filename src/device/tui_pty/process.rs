@@ -76,11 +76,39 @@ impl TerminalProcess {
             Err(RecvTimeoutError::Disconnected) => Ok(Some(Vec::new())),
         }
     }
+
+    /// Whether the child exited within `timeout`. Its output is read
+    /// meanwhile: a child cannot finish exiting while its terminal output
+    /// is undrained, and a blocking `wait` on one held a journey for its
+    /// whole 15-minute test timeout (vauchi/private#1297).
+    fn exits_within(&mut self, timeout: Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            while self.output.try_recv().is_ok() {}
+            if !matches!(self.child.try_wait(), Ok(None)) {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
 }
+
+const EXIT_GRACE: Duration = Duration::from_secs(5);
 
 impl Drop for TerminalProcess {
     fn drop(&mut self) {
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        if self.exits_within(EXIT_GRACE) {
+            return;
+        }
+        if let Some(pid) = self.child.process_id() {
+            let _ = std::process::Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .status();
+        }
+        let _ = self.exits_within(EXIT_GRACE);
     }
 }

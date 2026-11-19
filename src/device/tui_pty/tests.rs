@@ -238,3 +238,33 @@ fn exchange_completion_waits_use_the_frame_not_the_stream() {
         );
     }
 }
+
+// A journey that failed on a faulted Core held its test for the whole
+// 15-minute timeout and its own error stayed unseen: the drop waited on a
+// TUI that could not finish exiting while nothing read its output
+// (vauchi/private#1297).
+// @internal
+#[test]
+fn dropping_a_terminal_that_keeps_writing_still_ends_its_child() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("keeps-writing.sh");
+    std::fs::write(
+        &program,
+        "#!/bin/bash\ntrap '' HUP\nprintf 'PID=%s\\n' \"$$\"\nwhile :; do printf '%4096s' ''; done\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+    let pid = terminal.expect("PID=[0-9]+").unwrap();
+    let pid = pid.strip_prefix("PID=").unwrap().to_string();
+
+    drop(terminal);
+
+    let status = std::process::Command::new("kill")
+        .args(["-0", &pid])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert_eq!(status.code(), Some(1), "terminal child must be gone");
+}
