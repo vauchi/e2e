@@ -585,19 +585,33 @@ impl Device for TuiDevice {
         // The welcome screen's first row is "Link this device".
         self.session.send_char('1').await?;
         self.session
-            .wait_for_visible("Scan QR Code", Duration::from_secs(10))
+            .wait_for_visible("Scan QR Code|Paste QR data", Duration::from_secs(10))
             .await?;
-        // A terminal answers the scan request with a paste prompt; what is
-        // pasted reaches Core as the scanned QR.
-        self.session.activate_primary().await?;
-        self.session
-            .wait_for_visible("Paste QR data", Duration::from_secs(10))
-            .await?;
+        // Core since vauchi/private#1233 puts a paste field on this screen
+        // when the device has no camera. An older Core shows the scan alone,
+        // and the old terminal answers it with a paste prompt of its own.
+        let pastes_on_the_screen = self
+            .session
+            .read_screen_snapshot()
+            .await?
+            .contains("Paste QR data");
+        if !pastes_on_the_screen {
+            self.session.activate_primary().await?;
+            self.session
+                .wait_for_visible("Paste QR data", Duration::from_secs(10))
+                .await?;
+        }
         self.session.send_text(qr_data).await?;
         // Same pause as the exchange paste: Return before every character is
         // applied lands on a half-filled prompt.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        self.session.send_enter().await?;
+        if pastes_on_the_screen {
+            // Tab leaves the field so Return reaches Submit.
+            self.session.send_tab().await?;
+            self.session.activate_primary().await?;
+        } else {
+            self.session.send_enter().await?;
+        }
         self.session
             .wait_for_visible("Name for this device", Duration::from_secs(15))
             .await?;
