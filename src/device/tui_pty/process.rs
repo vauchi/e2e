@@ -32,7 +32,8 @@ impl TerminalProcess {
         let writer = pair.master.take_writer()?;
         let mut command = CommandBuilder::new(binary);
         command.env("TERM", "xterm-256color");
-        command.env("VAUCHI_DATA_DIR", data_dir);
+        // linux-app keeps its data in `$XDG_DATA_HOME/vauchi`.
+        command.env("XDG_DATA_HOME", data_dir);
         command.env("VAUCHI_RELAY_URL", relay_url);
         for (key, value) in extra_env {
             command.env(key, value);

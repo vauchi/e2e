@@ -460,7 +460,7 @@ impl Device for TuiDevice {
 
     async fn has_identity(&self) -> bool {
         // The TUI persists identity data in a SQLite database.
-        let identity_path = self.data_dir.path().join("vauchi.db");
+        let identity_path = self.data_dir.path().join("vauchi/vauchi.db");
         identity_path.exists()
     }
 

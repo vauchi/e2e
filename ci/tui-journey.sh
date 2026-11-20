@@ -3,19 +3,20 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The TUI journeys: e2e drives `vauchi-tui`, a binary that runs the app
-# engine, against real relays. It is the one lane that failed when the sync
-# call was removed from the engine (vauchi/private#1297, ADR-082 item 3).
+# The TUI journeys: e2e drives `vauchi-tui`, the binary linux-app builds
+# and users install (ADR-082 decision 10), against real relays. It is the
+# one lane that failed when the sync call was removed from the engine
+# (vauchi/private#1297, ADR-082 item 3).
 #
-# The TUI is built in a job-private directory. On a shell runner the tui
-# project's own job workspace is `../tui` of this checkout, so a sibling
-# clone there deleted a concurrent tui job's build tree and vice versa
-# (allyson, 2026-09-12). The relays are never taken from a sibling checkout
-# for the same reason.
+# The TUI is built in a job-private directory. On a shell runner another
+# project's job workspace is a sibling of this checkout, so a sibling clone
+# of tui deleted a concurrent tui job's build tree and vice versa (allyson,
+# 2026-09-12). The relays are never taken from a sibling checkout for the
+# same reason.
 #
 # With E2E_CORE_DIR the TUI is built against that Core checkout instead of
-# the tag tui pins: Core's merge requests run the engine under review, not
-# the last released one.
+# the tag linux-app pins: Core's merge requests run the engine under
+# review, not the last released one.
 #
 # Usage: ci/tui-journey.sh <job-dir> -E <nextest filter>
 # Env:   E2E_CORE_DIR   a Core checkout to build the TUI against
@@ -46,20 +47,17 @@ export VAUCHI_FEATURES_DIR
 rm -rf "$job_dir"
 mkdir -p "$job_dir"
 
-# The TUI stays at its main until its journey moves to its app.
-git clone --depth=20 --branch main "$origin/tui.git" "$job_dir/tui"
-git -C "$job_dir/tui" log --oneline -1
-# tui embeds themes/generated/tokens_ansi.json from a sibling checkout
-# (tui/src/theme.rs). themes/generated/ is not committed: the generator
-# writes it, and a missing file must fail here, not as a rustc include error.
-git clone --depth=1 --branch main "$origin/themes.git" "$job_dir/themes"
-python3 "$job_dir/themes/scripts/generate.py"
-test -f "$job_dir/themes/generated/tokens_ansi.json"
+# linux-app's main, not a release: a release that broke the journeys would
+# otherwise show here only after it shipped.
+git clone --depth=20 --branch main "$origin/linux-app.git" "$job_dir/linux-app"
+git -C "$job_dir/linux-app" log --oneline -1
 if [ -n "${E2E_CORE_DIR:-}" ]; then
-    sh ci/point-core-at.sh "$E2E_CORE_DIR" "$job_dir/tui/Cargo.toml"
+    sh ci/point-core-at.sh "$E2E_CORE_DIR" "$job_dir/linux-app/Cargo.toml"
 fi
-cargo build --release --manifest-path "$job_dir/tui/Cargo.toml"
-VAUCHI_TUI_BIN="$job_dir/tui/target/release/vauchi-tui"
+# Only the TUI pairing: the default feature builds GTK.
+cargo build --release --manifest-path "$job_dir/linux-app/Cargo.toml" \
+    --no-default-features --features tui --bin vauchi-tui
+VAUCHI_TUI_BIN="$job_dir/linux-app/target/release/vauchi-tui"
 export VAUCHI_TUI_BIN
 test -x "$VAUCHI_TUI_BIN"
 
