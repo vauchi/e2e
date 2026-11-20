@@ -584,17 +584,17 @@ impl Device for TuiDevice {
             .await?;
         // The welcome screen's first row is "Link this device".
         self.session.send_char('1').await?;
-        self.session
-            .wait_for_visible("Scan QR Code|Paste QR data", Duration::from_secs(10))
-            .await?;
         // Core since vauchi/private#1233 puts a paste field on this screen
         // when the device has no camera. An older Core shows the scan alone,
         // and the old terminal answers it with a paste prompt of its own.
+        // The retained frame is read, not the stream: the field's text
+        // shares cells with the screen before it, and unchanged cells are
+        // not redrawn (core job 18227499095 saw "Pa te QR data here").
         let pastes_on_the_screen = self
             .session
-            .read_screen_snapshot()
+            .wait_for_frame("Paste QR data|Scan QR Code", Duration::from_secs(10))
             .await?
-            .contains("Paste QR data");
+            == "Paste QR data";
         if !pastes_on_the_screen {
             self.session.activate_primary().await?;
             self.session
