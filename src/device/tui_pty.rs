@@ -79,16 +79,12 @@ impl PtySession {
             }
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
-                return Err(E2eError::device(format!(
-                    "Pattern '{pattern}' not found: timeout"
-                )));
+                return Err(self.timed_out(pattern));
             }
             match self.receive(remaining) {
                 Ok(true) => {}
                 Ok(false) => {
-                    return Err(E2eError::device(format!(
-                        "Pattern '{pattern}' not found: timeout"
-                    )));
+                    return Err(self.timed_out(pattern));
                 }
                 Err(error) => {
                     return Err(E2eError::device(format!(
@@ -97,6 +93,19 @@ impl PtySession {
                 }
             }
         }
+    }
+
+    /// A timeout names the screen the TUI stopped on: "not found" alone
+    /// does not say whether it is the screen before, an alert or an error.
+    /// The retained screen gets the output no pattern has matched yet.
+    fn timed_out(&self, pattern: &str) -> E2eError {
+        let mut shown = vt100::Parser::new(40, 160, 0);
+        shown.process(&self.screen.screen().contents_formatted());
+        shown.process(&self.pending);
+        E2eError::device(format!(
+            "Pattern '{pattern}' not found: timeout; the screen shows:\n{}",
+            shown.screen().contents()
+        ))
     }
 
     /// Read the visible screen without relying on a new full redraw.

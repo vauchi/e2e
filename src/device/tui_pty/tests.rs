@@ -268,3 +268,36 @@ fn dropping_a_terminal_that_keeps_writing_still_ends_its_child() {
         .unwrap();
     assert_eq!(status.code(), Some(1), "terminal child must be gone");
 }
+
+// @internal
+#[test]
+fn a_timeout_names_the_screen_the_terminal_stopped_on() {
+    let directory = tempfile::tempdir().unwrap();
+    let program = directory.path().join("two-screens.sh");
+    std::fs::write(
+        &program,
+        r#"#!/bin/bash
+stty -echo
+printf '\033[2J\033[HWelcome\033[2;1HFirst'
+IFS= read -r _
+printf '\033[2;1HSecond'
+sleep 30
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut terminal =
+        PtySession::new(&program, directory.path(), "unused", &HashMap::new()).unwrap();
+    terminal.expect("First").unwrap();
+    terminal.send_text("\n").unwrap();
+
+    let error = terminal
+        .expect_with_timeout("Third", std::time::Duration::from_secs(2))
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        error.contains("Pattern 'Third' not found: timeout; the screen shows:\nWelcome\nSecond"),
+        "{error}"
+    );
+}
