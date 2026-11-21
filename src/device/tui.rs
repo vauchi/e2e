@@ -713,9 +713,9 @@ impl Device for TuiDevice {
                 break;
             }
             if std::time::Instant::now() >= deadline {
-                return Err(E2eError::device(
-                    "the sync chip showed no outcome within 10 s",
-                ));
+                return Err(E2eError::device(format!(
+                    "the sync chip showed no outcome within 10 s; frame:\n{frame}"
+                )));
             }
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
