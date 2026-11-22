@@ -83,6 +83,16 @@ git -C "$t/remote.git" rev-parse -q --verify refs/heads/chore/update-pins >/dev/
 [ "$(git -C "$t/remote.git" log -1 --format=%ae chore/update-pins)" = bot@example.invalid ] || fail "the commit must be the bot user's"
 [ "$(grep -c '^POST .*merge_requests' "$t/log")" -eq 1 ] || fail "a moved pin must open exactly one MR"
 
+# A shell runner keeps its checkout: the branch of an earlier run is still
+# there, at an older commit, when the remote has none (private#1341).
+setup 0
+git_q -C "$t/work" branch chore/update-pins
+git_q -C "$t/work" commit -q --allow-empty -m "main moved on"
+run
+[ "$rc" = 0 ] || fail "a leftover local branch must not fail the job, got $rc: $(cat "$t/out")"
+[ "$(git -C "$t/remote.git" show chore/update-pins:ci/pins.env | grep RELAY_SHA)" = RELAY_SHA=new ] || fail "with a leftover local branch the moved pin must still be pushed"
+[ "$(git -C "$t/remote.git" rev-parse chore/update-pins~1)" = "$(git -C "$t/work" rev-parse main)" ] || fail "the pushed branch must start from the checked-out commit, not the leftover branch"
+
 setup 0
 git_q -C "$t/src" push -q "$t/remote.git" HEAD:refs/heads/chore/update-pins
 # The fake curl prints this JSON as the open-MR lookup's body.
