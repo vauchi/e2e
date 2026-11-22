@@ -47,7 +47,12 @@ include:
 # aligned with the shared Rust workflow.
 workflow:
   rules:
+    # The nightly is a signal: every lane runs to its end, and one red job
+    # (the pins bot, for nine nights) does not cancel the others
+    # (vauchi/private#1341). MR pipelines keep rust-base.yml's fail-fast.
     - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_KIND == "e2e"
+      auto_cancel:
+        on_job_failure: none
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
