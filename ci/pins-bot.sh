@@ -77,7 +77,9 @@ name=$(field name)
 email=$(field commit_email)
 [ -n "$email" ] || email=$(field email)
 
-git checkout -q -b "$branch"
+# -B: a shell runner keeps its checkout, and with it the branch of an
+# earlier run (vauchi/private#1341).
+git checkout -q -B "$branch"
 git -c user.name="$name" -c user.email="$email" commit -q -a \
     -m "chore: the pinned set follows green component mains" \
     -m "Opened by e2e's pins bot (ci/pins-bot.sh, vauchi/private#1034):" \
