@@ -24,7 +24,7 @@ setup() { # update-pins exit code
     mkdir -p "$t/src/ci"
     cp "$here/ci/pins-bot.sh" "$t/src/ci/"
     printf 'CORE_TAG=v1\nRELAY_SHA=old\n' > "$t/src/ci/pins.env"
-    printf '#!/bin/sh\n[ "%s" = 2 ] && exit 2\nsed -i s/RELAY_SHA=old/RELAY_SHA=new/ ci/pins.env\necho "relay: moved old -> new"\n' "$1" \
+    printf '#!/bin/sh\n[ "%s" = 2 ] && exit 2\nsed s/RELAY_SHA=old/RELAY_SHA=new/ ci/pins.env > ci/pins.env.new\nmv ci/pins.env.new ci/pins.env\necho "relay: moved old -> new"\n' "$1" \
         > "$t/src/ci/update-pins.sh"
     echo lock > "$t/src/Cargo.lock"
     git_q init -q "$t/src"
