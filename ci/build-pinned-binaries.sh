@@ -49,7 +49,7 @@ case "$mode" in
         head_of() { git ls-remote --heads "$gitlab/$1.git" main | cut -f1; }
         RELAY_SHA=$(head_of relay)
         OHTTP_RELAY_SHA=$(head_of ohttp-relay)
-        CLI_SHA=$(head_of cli)
+        CLI_SHA=$(head_of cli-display)
         for sha in "$RELAY_SHA" "$OHTTP_RELAY_SHA" "$CLI_SHA"; do
             [ -n "$sha" ] || { echo "FAIL: could not resolve a main head" >&2; exit 1; }
         done
@@ -143,7 +143,7 @@ elif cached cli "$CLI_SHA" "$CLI_BUILD_PROFILE" vauchi &&
     echo "CLI cached at $CLI_SHA"
 else
     echo "Building the e2e CLI at $CLI_SHA..."
-    fetch_at cli "$CLI_SHA" "$work/cli"
+    fetch_at cli-display "$CLI_SHA" "$work/cli"
     use_core "$work/cli"
     cargo build --features e2e-test-clock --manifest-path "$work/cli/Cargo.toml"
     cp "$work/cli/target/debug/vauchi" "$bin_dir/"
@@ -167,7 +167,7 @@ elif [ -f "$previous_dir/vauchi.sha" ] &&
     echo "Previous CLI cached at $PREVIOUS_CLI_SHA"
 else
     echo "Building the previous CLI at $PREVIOUS_CLI_SHA..."
-    fetch_at cli "$PREVIOUS_CLI_SHA" "$work/previous-cli"
+    fetch_at cli-display "$PREVIOUS_CLI_SHA" "$work/previous-cli"
     sh "$here/check-previous-core-pin.sh" "$work/previous-cli/Cargo.toml" "$CORE_TAG"
     cargo build --features e2e-test-clock --manifest-path "$work/previous-cli/Cargo.toml"
     mkdir -p "$previous_dir"

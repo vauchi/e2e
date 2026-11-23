@@ -120,7 +120,7 @@ def main():
         require(tag.get("protected") is True and isinstance(core_commit, str) and SHA.fullmatch(core_commit), "Core tag lacks protected release authority")
         require(core_tags.setdefault(selected_pins["CORE_TAG"], core_commit) == core_commit, "Core release tag moved during validation")
         trusted_pins = pins(trusted["ci/pins.env"])
-        for repo, key in (("relay", "RELAY_SHA"), ("cli", "CLI_SHA"), ("ohttp-relay", "OHTTP_RELAY_SHA")):
+        for repo, key in (("relay", "RELAY_SHA"), ("cli-display", "CLI_SHA"), ("ohttp-relay", "OHTTP_RELAY_SHA")):
             if selected_pins[key] != trusted_pins[key]:
                 runs = client.request("/projects/vauchi%2F" + repo + "/pipelines?" + urlencode({"ref": "main", "sha": selected_pins[key], "per_page": 1}))
                 require(isinstance(runs, list) and runs and runs[0].get("status") == "success", "component revision lacks successful main validation")
@@ -141,7 +141,7 @@ def main():
         environment["CARGO_HOME"] = str(root / "cargo-home")
         selected_pins = pins(source["ci/pins.env"])
         moves = []
-        for repo, key, core_pinned in (("relay", "RELAY_SHA", True), ("cli", "CLI_SHA", True), ("ohttp-relay", "OHTTP_RELAY_SHA", False)):
+        for repo, key, core_pinned in (("relay", "RELAY_SHA", True), ("cli-display", "CLI_SHA", True), ("ohttp-relay", "OHTTP_RELAY_SHA", False)):
             component = "/projects/vauchi%2F" + repo
             main = client.request(component + "/repository/branches/main")
             head = main.get("commit", {}).get("id")
@@ -175,7 +175,7 @@ def main():
         if not moves:
             print("cohort: component mains are not ready; nothing published")
             return
-        for repo, key in (("relay", "RELAY_SHA"), ("cli", "CLI_SHA")):
+        for repo, key in (("relay", "RELAY_SHA"), ("cli-display", "CLI_SHA")):
             response = client.request("/projects/vauchi%2F" + repo + "/repository/files/Cargo.toml?" + urlencode({"ref": selected_pins[key]}))
             require(response.get("file_path") == "Cargo.toml" and response.get("encoding") == "base64", "invalid cohort manifest response")
             if not component_matches_core(base64.b64decode(response["content"], validate=True), selected_pins["CORE_TAG"]):

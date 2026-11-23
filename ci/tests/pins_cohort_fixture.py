@@ -100,9 +100,9 @@ class CohortFixture:
         self.on_recheck = None
         self.pipeline_status = "running" if waiting else "success"
         self.pipeline_http_status = 200
-        self.heads = {"relay": OLD if cli_only else NEW, "cli": NEW if cli_only else OLD, "ohttp-relay": OLD}
+        self.heads = {"relay": OLD if cli_only else NEW, "cli-display": NEW if cli_only else OLD, "ohttp-relay": OLD}
         self.pipeline_authentication = []
-        self.component_tags = {"relay": "v0.106.1", "cli": "v0.106.1", "ohttp-relay": "v0.106.1"}
+        self.component_tags = {"relay": "v0.106.1", "cli-display": "v0.106.1", "ohttp-relay": "v0.106.1"}
         self.core_protected = True
         self.core_tag_commits = [CORE]
         self.core_tag_reads = 0

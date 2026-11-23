@@ -112,7 +112,7 @@ class CohortTests(unittest.TestCase):
     def test_cli_ready_alone_waits_for_the_relay_core_bump(self):
         fixture = self.fixture(cli_only=True)
         self.bump_core(fixture)
-        fixture.component_tags["cli"] = "v0.106.2"
+        fixture.component_tags["cli-display"] = "v0.106.2"
         before = fixture.head()
         self.succeeds(fixture.run())
         self.assertEqual(fixture.head(), before)
@@ -122,8 +122,8 @@ class CohortTests(unittest.TestCase):
     def test_compatible_component_mains_complete_the_core_bump(self):
         fixture = self.fixture()
         self.bump_core(fixture)
-        fixture.heads["cli"] = NEW
-        fixture.component_tags.update(relay="v0.106.2", cli="v0.106.2")
+        fixture.heads["cli-display"] = NEW
+        fixture.component_tags.update({"relay": "v0.106.2", "cli-display": "v0.106.2"})
         self.succeeds(fixture.run())
         self.assertIn("CORE_TAG=v0.106.2", fixture.read("ci/pins.env"))
         self.assertIn("tag=v0.106.2", fixture.read("Cargo.lock"))
