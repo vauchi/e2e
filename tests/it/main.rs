@@ -31,6 +31,7 @@ mod action_family_oracles;
 mod backup_restore;
 mod cli_link_exchange;
 mod cli_signed_ohttp_key;
+mod cohort_transport;
 mod contact_actions;
 mod cross_platform;
 mod delivery_pipeline;

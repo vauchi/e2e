@@ -205,6 +205,9 @@ pub struct RelayConfig {
     /// Optional relay-specific tracing filter for observer scenarios.
     /// When unset, the manager inherits `RUST_LOG` from its parent.
     pub log_filter: Option<String>,
+    /// `RELAY_COHORT_STORE`: mailbox cohorts (ADR-081, proposed) are off
+    /// unless a test names a store (vauchi/private#1281).
+    pub cohort_store: Option<String>,
 }
 
 impl Default for RelayConfig {
@@ -227,6 +230,7 @@ impl Default for RelayConfig {
             version_changed_at_secs: None,
             ohttp_key_file_path: None,
             log_filter: None,
+            cohort_store: None,
         }
     }
 }
@@ -391,6 +395,9 @@ impl RelayManager {
         // Enable HTTP API v2 and OHTTP gateway when configured (defaults to true).
         if self.config.http_api_enabled {
             env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        }
+        if let Some(store) = &self.config.cohort_store {
+            env_vars.insert("RELAY_COHORT_STORE".to_string(), store.clone());
         }
         if self.config.ohttp_enabled {
             env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
@@ -683,6 +690,9 @@ impl RelayManager {
         );
         if self.config.http_api_enabled {
             env_vars.insert("RELAY_HTTP_API_ENABLED".to_string(), "true".to_string());
+        }
+        if let Some(store) = &self.config.cohort_store {
+            env_vars.insert("RELAY_COHORT_STORE".to_string(), store.clone());
         }
         if self.config.ohttp_enabled {
             env_vars.insert("RELAY_OHTTP_ENABLED".to_string(), "true".to_string());
