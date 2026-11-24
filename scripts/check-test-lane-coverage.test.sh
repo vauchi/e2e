@@ -19,6 +19,8 @@ fails=0
 # test: filter "ALL" selects A,B,C; filter "NARROW" selects A,B only.
 cat >"$WORK/lister.sh" <<'LISTER'
 #!/bin/sh
+# An empty listing stands for a crate that did not build.
+[ -n "${LISTER_EMPTY:-}" ] && exit 0
 case "$1" in
 	"kind(test)") printf 'A\nB\nC\n' ;;
 	NARROW)       printf 'A\nB\n' ;;
@@ -30,6 +32,7 @@ chmod +x "$WORK/lister.sh"
 run_guard() { # $1=filter-content $2=allowlist-content
 	printf '%s\n' "$1" >"$WORK/filter"
 	printf '%s\n' "$2" >"$WORK/allow"
+	LISTER_EMPTY="${LISTER_EMPTY:-}" \
 	LANE_LIST_CMD="$WORK/lister.sh" \
 	LANE_FILTER_FILE="$WORK/filter" \
 	LANE_ALLOWLIST_FILE="$WORK/allow" \
@@ -64,6 +67,12 @@ check "allowlisted C tolerates narrow filter -> exit 0" 0 "$rc"
 # 4. Allowlist comments/blanks ignored; C still uncovered -> fail.
 set +e; run_guard 'NARROW' '# C is fine'; rc=$?; set -e
 check "commented allowlist does not cover C -> exit 1" 1 "$rc"
+
+# 5. Nothing listed (the crate did not build) -> fail, not "all 0 covered".
+# e2e!348's pipeline passed this check with 0 tests while the crate failed
+# to compile (private#1281).
+set +e; LISTER_EMPTY=1 run_guard 'kind(test)' ''; rc=$?; set -e
+check "an empty test listing fails -> exit 1" 1 "$rc"
 
 if [ "$fails" -eq 0 ]; then
 	echo "All sentinel cases passed."
