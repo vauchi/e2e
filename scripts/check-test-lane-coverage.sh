@@ -51,6 +51,13 @@ sort -u "$TMP/selected" "$TMP/allow" >"$TMP/covered"
 awk 'NR==FNR { c[$0]=1; next } !($0 in c)' "$TMP/covered" "$TMP/universe" >"$TMP/uncovered"
 
 universe_n=$(grep -c . "$TMP/universe" || true)
+# A listing with no test means the crate did not build (the lister's
+# errors are discarded), not that everything is covered (private#1281).
+if [ "$universe_n" -eq 0 ]; then
+	echo "ERROR: no ${SUITE} test was listed; does the crate build?" >&2
+	echo "Run: cargo nextest list --profile ci" >&2
+	exit 1
+fi
 
 if [ -s "$TMP/uncovered" ]; then
 	echo "ERROR: ${SUITE} tests selected by no CI lane:" >&2
