@@ -100,7 +100,7 @@ vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.109.0", ve
 toml = "0.9"
 
 # At RELAY_SHA in ci/pins.env, the commit the relay binary is built from.
-vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "05283eede16ff8700edae42e60b1412fe57e84b1" }
+vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "04460cd242ca7beffad0c42d1f10c734cde79c38" }
 
 # Signed OHTTP key records (#288): decoded in the e2e signed-key tests,
 # pinned to the Core tag above like vauchi-core.
