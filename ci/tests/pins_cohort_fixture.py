@@ -104,6 +104,9 @@ class CohortFixture:
         self.pipeline_authentication = []
         self.component_tags = {"relay": "v0.106.1", "cli-display": "v0.106.1", "ohttp-relay": "v0.106.1"}
         self.core_protected = True
+        self.core_lock = 'version=4\n'
+        self.core_lock_http_status = 200
+        self.core_lock_metadata = {}
         self.core_tag_commits = [CORE]
         self.core_tag_reads = 0
         self.component_extra = {}
@@ -184,6 +187,11 @@ class CohortFixture:
             return 200, [mr] if self.open else []
         if path == prefix + "/merge_requests/7":
             return 200, mr
+        if path == "/projects/vauchi/core/repository/files/Cargo.lock":
+            if query.get("ref") != [self.core_tag_commits[0]]:
+                return 404, {}
+            return self.core_lock_http_status, {"file_path": "Cargo.lock", "encoding": "base64",
+                         "content": base64.b64encode(self.core_lock.encode()).decode(), **self.core_lock_metadata}
         for repo, head in self.heads.items():
             if path == f"/projects/vauchi/{repo}/repository/branches/main":
                 return 200, {"name": "main", "protected": self.component_main_protected, "commit": {"id": head}}

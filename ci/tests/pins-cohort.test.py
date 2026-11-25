@@ -137,6 +137,64 @@ class CohortTests(unittest.TestCase):
         self.assertFalse(fixture.cargo_log.exists())
         self.assertEqual(fixture.posts, [])
 
+    def release_dependency(self, fixture):
+        self.bump_core(fixture)
+        fixture.heads["cli-display"] = NEW
+        fixture.component_tags.update({"relay": "v0.106.2", "cli-display": "v0.106.2"})
+        package = ('[[package]]\nname="vauchi-contract"\nversion="0.101.0"\n'
+                   'source="git+https://gitlab.com/vauchi/contract.git?tag=v0.101.0#' + "d" * 40 + '"\n')
+        fixture.change({"Cargo.lock": fixture.read("Cargo.lock") + "\n" + package})
+        return package
+
+    def test_new_git_dependency_is_admitted_from_the_protected_core_release(self):
+        fixture = self.fixture()
+        package = self.release_dependency(fixture)
+        fixture.core_lock += package
+        self.succeeds(fixture.run())
+        self.assertIn(package.strip(), fixture.read("Cargo.lock"))
+        self.assertIn(f"RELAY_SHA={NEW}", fixture.read("ci/pins.env"))
+
+    def test_new_git_dependency_absent_from_the_core_release_is_rejected(self):
+        fixture = self.fixture()
+        self.release_dependency(fixture)
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("untrusted lockfile source", result.stderr)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_release_git_source_cannot_authorize_an_unreleased_package(self):
+        for original, replacement in (('name="vauchi-contract"', 'name="another-package"'),
+                                      ('version="0.101.0"', 'version="0.102.0"')):
+            with self.subTest(replacement=replacement):
+                fixture = self.fixture()
+                package = self.release_dependency(fixture)
+                fixture.core_lock += package.replace(original, replacement)
+                result = fixture.run()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("untrusted lockfile source", result.stderr)
+                self.assertFalse(fixture.cargo_log.exists())
+                self.assertEqual(fixture.posts, [])
+
+    def test_unavailable_release_lockfile_cannot_publish(self):
+        fixture = self.fixture()
+        fixture.core_lock_http_status = 403
+        result = fixture.run()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("HTTP 403", result.stderr)
+        self.assertFalse(fixture.cargo_log.exists())
+        self.assertEqual(fixture.posts, [])
+
+    def test_malformed_release_file_metadata_cannot_publish(self):
+        for metadata in ({"file_path": "other"}, {"encoding": "text"}, {"content": "!!!"}):
+            with self.subTest(metadata=metadata):
+                fixture = self.fixture()
+                fixture.core_lock_metadata = metadata
+                result = fixture.run()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(fixture.cargo_log.exists())
+                self.assertEqual(fixture.posts, [])
+
     def test_core_tag_cannot_move_during_resolution(self):
         fixture = self.fixture()
         fixture.core_tag_commits = ["c" * 40, "d" * 40]

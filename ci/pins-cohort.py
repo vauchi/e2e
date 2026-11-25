@@ -112,6 +112,7 @@ def main():
         metadata[name] = last
 
     core_tags = {}
+    core_locks = {}
 
     def validate_set(files, transitional=False):
         selected_pins = pins(files["ci/pins.env"])
@@ -119,12 +120,19 @@ def main():
         core_commit = tag.get("commit", {}).get("id")
         require(tag.get("protected") is True and isinstance(core_commit, str) and SHA.fullmatch(core_commit), "Core tag lacks protected release authority")
         require(core_tags.setdefault(selected_pins["CORE_TAG"], core_commit) == core_commit, "Core release tag moved during validation")
+        # Only the protected release can authorize new transitive Git sources.
+        if core_commit not in core_locks:
+            response = client.request("/projects/vauchi%2Fcore/repository/files/Cargo.lock?" + urlencode({"ref": core_commit}))
+            require(response.get("file_path") == "Cargo.lock" and response.get("encoding") == "base64", "invalid Core release lockfile response")
+            release_lock = base64.b64decode(response["content"], validate=True)
+            require(len(release_lock) <= LIMIT, "Core release lockfile exceeds size limit")
+            core_locks[core_commit] = release_lock
         trusted_pins = pins(trusted["ci/pins.env"])
         for repo, key in (("relay", "RELAY_SHA"), ("cli-display", "CLI_SHA"), ("ohttp-relay", "OHTTP_RELAY_SHA")):
             if selected_pins[key] != trusted_pins[key]:
                 runs = client.request("/projects/vauchi%2F" + repo + "/pipelines?" + urlencode({"ref": "main", "sha": selected_pins[key], "per_page": 1}))
                 require(isinstance(runs, list) and runs and runs[0].get("status") == "success", "component revision lacks successful main validation")
-        validate(files, trusted, selected_pins, core_commit, transitional)
+        validate(files, trusted, selected_pins, core_commit, transitional, core_locks[core_commit])
 
     validate_set(source, transitional=True)
     with tempfile.TemporaryDirectory(prefix="pins-cohort-") as temporary:

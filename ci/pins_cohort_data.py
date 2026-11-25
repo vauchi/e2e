@@ -82,7 +82,7 @@ def component_matches_core(data, tag):
                                  and entry.get("version") == "=" + tag[1:] for _, entry in entries)
 
 
-def lock(data, trusted, selected, core_commit, transitional=False):
+def lock(data, trusted, selected, core_commit, transitional=False, release_lock=None):
     actual = tomllib.loads(data.decode("utf-8"))
     baseline = tomllib.loads(trusted.decode("utf-8"))
     require(set(actual) == {"version", "package"} and actual["version"] == baseline["version"], "unsupported lockfile structure")
@@ -95,6 +95,10 @@ def lock(data, trusted, selected, core_commit, transitional=False):
     allowed_sources.update((core_source, relay_source))
     if transitional:
         allowed_sources.update(p["source"] for p in baseline_packages if "source" in p)
+    released = tomllib.loads(release_lock.decode("utf-8")) if release_lock is not None else {}
+    released_packages = {(p["name"], p["version"], p["source"]): p.get("checksum")
+                         for p in released.get("package", []) if "source" in p}
+    dependency_sources = allowed_sources | {identity[2] for identity in released_packages}
     local = {(p["name"], p["version"]) for p in baseline_packages if "source" not in p}
     checksums = {(p["name"], p["version"], p.get("source")): p.get("checksum") for p in baseline_packages}
     seen = set()
@@ -108,7 +112,9 @@ def lock(data, trusted, selected, core_commit, transitional=False):
         if source is None:
             require(identity[:2] in local, "foreign source-less lock package")
         else:
-            require(source in allowed_sources, "untrusted lockfile source")
+            require(source in allowed_sources or identity in released_packages, "untrusted lockfile source")
+            if source not in allowed_sources:
+                require(package.get("checksum") == released_packages[identity], "changed checksum for a released package")
             if source.startswith("registry+"):
                 checksum = package.get("checksum")
                 require(isinstance(checksum, str) and re.fullmatch(r"[0-9a-f]{64}", checksum), "invalid registry checksum")
@@ -121,13 +127,13 @@ def lock(data, trusted, selected, core_commit, transitional=False):
         for value in dependencies:
             if "://" in value:
                 match = re.fullmatch(r"[^()]+ \(([^()]+)\)", value)
-                require(match is not None and match[1] in allowed_sources, "untrusted source in a lock dependency identity")
+                require(match is not None and match[1] in dependency_sources, "untrusted source in a lock dependency identity")
     return actual
 
 
-def validate(files, trusted, selected, core_commit, transitional=False):
+def validate(files, trusted, selected, core_commit, transitional=False, release_lock=None):
     document = manifest(files["Cargo.toml"], trusted["Cargo.toml"], selected)
-    resolved = lock(files["Cargo.lock"], trusted["Cargo.lock"], selected, core_commit, transitional)
+    resolved = lock(files["Cargo.lock"], trusted["Cargo.lock"], selected, core_commit, transitional, release_lock)
     if not transitional:
         expected = {name for name, _ in core_dependencies(document)}
         found = {package["name"] for package in resolved["package"]
